@@ -1,0 +1,25 @@
+{
+  "title": "Example topic: HTTP basics",
+  "subtitle": "Template showing how a topic is structured",
+  "type": "documentation",
+  "area": "web",
+  "order": 99,
+  "goals": [],
+  "reason": "",
+  "language": {
+    "source": "en",
+    "notes": "en",
+    "exams": "en"
+  },
+  "routine": {
+    "cadence": "",
+    "session": ""
+  },
+  "end_date": "",
+  "links": [
+    {
+      "title": "MDN: Overview of HTTP",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview"
+    }
+  ]
+}

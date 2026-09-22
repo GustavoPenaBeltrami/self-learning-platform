@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+<script src="viz.js"></script>
+<script src="shell.js"></script>
+<style>
+  .question { padding: var(--spacing-16) 0 var(--spacing-24); }
+  .question + .question { border-top: 1px dashed var(--line); }
+  .stem { display: flex; gap: .8rem; margin: 0 0 .7rem; }
+  .stem .num { color: var(--ansi-orange); flex: none; }
+  .option { display: flex; gap: .7rem; padding: .15rem 0 .15rem 3.4rem; cursor: pointer; }
+  .option:hover { background: var(--color-graphite); }
+  .option input { position: absolute; opacity: 0; pointer-events: none; }
+  .option .box { flex: none; color: var(--muted); }
+  .option .box::before { content: '( )'; }
+  .option input:checked + .box { color: var(--accent); }
+  .option input:checked + .box::before { content: '(•)'; }
+  .option input:checked ~ span:last-child { color: var(--ink); font-weight: 700; }
+  .option input:focus-visible + .box { outline: 1px solid var(--accent); }
+
+  .graded { display: flex; gap: .7rem; padding: .15rem 0 .15rem 3.4rem; color: var(--muted); }
+  .graded .tick { flex: none; width: 3ch; text-align: center; }
+  .graded.correct { color: var(--good); }
+  .graded.wrong-pick { color: var(--bad); }
+  .graded.wrong-pick span:last-child { text-decoration: line-through; }
+  .why { margin: .7rem 0 0 3.4rem; color: var(--muted); }
+  .why::before { content: '// '; color: var(--color-steel); }
+
+  .meter { display: flex; align-items: baseline; gap: .2rem; margin: var(--spacing-16) 0 .3rem; font-size: 16px; }
+  .meter .label { color: var(--ansi-cyan); }
+  .meter .cells { white-space: pre; color: var(--color-slate); }
+  .meter .filled { color: var(--good); }
+  .meter.bad .filled { color: var(--bad); }
+  .meter .pct { color: var(--ink); font-weight: 700; }
+
+  .answer { display: block; width: 100%; margin-top: .3rem; padding: .6rem .7rem;
+    background: var(--color-graphite); color: var(--ink); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); font: 400 var(--text-body)/1.5 var(--mono); resize: vertical; }
+  .oral { margin-top: .3rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .oral-preview { height: 2.2rem; }
+  .record.recording { color: var(--bad); animation: pulse .8s ease-in-out infinite alternate; }
+  @keyframes pulse { to { opacity: .35; } }
+  .given-answer { margin: .3rem 0 0; color: var(--ink); white-space: pre-wrap; }
+  .pending { margin: .3rem 0 0; color: var(--ansi-yellow); }
+  .pending::before { content: '// '; color: var(--color-steel); }
+</style>
+
+<body>
+<script>
+const { app, tree, tools, path, mode } = mountShell('exams');
+const statusEl = document.getElementById('status');
+const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
+const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const file = new URLSearchParams(location.search).get('f');
+const key = (k, text, extra = '') => `<button class="key ${extra}"><kbd>${k}</kbd><span>${text}</span></button>`;
+
+function buildTree(topics) {
+  tree.innerHTML = topics.map(t => {
+    const current = t.exams.some(e => e.path === file);
+    return `<details open${current ? ' class="current"' : ''}>
+      <summary title="${esc(t.title)}"><span class="name">${esc(t.slug)}/</span><span class="count">${t.exams.length}</span></summary>
+      <ul>${t.exams.map(e => `<li><a href="?f=${encodeURIComponent(e.path)}"${e.path === file ? ' aria-current="page"' : ''}
+          title="${esc(e.title)}"><span class="n">›</span><span>${esc(e.title)}</span></a></li>`).join('')
+        || '<li class="empty">(no exams)</li>'}</ul>
+    </details>`;
+  }).join('');
+}
+
+async function load() {
+  const data = await (await fetch('/api/index')).json();
+  buildTree(data.topics);
+  return data.topics;
+}
+
+async function index() {
+  let topics;
+  try {
+    topics = await load();
+  } catch {
+    app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
+      <p>Open a terminal here and run <code>npm run app</code>.</p></div>`;
+    return;
+  }
+  path('~/notes/topics/*/exams');
+  app.innerHTML = `
+    <div class="sheet">
+    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/topics</span> <span class="p-sig">❯</span> ls */exams</p>
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">EXAMS</th></tr></thead>
+      <tbody>${topics.map(l => `
+        <tr>
+          <td class="num">${l.order < 999 ? String(l.order).padStart(2, '0') : '—'}</td>
+          <td class="wide">${esc(l.title)}<br><span class="sub">${esc(l.subtitle || '')}</span></td>
+          <td class="type">${esc(l.type)}</td>
+          <td class="num${l.exams.length ? '' : ' zero'}">${l.exams.length}</td>
+        </tr>${l.exams.map(e => `
+        <tr onclick="location.search='?f=${encodeURIComponent(e.path)}'">
+          <td></td><td class="wide" colspan="3"><span class="sub">└─ </span><a href="?f=${encodeURIComponent(e.path)}">${esc(e.title)}</a></td>
+        </tr>`).join('')}`).join('')}</tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+}
+
+function header(exam, n, command) {
+  const name = file.split('/').pop();
+  return `
+    <div class="sheet">
+    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/${esc(file.split('/').slice(0, -1).join('/'))}</span> <span class="p-sig">❯</span> ${command} ${esc(name)}</p>
+    <h1>${esc(exam.title || 'Exam')}</h1>
+    <p class="minor"># ${n} questions · graded at the end</p>`;
+}
+
+function take(exam) {
+  const questions = shuffle(exam.questions);
+  document.title = exam.title || 'Exam';
+  path('~/notes/' + file);
+
+  app.innerHTML = header(exam, questions.length, 'exam') + `
+    ${questions.map((q, i) => questionHTML(q, i)).join('')}
+    <div class="keys">${key('⏎', 'Grade', 'cta')}${key('Esc', 'Back')}</div>
+    <div class="tildes"></div></div>`;
+
+  vizPaint(app);
+  app.querySelectorAll('.oral').forEach(div => {
+    const question = div.closest('.question');
+    if (!navigator.mediaDevices?.getUserMedia) return showText(question);
+    div.querySelector('.record').onclick = () => recordOral(div.querySelector('.record'), div.querySelector('.oral-preview'));
+    div.querySelector('.write-instead').onclick = () => showText(question);
+  });
+  const progress = () => {
+    const picked = app.querySelectorAll('input:checked').length;
+    const written = [...app.querySelectorAll('textarea.answer')].filter(t => t.value.trim()).length;
+    const spoken = [...app.querySelectorAll('.oral-preview')].filter(a => a._blob).length;
+    const n = picked + written + spoken;
+    statusEl.textContent = `${n}/${questions.length} answered`;
+    mode(n ? 'INSERT' : 'NORMAL', n ? 'insert' : '');
+  };
+  progress();
+  app.addEventListener('change', progress);
+  app.addEventListener('input', progress);
+  const [gradeBtn, backBtn] = app.querySelectorAll('.keys .key');
+  gradeBtn.onclick = () => grade(exam, questions);
+  backBtn.onclick = () => location.href = 'exam.html';
+}
+
+function questionHTML(q, i) {
+  const type = q.type || 'multiple_choice';
+  const stem = `<p class="stem"><span class="num">[${String(i + 1).padStart(2, '0')}]</span><span>${vizText(q.q)}</span></p>`;
+  if (type === 'multiple_choice') {
+    return `<div class="question">${stem}
+      ${q.options.map((o, j) => `
+        <label class="option"><input type="radio" name="q${i}" value="${j}"><span class="box"></span><span>${vizText(o)}</span></label>`).join('')}
+    </div>`;
+  }
+  if (type === 'oral') {
+    return `<div class="question">${stem}
+      <div class="oral">
+        ${key('●', 'Record', 'record')}
+        <audio class="oral-preview" controls style="display:none"></audio>
+        ${key('T', 'Answer in writing', 'write-instead')}
+      </div>
+      <textarea class="answer oral-text" name="q${i}" rows="4" placeholder="Your answer" style="display:none"></textarea>
+    </div>`;
+  }
+  return `<div class="question">${stem}
+      <textarea class="answer" name="q${i}" rows="4" placeholder="Your answer"></textarea>
+    </div>`;
+}
+
+function showText(question) {
+  const oral = question.querySelector('.oral');
+  if (oral) oral.style.display = 'none';
+  const t = question.querySelector('.oral-text');
+  t.style.display = '';
+  t.focus();
+}
+
+function meter(pct) {
+  const cells = 40, filled = Math.round(pct / 100 * cells);
+  return `<div class="meter ${pct >= 70 ? 'good' : 'bad'}"><span class="label">Score</span><span class="cells">[<span class="filled">${'|'.repeat(filled)}</span>${' '.repeat(cells - filled)}]</span><span class="pct">${pct}%</span></div>`;
+}
+
+async function recordOral(button, audio) {
+  if (button.dataset.recording) { button.dataset.stop = '1'; return; }
+  let mic;
+  try {
+    mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    statusEl.textContent = 'No microphone: ' + e.message;
+    return showText(button.closest('.question'));
+  }
+  const recorder = new MediaRecorder(mic);
+  const chunks = [];
+  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const stopped = new Promise(r => recorder.onstop = r);
+  recorder.start();
+
+  button.dataset.recording = '1';
+  button.classList.add('recording');
+  statusEl.textContent = 'Recording… click record to finish';
+  await new Promise(r => (function check() { button.dataset.stop ? r() : setTimeout(check, 200); })());
+
+  recorder.stop();
+  await stopped;
+  mic.getTracks().forEach(t => t.stop());
+  delete button.dataset.recording;
+  delete button.dataset.stop;
+  button.classList.remove('recording');
+
+  const blob = new Blob(chunks, { type: recorder.mimeType });
+  audio._blob = blob;
+  audio._mime = blob.type;
+  audio.src = URL.createObjectURL(blob);
+  audio.style.display = '';
+  statusEl.textContent = 'Recording ready';
+  audio.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+const blobToBase64 = blob => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(r.result.split(',')[1]);
+  r.onerror = rej;
+  r.readAsDataURL(blob);
+});
+
+async function grade(exam, questions) {
+  let right = 0, totalMC = 0;
+  const answers = [];
+  const detail = (await Promise.all(questions.map(async (q, i) => {
+    const type = q.type || 'multiple_choice';
+    const stem = `<p class="stem"><span class="num">[${String(i + 1).padStart(2, '0')}]</span><span>${vizText(q.q)}</span></p>`;
+    if (type === 'multiple_choice') {
+      totalMC++;
+      const sel = document.querySelector(`input[name=q${i}]:checked`);
+      const chosen = sel ? +sel.value : null;
+      if (chosen === q.answer) right++;
+      answers.push({ i, type, chosen });
+      return `<div class="question">${stem}
+        ${q.options.map((o, j) => {
+          const cls = j === q.answer ? 'correct' : (j === chosen ? 'wrong-pick' : '');
+          const tick = j === q.answer ? '✓' : (j === chosen ? '✕' : '·');
+          return `<div class="graded ${cls}"><span class="tick">${tick}</span><span>${vizText(o)}</span></div>`;
+        }).join('')}
+        ${q.explanation ? `<p class="why">${vizText(q.explanation)}</p>` : ''}
+      </div>`;
+    }
+    if (type === 'oral') {
+      const qEl = app.querySelectorAll('.question')[i];
+      const audio = qEl.querySelector('.oral-preview');
+      if (audio._blob) {
+        answers.push({ i, type, audio: await blobToBase64(audio._blob), mime: audio._mime });
+        return `<div class="question">${stem}
+          <p class="given-answer">(audio recorded)</p>
+          <p class="pending">pending grading</p>
+        </div>`;
+      }
+      const text = qEl.querySelector('.oral-text').value.trim();
+      answers.push({ i, type, text });
+      return `<div class="question">${stem}
+        <p class="given-answer">${text ? esc(text) : '<em>(no answer)</em>'}</p>
+        <p class="pending">pending grading</p>
+      </div>`;
+    }
+    const text = document.querySelector(`textarea[name=q${i}]`)?.value.trim() || '';
+    answers.push({ i, type, text });
+    return `<div class="question">${stem}
+      <p class="given-answer">${text ? esc(text) : '<em>(no answer)</em>'}</p>
+      <p class="pending">pending grading</p>
+    </div>`;
+  }))).join('');
+
+  const pct = totalMC ? Math.round(right / totalMC * 100) : null;
+  const [slug, , examId] = file.split('/').slice(1);
+  let saved;
+  try {
+    saved = await (await fetch('/api/attempt', {
+      method: 'POST', body: JSON.stringify({ slug, exam: examId, answers })
+    })).json();
+  } catch (e) {
+    saved = { error: e.message };
+  }
+  const footer = saved.error
+    ? `could not save the attempt: ${esc(saved.error)}`
+    : `run <code>notes-grade</code> on this attempt — saved to <code>${esc(saved.path)}</code>`;
+
+  app.innerHTML = header(exam, questions.length, 'exam --check') + `
+    ${pct !== null ? meter(pct) : ''}
+    <p class="minor"># ${totalMC ? `${right} of ${totalMC} correct (multiple choice)` : 'no multiple-choice questions'}</p>
+    ${detail}
+    <p class="minor">${footer}</p>
+    <div class="keys">${key('⏎', 'Retake', 'cta')}${key('Esc', 'Back')}</div>
+    <div class="tildes"></div></div>`;
+  vizPaint(app);
+  mode(pct === null ? 'DONE' : (pct >= 70 ? 'PASS' : 'FAIL'), pct !== null && pct >= 70 ? 'insert' : '');
+  statusEl.textContent = totalMC ? `${right}/${totalMC} correct` : 'attempt saved';
+  const [again, back] = app.querySelectorAll('.keys .key');
+  again.onclick = () => location.reload();
+  back.onclick = () => location.href = 'exam.html';
+  scrollTo(0, 0);
+}
+
+addEventListener('keydown', e => {
+  if (!file || e.target.closest?.('textarea, select, button')) return;
+  if (e.key === 'Escape') location.href = 'exam.html';
+  if (e.key === 'Enter') app.querySelector('.key.cta')?.click();
+});
+
+file
+  ? Promise.all([fetch('/' + file).then(r => r.json()), load()]).then(([exam]) => take(exam))
+      .catch(e => app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> could not open the exam</p><p class="minor">${esc(e)}</p></div>`)
+  : index();
+</script>

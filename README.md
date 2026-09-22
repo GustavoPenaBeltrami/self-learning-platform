@@ -2,122 +2,142 @@
 
 <!-- omit in toc -->
 
-# Notas 📚
+# TomaNota 📚
 
-<strong>Hub para autodidactas agentizado</strong>
+<strong>An agent-powered hub for self-learners</strong>
 
-*Hecho por [Gustavo Peña Beltrami](https://github.com/GustavoPenaBeltrami)*
+*Made by [Gustavo Peña Beltrami](https://github.com/GustavoPenaBeltrami)*
 
 [![Manual](https://img.shields.io/badge/docs-manual-blue)](docs/manual.md)
 [![Stars](https://img.shields.io/github/stars/GustavoPenaBeltrami/Notas.svg)](https://github.com/GustavoPenaBeltrami/Notas/stargazers)
 [![Issues](https://img.shields.io/github/issues/GustavoPenaBeltrami/Notas.svg)](https://github.com/GustavoPenaBeltrami/Notas/issues)
 [![Python](https://img.shields.io/badge/python-server-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Local](https://img.shields.io/badge/local-development-2EA44F?logo=homeassistant&logoColor=white)](#instalación)
+[![Local](https://img.shields.io/badge/local-development-2EA44F?logo=homeassistant&logoColor=white)](#installation)
 
 </div>
 
 ---
 
-Un libro, una certificación, la documentación de una herramienta, un curso: cada cosa que estudiás es un **tema**, y Notas le arma alrededor el loop completo — preparación, práctica, feedback, repaso espaciado. Todo arranca con una línea en tu agente:
+A book, a certification, a tool's documentation, a course: everything you study is a **topic**, and Notes builds the full loop around it — preparation, practice, feedback, spaced review. It all starts with one line in your agent:
 
-```
-/notas-init      dar de alta un tema: entrevista, estructura, diagnóstico de nivel
-/notas-sesion    qué hay pendiente hoy en todos los temas, y qué hacer
-```
+| Command | What it does |
+|---|---|
+| `/notes-init` | Sets up a topic: interview, structure, level check |
+| `/notes-session` | What's pending today across all topics, and what to do |
 
-## Por qué Notas
+## Why Notes
 
-Estudiar bien es más difícil de lo que parece. Leer no alcanza: hace falta que alguien te explique, te tome examen, te corrija y te haga repasar justo antes de olvidarte. Notas se encarga de todo eso. Vos estudiás el material, el agente enseña y corrige, y todo queda en Markdown en tu disco: **con Notas, el método ya viene incluido.**
+Studying well is harder than it looks. Reading isn't enough: you need someone to explain, quiz you, grade you and make you review right before you forget. Notes takes care of all of that. You study the material, the agent teaches and grades, and everything stays as Markdown on your disk: **with Notes, the method comes built in.**
 
-**No depende de un agente en particular.** Las skills están en formato `SKILL.md` y `AGENTS.md` le explica el proyecto a cualquiera — Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, con un modelo en la nube o local vía Ollama.
+**It doesn't depend on any particular agent.** The skills use the `SKILL.md` format and `AGENTS.md` explains the project to any of them — Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, with a cloud model or a local one via Ollama.
 
-Notas tiene cuatro piezas que se hablan a través del filesystem:
+Notes has four pieces that talk to each other through the filesystem:
 
 <table>
 <tr>
 <td align="center" valign="top" width="25%">
 <strong>🧠 Skills</strong>
-<br /><code>agente/skills/</code>
-<br />Enseñar, armar exámenes y ejercicios, corregir con rúbrica, repasar con Leitner.
+<br /><code>agent/skills/</code>
+<br />Teach, build exams and exercises, grade against a rubric, review with Leitner.
 </td>
 <td align="center" valign="top" width="25%">
-<strong>🎓 Agentes</strong>
-<br /><code>agente/agents/</code>
-<br />Un <code>investigador</code> que verifica antes de afirmar y un <code>profesor-&lt;tema&gt;</code> por tema.
+<strong>🎓 Agents</strong>
+<br /><code>agent/agents/</code>
+<br />A <code>researcher</code> that verifies before stating anything and a <code>teacher-&lt;slug&gt;</code> per topic.
 </td>
 <td align="center" valign="top" width="25%">
 <strong>🗂️ Filesystem</strong>
-<br /><code>temas/&lt;tema&gt;/</code>
-<br />Notas en Markdown, exámenes en JSON, intentos, correcciones y progreso. Sin base de datos.
+<br /><code>topics/&lt;slug&gt;/</code>
+<br />Notes in Markdown, exams in JSON, attempts, grading and progress. No database.
 </td>
 <td align="center" valign="top" width="25%">
 <strong>📓 App</strong>
 <br /><code>app/</code>
-<br />Cuaderno y simulador de examen en local, con dictado, Mermaid y LaTeX.
+<br />Local notebook and exam simulator, with dictation, Mermaid and LaTeX.
 </td>
 </tr>
 </table>
 
-Las **skills** son el método: enseñar desde verdades incondicionales, practicar y repasar. Los **agentes** le ponen la persona justa a cada tema. El **filesystem** se lee en GitHub, Obsidian o cualquier editor. Y la **app** es donde tomás notas y rendís, con dictado por voz vía Whisper.
+The **skills** are the method: teach from unconditional truths, practice and review. The **agents** give each topic the right persona. The **filesystem** reads fine on GitHub, in Obsidian or in any editor. And the **app** is where you take notes and sit exams, with voice dictation via Whisper.
 
-¿Listo para empezar? Seguí la [instalación](#instalación) o saltá directo al [manual](docs/manual.md).
+Ready to start? Follow the [installation](#installation) or jump straight to the [manual](docs/manual.md).
 
-## Tres ventanas
+## Three windows
 
-Notas se usa con tres ventanas lado a lado:
+Notes is used with three windows side by side:
 
-| | Ventana | Para qué |
+| | Window | What for |
 |---|---|---|
-| 1 | **El material** | El PDF, el curso, la documentación. Lo que estás estudiando. |
-| 2 | **La app** (`npm run app`) | El cuaderno en `localhost:8321`. Los exámenes, desde la barra de navegación. |
-| 3 | **El agente** | Abierto en la raíz del repo. Enseña, arma exámenes, corrige. |
+| 1 | **The material** | The PDF, the course, the docs. Whatever you're studying. |
+| 2 | **The app** | The notebook at `localhost:8321`. Exams are in the nav bar. |
+| 3 | **The agent** | Open at the repo root. Teaches, builds exams, grades. |
 
-Después el loop: `/notas-ensenar` o `/notas-resumir` para preparar, `/notas-examen` y `/notas-ejercicios` para practicar (rendís en la ventana 2), `/notas-correjir` para el feedback y `/notas-repasar` para que no se evapore. Todo lo que producen queda en `temas/<tema>/` y aparece solo en la app.
+Then the loop: `/notes-teach` or `/notes-summarize` to prepare, `/notes-exam` and `/notes-exercises` to practice (you sit them in window 2), `/notes-grade` for feedback and `/notes-review` so it doesn't fade away. Everything they produce lands in `topics/<slug>/` and shows up in the app on its own.
 
-`temas/ejemplo/` muestra la estructura. Tus temas reales quedan fuera de git.
+`topics/example/` shows the structure. Your real topics stay out of git.
 
-## Instalación
+### Language
 
-Corre en macOS, Linux y Windows. Necesitás:
+Each topic's `topic.json` has a `language` block that sets the defaults: `source` is the language of the material, `notes` is used for notes, summaries and lessons, and `exams` for exams, exercises and grading feedback. You can ask for a different language on any single request ("give me the exam in English") without touching the file. The agent chats with you in whatever language you write in.
 
-- **Python 3.9+**
-- **[uv](https://docs.astral.sh/uv/)** — trae el motor de dictado la primera vez: mlx-whisper en Mac Apple Silicon, faster-whisper en el resto
-- **Un agente de código**, el que uses
-- npm es opcional: `npm run app` es sólo un atajo, no hay `npm install`
+## Installation
 
-Sin uv, `python3 app/server.py app/notas.html` levanta todo menos el dictado. En Windows ARM, el dictado corre con Python x64 emulado (ver el [manual](docs/manual.md#arrancar)).
+### Requirements
+
+- **[uv](https://docs.astral.sh/uv/)** — the only thing you need to install. It downloads Python 3.9+ if you don't have it, and the dictation engine the first time.
+  ```sh
+  curl -LsSf https://astral.sh/uv/install.sh | sh                                # macOS and Linux
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # Windows
+  ```
+- **git**, to clone the repo.
+- **A coding agent**, whichever you use.
+- **A browser** with a microphone for dictation and oral exams.
+- **Internet only the first time**, to download the packages and the voice model. After that it works offline: Mermaid and KaTeX ship in the repo (`app/vendor/`).
+- npm is optional: `npm run app` is just a shortcut, there's no `npm install`.
+
+### Platforms
+
+| System | Dictation | Disk (packages + model) | How to start it |
+|---|---|---|---|
+| macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `npm run app` |
+| macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `npm run app` |
+| Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html` |
+
+Without npm: `uv run app/server.py app/notes.html`. Without uv: `python3 app/server.py app/notes.html` starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `NOTES_VOICE_MODEL=turbo` makes it more accurate.
+
+### Steps
 
 ```sh
 git clone https://github.com/GustavoPenaBeltrami/Notas.git
 cd Notas
 ```
 
-Abrí tu agente en la carpeta y pedile:
+Open your agent in the folder and ask it:
 
 ```
-Leé AGENTS.md y corré notas-setup-agente.
+Read AGENTS.md and run notes-setup-agent.
 ```
 
-Detecta qué agente es y expone las skills en su formato — symlinks si las soporta, conversión si no. Lo que crea queda en `.git/info/exclude`, así que no ensucia el repo. Después levantá la app:
+It detects which agent it is and exposes the skills in that agent's format — symlinks if it supports them, conversion if not. Whatever it creates goes to `.git/info/exclude`, so it doesn't clutter the repo. Then start the app:
 
 ```sh
 npm run app
 ```
 
-**¿Vas a guardar tus temas en un repo propio?** Cambiá el remote:
+**Going to keep your topics in your own repo?** Change the remote:
 
 ```sh
-git remote set-url origin <tu-repo>
+git remote set-url origin <your-repo>
 ```
 
-## 📚 Documentación
+## 📚 Documentation
 
-El detalle de cada skill, del cuaderno y del formato de examen está en el **[manual](docs/manual.md)**.
+The details of each skill, the notebook and the exam format are in the **[manual](docs/manual.md)**.
 
-**Roadmap:** probar `notas-setup-agente` en Codex, Gemini CLI, Antigravity y Cline, y dictado nativo en Windows ARM. Ver los [issues abiertos](https://github.com/GustavoPenaBeltrami/Notas/issues).
+**Roadmap:** test `notes-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/Notas/issues).
 
-**Gracias a** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) por el método de `notas-ensenar` y a [Matt Pocock](https://github.com/mattpocock) por la memoria por tema y el repaso espaciado.
+**Thanks to** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `notes-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory and spaced review.
 
-## Contribuir
+## Contributing
 
-¡Las contribuciones son bienvenidas! Hacé un fork, creá tu rama, y abrí un Pull Request. Las skills se editan en `agente/skills/`, nunca en la carpeta de un agente. Para bugs o ideas, [abrí un issue](https://github.com/GustavoPenaBeltrami/Notas/issues/new).
+Contributions are welcome! Fork the repo, create your branch, and open a Pull Request. Skills are edited in `agent/skills/`, never inside an agent's own folder. For bugs or ideas, [open an issue](https://github.com/GustavoPenaBeltrami/Notas/issues/new).

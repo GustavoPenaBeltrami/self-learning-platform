@@ -1,27 +1,25 @@
-/* ponytail: Mermaid + KaTeX from CDN, no build step. Vendor them into app/ if
-   you need offline study. */
 (() => {
-  const MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-  const KATEX_JS_URL = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js';
-  const KATEX_CSS_URL = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css';
-
   let mermaidLoad, katexLoad, seq = 0;
 
   const isDark = () => getComputedStyle(document.documentElement).colorScheme !== 'light';
 
-  const loadMermaid = () => (mermaidLoad ||= import(MERMAID_URL).then(m => m.default));
+  const script = src => new Promise((ok, fail) => {
+    const js = document.createElement('script');
+    js.src = src;
+    js.onload = ok;
+    js.onerror = () => fail(new Error('could not load ' + src));
+    document.head.appendChild(js);
+  });
 
-  const loadKatex = () => (katexLoad ||= new Promise((ok, fail) => {
+  const loadMermaid = () => (mermaidLoad ||= script('vendor/mermaid.min.js').then(() => window.mermaid));
+
+  const loadKatex = () => (katexLoad ||= (() => {
     const css = document.createElement('link');
     css.rel = 'stylesheet';
-    css.href = KATEX_CSS_URL;
+    css.href = 'vendor/katex/katex.min.css';
     document.head.appendChild(css);
-    const js = document.createElement('script');
-    js.src = KATEX_JS_URL;
-    js.onload = () => ok(window.katex);
-    js.onerror = () => fail(new Error('no se pudo cargar KaTeX'));
-    document.head.appendChild(js);
-  }));
+    return script('vendor/katex/katex.min.js').then(() => window.katex);
+  })());
 
   const token = name => getComputedStyle(document.documentElement)
     .getPropertyValue(name).trim();
@@ -105,7 +103,7 @@
   }
 
   new MutationObserver(() => paintAll())
-    .observe(document.documentElement, { attributeFilter: ['data-tema'] });
+    .observe(document.documentElement, { attributeFilter: ['data-theme'] });
 
   Object.assign(window, { vizPaint: paintAll, vizBlock: block, vizText: withBlocks });
 })();

@@ -1,405 +1,419 @@
 # Manual
 
-Referencia completa. La presentación está en el [README](../README.md).
+Full reference. The introduction is in the [README](../README.md).
 
-## Arrancar
+## Getting started
 
 ```sh
-npm run app      # abre los cuadernos; los examenes desde la nav
+npm run app      # opens the notebooks; exams are in the nav
 ```
 
-Levanta el servidor en `http://localhost:8321/` y abre `notas.html`. Si ya hay
-uno corriendo, abre la pestana y sale. Sin `npm install` y sin build: corre sobre la stdlib de Python.
-La única excepción es el dictado: `npm run app` arranca con `uv run`, que lee
-las dependencias del encabezado de `app/server.py` y baja la que corresponde la
-primera vez — `mlx-whisper` (GPU) en Mac Apple Silicon, `faster-whisper` (CPU)
-en Linux, Windows y Mac Intel. En CPU usa el modelo `small`; para otro,
-`NOTAS_MODELO_VOZ=turbo npm run app`. En Windows ARM el dictado necesita Python
-x64 (emulado): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notas.html`.
-Sin `uv`, `python3 app/server.py app/notas.html` levanta todo menos el dictado.
+Starts the server at `http://localhost:8321/` and opens `notes.html`. If one is
+already running, it opens the tab and exits. No `npm install` and no build: it runs on the Python stdlib.
+The only exception is dictation: `npm run app` starts with `uv run`, which reads
+the dependencies from the header of `app/server.py` and downloads the right one
+the first time — `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU)
+on Linux, Windows and Intel Macs. On CPU it uses the `small` model; for another one,
+`NOTES_VOICE_MODEL=turbo npm run app`. On Windows ARM, dictation needs x64 Python
+(emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html`.
+Without `uv`, `python3 app/server.py app/notes.html` starts everything except dictation.
 
-## Archivos
+## Files
 
 ```
-README.md            La presentación.
-package.json         `npm run app`. Sin dependencias.
-AGENTS.md            Entrada para cualquier agente: dónde están las skills y cómo traducir herramientas.
-agente/
-    skills/          Las skills de abajo. Fuente única, para cualquier agente.
-    agents/          investigador (verifica antes de enseñar) y un profesor-<tema> por tema (personales, ignorados).
-docs/manual.md       Esto.
+README.md            The introduction.
+package.json         `npm run app`. No dependencies.
+AGENTS.md            Entry point for any agent: where the skills are and how to map tools.
+agent/
+    skills/          The skills below. Single source, for any agent.
+    agents/          researcher (verifies before teaching) and one teacher-<slug> per topic (personal, ignored).
+docs/manual.md       This file.
 app/
-    server.py        Servidor local. Lista archivos, arma y guarda los cuadernos.
-    texto.py         Conversión HTML <-> Markdown. `python3 app/texto.py` se autotestea.
-    estilo.css       Sistema visual compartido. Tokens y temas.
-    tema.js          Lista de temas y selector, compartido.
-    shell.js         Waybar, explorer y statusline, compartidos.
-    examen.html      Simulador de examen. Rinde los 4 tipos de pregunta.
-    notas.html       Cuaderno de notas.
-    viz.js           Diagramas (Mermaid) y fórmulas (KaTeX). Compartido.
-    Design.md        El sistema visual: tokens, componentes, do's y don'ts.
-temas/<tema>/
-    tema.json          Título, subtítulo, tipo, área, objetivos, motivo, idioma, rutina, enlaces.
-    aprendizaje.md     Misión, glosario y registro. La memoria de /notas-ensenar.
-    notas/NN-*.md      Una sección por archivo. Markdown de verdad.
-    notas/img/         Las imágenes pegadas, como archivos sueltos.
-    recursos/          PDFs, apuntes, lo que quieras tener a mano.
-    examenes/<slug>/
-        examen.json    Preguntas: opción múltiple, desarrollo, oral o práctico.
-        intentos/      Un .json (respuestas) y un .md (corrección) por intento rendido.
-    ejercicios/<slug>/
-        enunciado.md   Consigna aplicada: producir un artefacto, no responder.
-        intentos/      El artefacto entregado y su .md de corrección.
-    progreso/
-        status.md      Dónde estoy hoy en este tema.
-        log.md          Historial: lectura, exámenes, ejercicios, repasos.
-temas/repaso/         Lo crea /notas-repasar. Un examen fechado por repaso.
+    server.py        Local server. Lists files, builds and saves the notebooks.
+    text.py          HTML <-> Markdown conversion. `python3 app/text.py` self-tests.
+    test_attempt.py  Tests for saving exam attempts.
+    style.css        Shared visual system. Tokens and color themes.
+    theme.js         Color theme list and picker, shared.
+    shell.js         Waybar, explorer and statusline, shared.
+    exam.html        Exam simulator. Handles every question type.
+    notes.html       Notebook.
+    viz.js           Diagrams (Mermaid) and formulas (KaTeX). Shared.
+    vendor/          Mermaid 11.17.2 and KaTeX 0.16.11 with their fonts, to work offline.
+    Design.md        The visual system: tokens, components, do's and don'ts.
+topics/<slug>/
+    topic.json         Title, subtitle, type, area, goals, reason, language, routine, links.
+    learning.md        Mission, Glossary and Record. The memory of /notes-teach.
+    notes/NN-*.md      One section per file. Real Markdown.
+    notes/img/         Pasted images, as separate files.
+    resources/         PDFs, handouts, anything you want at hand.
+    exams/<slug>/
+        exam.json      Questions: multiple choice, open, oral or practical.
+        attempts/      One .json (answers) and one .md (grading) per attempt.
+    exercises/<slug>/
+        prompt.md      Applied task: produce an artifact, not an answer.
+        attempts/      The submitted artifact and its grading .md.
+    progress/
+        status.md      Where I am today in this topic.
+        log.md         History: reading, exams, exercises, reviews.
+topics/review/       Created by /notes-review. One dated exam per review.
 ```
 
-Los frontends leen el filesystem: cualquier `<slug>/examen.json` que pongas en
-`examenes/` aparece solo en la lista, y las secciones del cuaderno salen de
-los `.md`. No hay índice que mantener a mano.
+The frontends read the filesystem: any `<slug>/exam.json` you put in
+`exams/` shows up in the list on its own, and the notebook sections come from
+the `.md` files. There's no index to maintain by hand.
 
-## El sistema visual
+## The visual system
 
-`app/Design.md` es la fuente. La app imita un escritorio tiling en una pestaña:
-waybar arriba (navegación y herramientas), explorer a la izquierda con todos los
-temas y sus índices, el contenido como un buffer de vim en el medio (números de
-línea, `~` al final) y una statusline abajo (modo, ruta, guardado, zoom, ancho).
-JetBrains Mono en todo, superficies planas, sin sombras. Los títulos se
-distinguen por color ANSI, no por tamaño.
+`app/Design.md` is the source. The app imitates a tiling desktop in a tab:
+a waybar on top (navigation and tools), an explorer on the left with every
+topic and its index, the content as a vim buffer in the middle (line numbers,
+`~` at the end) and a statusline at the bottom (mode, path, saved, zoom, width).
+JetBrains Mono everywhere, flat surfaces, no shadows. Headings are told apart
+by ANSI color, not by size.
 
-Hay seis temas en el selector de la waybar: `hypr` (navy, el default oscuro),
-`claro`, `e-ink` (monocromo oscuro), `sakura`, `bosque` y `ámbar crt`. Cada uno
-es un bloque de 20 tokens en `estilo.css`. Para sumar uno, se copia un bloque y
-se agrega la clave en `TEMAS` de `tema.js`. Los componentes sólo leen tokens:
-tocá ahí, no en las reglas sueltas.
+There are six color themes in the waybar picker: `hypr` (navy, the dark default),
+`light`, `e-ink` (dark monochrome), `sakura`, `forest` and `amber crt`. Each one
+is a block of 20 tokens in `style.css`. To add one, copy a block and add its key
+to `THEMES` in `theme.js`. Components only read tokens: change them there, not
+in individual rules.
 
-El selector de fuente de lectura del cuaderno (mono / serif / inter) aplica sólo
-al cuerpo de la nota.
+The notebook's reading font picker (mono / serif / inter) applies only to the
+body of the note.
 
-## Diagramas y fórmulas
+## Diagrams and formulas
 
-En el cuaderno, los botones ⌗ y Σ insertan un bloque de diagrama (Mermaid) o de
-fórmula (LaTeX). Se hace clic encima para editar la fuente y se redibuja solo.
+In the notebook, the ⌗ and Σ buttons insert a diagram block (Mermaid) or a
+formula block (LaTeX). Click it to edit the source and it redraws itself.
 
-El bloque es atómico: no se escribe adentro. Lo que manda es su texto fuente; el
-dibujo se descarta al guardar, así que en el `.md` queda un fence limpio:
+The block is atomic: you don't type inside it. Its source text is what counts; the
+drawing is discarded on save, so the `.md` keeps a clean fence:
 
     ```mermaid
     graph TD
-      A[Paquete] --> B[Stream confiable]
+      A[Packet] --> B[Reliable stream]
     ```
 
-Eso significa que el archivo también renderiza en GitHub y en Obsidian, y que se
-puede escribir el fence a mano en el `.md` sin abrir la app. `examen.html`
-renderiza los mismos fences dentro del enunciado, las opciones y la explicación.
+That means the file also renders on GitHub and in Obsidian, and you can write
+the fence by hand in the `.md` without opening the app. `exam.html` renders the
+same fences inside the question, the options and the explanation.
 
-Mermaid y KaTeX se bajan de CDN la primera vez, así que sin internet los bloques
-muestran su fuente en vez del dibujo. Matemática en medio de un renglón no está
-soportada: sólo bloques.
+Mermaid and KaTeX ship in `app/vendor/`, so diagrams and formulas work without
+internet. Inline math in the middle of a line isn't supported: blocks only.
 
-## Cómo se usa
+## How it's used
 
-La puerta de entrada es `/notas-sesion`: releva el estado de todos los temas
-(repasos vencidos, intentos sin corregir, temas sin ejercicios) y pregunta qué
-querés hacer. Para un tema nuevo, `/notas-init` entrevista, crea el filesystem
-de arriba y hace un diagnóstico de nivel.
+The entry point is `/notes-session`: it surveys the state of every topic
+(overdue reviews, ungraded attempts, topics without exercises) and asks what
+you want to do. For a new topic, `/notes-init` interviews you, creates the
+filesystem above and runs a level check.
 
-Adentro de un tema, el loop es preparación → práctica → feedback → iteración:
+Inside a topic, the loop is preparation → practice → feedback → iteration:
 
-1. **Preparación** — leo con `recursos/` y `enlaces` de `tema.json`, tomo
-   notas en **notas.html**, o `/notas-resumir` condensa un texto que ya
-   entiendo. Cuando algo no entra leyéndolo, `/notas-ensenar` lo construye
-   desde cero (ver abajo).
-2. **Práctica** — `/notas-examen` arma un examen (`examenes/<slug>/`) para
-   responder sobre el tema; `/notas-ejercicios` arma un ejercicio
-   (`ejercicios/<slug>/`) para producir algo con el tema — código, un ADR,
-   una crítica. Rindo el examen en **examen.html**.
-3. **Feedback** — `/notas-correjir` corrige el intento, examen o ejercicio,
-   contra la rúbrica o la consigna, y actualiza `aprendizaje.md` y `progreso/`.
-4. **Iteración** — `/notas-repasar` arma un repaso espaciado e intercalado
-   (tarjetas Leitner) para que lo entendido no se evapore.
+1. **Preparation** — I read with `resources/` and the `links` in `topic.json`,
+   take notes in **notes.html**, or `/notes-summarize` condenses a text I
+   already understand. When something doesn't sink in by reading,
+   `/notes-teach` builds it from scratch (see below).
+2. **Practice** — `/notes-exam` builds an exam (`exams/<slug>/`) to answer
+   questions about the topic; `/notes-exercises` builds an exercise
+   (`exercises/<slug>/`) to produce something with it — code, an ADR,
+   a critique. I sit the exam in **exam.html**.
+3. **Feedback** — `/notes-grade` grades the attempt, exam or exercise, against
+   the rubric or the prompt, and updates `learning.md` and `progress/`.
+4. **Iteration** — `/notes-review` builds a spaced, interleaved review
+   (Leitner cards) so that what you understood doesn't fade away.
 
-## Temas
+## Topics
 
-Un **tema** es cualquier fuente de estudio, no sólo un libro. El campo `tipo`
-de `tema.json` dice cuál es: `libro`, `certificación`, `documentación`, `curso`
-o `práctica`. El tipo cambia dos cosas: la etiqueta que ves en las listas y
-cómo `notas-examen` escribe las preguntas (un examen de certificación imita el
-formato real del examen, uno de documentación pregunta cuándo usar qué).
+A **topic** is any study source, not just a book. The `type` field in
+`topic.json` says which: `book`, `certification`, `documentation`, `course`
+or `practice`. The type changes two things: the label you see in the lists and
+how `notes-exam` writes the questions (a certification exam mimics the real
+exam format, a documentation one asks when to use what).
 
 ```json
 {
-  "titulo": "AWS Certified Cloud Practitioner",
-  "subtitulo": "CLF-C02 · 65 preguntas en 90 min · aprueba con 700 de 1000",
-  "tipo": "certificación",
+  "title": "AWS Certified Cloud Practitioner",
+  "subtitle": "CLF-C02 · 65 questions in 90 min · pass with 700 of 1000",
+  "type": "certification",
   "area": "cloud",
-  "orden": 3,
-  "objetivos": ["Poder elegir el servicio correcto por trade-offs, no por nombre conocido."],
-  "motivo": "Necesito la certificación para el rol.",
-  "idioma": { "fuente": "en", "notas": "es", "examenes": "es" },
-  "rutina": { "cadencia": "1 dominio por semana", "sesion": "~30 min" },
-  "fecha_fin": "YYYY-MM-DD",
-  "enlaces": [
-    { "titulo": "Guía del examen", "url": "https://docs.aws.amazon.com/..." }
+  "order": 3,
+  "goals": ["Pick the right service by trade-offs, not by the name I know."],
+  "reason": "I need the certification for the role.",
+  "language": { "source": "en", "notes": "es", "exams": "es" },
+  "routine": { "cadence": "1 domain per week", "session": "~30 min" },
+  "end_date": "YYYY-MM-DD",
+  "links": [
+    { "title": "Exam guide", "url": "https://docs.aws.amazon.com/..." }
   ]
 }
 ```
 
-`area` agrupa temas afines (por ejemplo varios libros de arquitectura de
-software) como dato de contexto/tono. El agente-profesor es por **tema**, no
-por área: `notas-init` ofrece generar `agente/agents/profesor-<tema>.md` al
-dar de alta un tema nuevo, con una persona diseñada para ese tema puntual (un
-libro de literatura pide un profesor de letras, una cert pide un instructor
-de esa cert); `notas-sesion` ofrece generarlo para los temas que todavía no
-lo tienen. `idioma` separa el idioma de la fuente, de las notas y de los
-exámenes, así
-`notas-resumir` no asume inglés → español. `enlaces` son fuentes externas
-(documentación oficial, un curso); `recursos/` son archivos locales (el PDF
-del libro, un apunte). Los dos aparecen juntos arriba del índice del cuaderno.
+`area` groups related topics (for example several software architecture
+books) as context and tone. The teacher agent is per **topic**, not per area:
+`notes-init` offers to generate `agent/agents/teacher-<slug>.md` when you add
+a new topic, with a persona designed for that specific topic (a literature
+book calls for a literature teacher, a cert calls for an instructor for that
+cert); `notes-session` offers to generate it for topics that don't have one yet.
+`links` are external sources (official docs, a course); `resources/` are local
+files (the book's PDF, a handout). Both show up together above the notebook's index.
 
-Para agregar un tema: `/notas-init` entrevista y crea `temas/<slug>/` con
-`tema.json` y las carpetas `notas/`, `examenes/`, `ejercicios/`, `recursos/`
-y `progreso/`. Aparece solo en las listas.
+### Language
 
-## Cuaderno de notas
+`language` sets the default language of each output, separately:
 
-**Un cuaderno por tema.** No se crean notas a mano: cada **Título 1** que
-escribís *es* una sección, y se guarda como su propio `.md` en
-`temas/<tema>/notas/`. Borrar el título borra el archivo. Renombrarlo lo
-renombra. El orden de los archivos (`01-`, `02-`…) es el orden del documento.
+- `source` — the language of the material, so `notes-summarize` doesn't assume
+  it has to translate.
+- `notes` — notes, summaries and lessons (`notes-summarize`, `notes-teach`).
+- `exams` — exams, exercises and grading feedback (`notes-exam`,
+  `notes-exercises`, `notes-review`, `notes-grade`).
 
-- El cuaderno abre con el título del tema, el subtítulo y el índice. Los tres
-  se editan en el lugar; el índice se arma solo con los títulos que escribís.
-- **Numeración automática**: h1 → 1, 2, 3; h2 → 1.1, 1.2; h3 → 1.1.1. Es CSS,
-  no se guarda en el archivo, así que nunca queda desfasada.
-- Clic en una entrada del índice lleva a la sección.
-- **Atajos de escritura**: `/h1` … `/h6` al empezar un renglón lo convierten en
-  título; `/p` vuelve a párrafo; `/lista` o un `- ` seguido de espacio abren una
-  lista. El desplegable de la barra hace lo mismo si preferís el mouse.
-- Resaltar / subrayar / tachar con color: elegís el color en la barra y después
-  la acción. La paleta es el array `COLORES` arriba del script de `app/notas.html`.
-- **Comentarios**: sólo sobre texto ya resaltado, subrayado o tachado. Hacés clic
-  en la marca y se abre un menú con los seis colores, el campo de comentario y el
-  botón de quitar la marca. La marca comentada lleva un `°`; el comentario
-  aparece en un globo al pasar el mouse.
-- **Referencias**: el botón abre un desplegable con todas las secciones del
-  índice, numeradas y sangradas por nivel. Si tenías texto seleccionado, ese
-  texto queda como enlace; si no, entra el título de la sección. También podés
-  escribir `[[Nombre de la sección]]` y se convierte al cerrar el corchete. Al
-  pasar el mouse levanta el contenido de la sección referenciada.
-- **Imagen**: entra en el flujo del texto, centrada, donde esté el cursor.
-  También podés pegarla (⌘V, sirve para capturas de pantalla) o soltarla sobre
-  el documento. Clic en la imagen abre un control de ancho, de 20% a 100%.
-  Al guardar, la imagen se escribe como archivo en `notas/img/` y en el `.md`
-  queda sólo la referencia: `<img src="img/ae738e6a.png">`. El nombre es el
-  hash del contenido, así que pegar dos veces la misma captura no duplica el
-  archivo, y las que dejan de estar referenciadas se borran solas.
-- **Nota al margen**: queda flotando donde la dejes, en el margen derecho, al
-  50% de opacidad hasta que le pasás el mouse. Se arrastra del `⠿`. Si pegás una imagen adentro,
-  tenés una imagen flotante.
-- **Fuente de lectura**: Serif (Charter), Inter o JetBrains Mono, en la barra.
-  Se recuerda. Las dos últimas se bajan de Google Fonts; sin internet caen a la
-  fuente equivalente del sistema.
-- **Modo claro / oscuro** en la barra, para toda la interfaz.
-- **Dictado**: clic en el micrófono o `⌃M` (Control, no Command: macOS usa
-  `⌘M` para minimizar), hablás, y lo mismo para terminar. El texto entra donde
-  está el cursor. Transcribe Whisper (`large-v3-turbo`) local en la GPU, fijo en
-  español, sin internet salvo la primera vez que baja el modelo (~1,6 GB). El
-  modelo se cambia en `MODELO_VOZ` de `app/server.py`.
-- Guarda solo, 0,9 s después de cada cambio. El estado se ve en la barra.
+They're defaults, not locks: ask for a different language on any single request
+("give me the exam in English", "explain this in Spanish") and that output
+follows your request. The agent chats with you in whatever language you write in.
 
-### Qué hay dentro de un `.md`
+To add a topic: `/notes-init` interviews you and creates `topics/<slug>/` with
+`topic.json` and the `notes/`, `exams/`, `exercises/`, `resources/`
+and `progress/` folders. It shows up in the lists on its own.
 
-Markdown común (`#`, `-`, `**`, `*`, `~~`) más HTML inline para lo que el
-markdown no tiene: resaltados con color, comentarios, notas al margen y
-renglones en blanco (`<br>`, porque markdown no sabe representar uno). Es HTML
-válido dentro de markdown, así que los archivos se abren bien en Obsidian o en
-cualquier editor.
+## Notebook
 
-`python3 app/texto.py` verifica que la ida y vuelta HTML↔MD no pierda nada ni
-mueva nada de lugar.
+**One notebook per topic.** You don't create notes by hand: every **Heading 1**
+you write *is* a section, and it's saved as its own `.md` in
+`topics/<slug>/notes/`. Deleting the heading deletes the file. Renaming it
+renames the file. The file order (`01-`, `02-`…) is the document order.
 
-## Orden de los temas
+- The notebook opens with the topic's title, subtitle and index. All three
+  are edited in place; the index builds itself from the headings you write.
+- **Automatic numbering**: h1 → 1, 2, 3; h2 → 1.1, 1.2; h3 → 1.1.1. It's CSS,
+  not saved in the file, so it never gets out of sync.
+- Clicking an index entry takes you to the section.
+- **Typing shortcuts**: `/h1` … `/h6` at the start of a line turn it into a
+  heading; `/p` goes back to paragraph; `/list` or a `- ` followed by a space
+  starts a list. The toolbar dropdown does the same if you prefer the mouse.
+- Highlight / underline / strikethrough with color: pick the color in the toolbar
+  and then the action. The palette is the `COLORS` array at the top of the
+  script in `app/notes.html`.
+- **Comments**: only on text that's already highlighted, underlined or struck
+  through. Click the mark and a menu opens with the six colors, the comment
+  field and the button to remove the mark. A commented mark carries a `°`; the
+  comment shows in a bubble on hover.
+- **References**: the button opens a dropdown with every section in the
+  index, numbered and indented by level. If you had text selected, that text
+  becomes the link; otherwise the section title is inserted. You can also type
+  `[[Section name]]` and it converts when you close the bracket. On hover it
+  pulls up the content of the referenced section.
+- **Image**: goes into the text flow, centered, wherever the cursor is.
+  You can also paste it (⌘V, works for screenshots) or drop it on the
+  document. Clicking the image opens a width control, from 20% to 100%.
+  On save, the image is written as a file in `notes/img/` and the `.md`
+  keeps only the reference: `<img src="img/ae738e6a.png">`. The name is the
+  content hash, so pasting the same screenshot twice doesn't duplicate the
+  file, and images that are no longer referenced are deleted on their own.
+- **Margin note**: floats wherever you leave it, in the right margin, at
+  50% opacity until you hover over it. Drag it by the `⠿`. If you paste an
+  image inside, you get a floating image.
+- **Reading font**: Serif (Charter), Inter or JetBrains Mono, in the toolbar.
+  It's remembered. The last two load from Google Fonts; without internet they
+  fall back to the equivalent system font.
+- **Light / dark mode** in the toolbar, for the whole interface.
+- **Dictation**: click the microphone or `⌃M` (Control, not Command: macOS uses
+  `⌘M` to minimize), speak, and do the same to finish. The text goes where the
+  cursor is. Whisper transcribes locally (`large-v3-turbo` on the GPU on Apple
+  Silicon, `NOTES_VOICE_MODEL` on CPU), detecting the language when none is
+  given, with no internet except the first time it downloads the model
+  (~1.6 GB on Apple Silicon). The GPU model is set in `VOICE_MODEL` in
+  `app/server.py`.
+- Saves on its own, 0.9 s after each change. The status shows in the toolbar.
 
-`tema.json` tiene un campo `orden`. Manda en las dos listas, la de notas y la
-de exámenes. El tema sin `orden` cae al final, ordenado por título. El título
-no lleva número: eso es lo que ordena, no lo que se lee.
+### What's inside a `.md`
+
+Plain Markdown (`#`, `-`, `**`, `*`, `~~`) plus inline HTML for what
+Markdown lacks: colored highlights, comments, margin notes and blank lines
+(`<br>`, because Markdown can't represent one). It's valid HTML inside
+Markdown, so the files open fine in Obsidian or any editor.
+
+`python3 app/text.py` checks that the HTML↔MD round trip doesn't lose anything
+or move anything around.
+
+## Topic order
+
+`topic.json` has an `order` field. It rules both lists, notes and exams.
+A topic without `order` goes at the end, sorted by title. The title carries
+no number: the number is what sorts, not what you read.
 
 ```json
-{ "titulo": "Fundamentals of Software Architecture", "subtitulo": "…", "orden": 1 }
+{ "title": "Fundamentals of Software Architecture", "subtitle": "…", "order": 1 }
 ```
 
-Se edita a mano; el editor no lo pisa al guardar.
+It's edited by hand; the editor doesn't overwrite it on save.
 
-## Por qué no hay carpetas por bloque
+## Why there are no folders per block
 
-Los bloques son orden de lectura, no ubicación de archivos. Un tema es un
-tema; agrupar carpetas por bloque obliga a moverlas si cambia el orden.
-El agrupamiento vive en un `progreso/roadmap.md` dentro del tema que haga de eje.
+Blocks are reading order, not file location. A topic is a topic; grouping
+folders by block forces you to move them whenever the order changes.
+The grouping lives in a `progress/roadmap.md` inside whichever topic acts as the hub.
 
 ## Skills
 
-Viven en `agente/skills/`. Se activan solas cuando el pedido encaja, o las
-llamás por nombre (`/nombre` en Claude Code). Para otro agente, ver
-`/notas-setup-agente`. Todas escriben en las carpetas de este proyecto, no
-en el chat.
+They live in `agent/skills/`. They trigger on their own when the request fits,
+or you call them by name (`/name` in Claude Code). For another agent, see
+`/notes-setup-agent`. They all write to this project's folders, not to the chat.
 
-| Skill | Para qué | Deja |
+| Skill | What for | Leaves |
 |---|---|---|
-| `/notas-setup-agente` | Configurar el repo para tu agente (Claude Code, Codex, Gemini, Cline…) | Symlinks o archivos nativos, en `.git/info/exclude` |
-| `/notas-sesion` | Punto de entrada: qué falta en todos los temas, qué hacer hoy | Deriva a la skill que corresponda |
-| `/notas-init` | Dar de alta un tema nuevo | `temas/<tema>/` completo, `aprendizaje.md` con la Misión |
-| `/notas-ensenar` | Entender algo de cero, en serio | Una lección en `temas/<tema>/notas/` |
-| `/notas-resumir` | Condensar un texto que ya entendés, en el idioma del tema | Secciones nuevas en una nota existente |
-| `/notas-examen` | Convertir material en preguntas corregibles | `temas/<tema>/examenes/<slug>/examen.json` |
-| `/notas-ejercicios` | Forzar a producir un artefacto, no a responder | `temas/<tema>/ejercicios/<slug>/enunciado.md` |
-| `/notas-correjir` | Corregir un intento de examen o de ejercicio | El `.md` de feedback junto al intento, `aprendizaje.md`, `progreso/` |
-| `/notas-repasar` | Que lo entendido no se evapore | `temas/repaso/examenes/YYYY-MM-DD/examen.json` |
+| `/notes-setup-agent` | Set up the repo for your agent (Claude Code, Codex, Gemini, Cline…) | Symlinks or native files, in `.git/info/exclude` |
+| `/notes-session` | Entry point: what's missing across topics, what to do today | Hands off to the right skill |
+| `/notes-init` | Add a new topic | Full `topics/<slug>/`, `learning.md` with the Mission |
+| `/notes-teach` | Really understand something from scratch | A lesson in `topics/<slug>/notes/` |
+| `/notes-summarize` | Condense a text you already understand, in the topic's notes language | New sections in an existing note |
+| `/notes-exam` | Turn material into gradable questions | `topics/<slug>/exams/<slug>/exam.json` |
+| `/notes-exercises` | Force you to produce an artifact, not to answer | `topics/<slug>/exercises/<slug>/prompt.md` |
+| `/notes-grade` | Grade an exam or exercise attempt | The feedback `.md` next to the attempt, `learning.md`, `progress/` |
+| `/notes-review` | Keep what you understood from fading | `topics/review/exams/YYYY-MM-DD/exam.json` |
 
-Más el subagente **investigador** (`agente/agents/`), que no se llama a mano:
-`notas-ensenar` lo dispara para verificar un hecho antes de afirmarlo y para
-relevar un tema antes de planificar.
+Plus the **researcher** subagent (`agent/agents/`), which isn't called by hand:
+`notes-teach` fires it to verify a fact before stating it and to survey a topic
+before planning.
 
-### `/notas-ensenar` — la que vale la pena conocer
+### `/notes-teach` — the one worth knowing
 
-Viene del [sistema de amosblomqvist](https://github.com/amosblomqvist/learn),
-adaptado a este proyecto. La idea de fondo: el cerebro no fija un hecho que no
-está seguro de que sea seguro fijar. Si algo más profundo puede contradecirlo
-después, hedgea y el hecho nunca aterriza. De ahí los dos principios:
+It comes from [amosblomqvist's system](https://github.com/amosblomqvist/learn),
+adapted to this project. The core idea: the brain doesn't lock in a fact it
+isn't sure is safe to lock in. If something deeper might contradict it later,
+it hedges and the fact never lands. Hence the two principles:
 
-1. **Primero las verdades incondicionales** — lo que se acepta tal cual, sin
-   salvedades. Se fija al instante y da piso firme para construir encima.
-2. **"¿Cómo podría haberlo descubierto yo?"** — nada aparece de la nada. Cada
-   paso motivado, estilo 3Blue1Brown. Un hecho que se siente arbitrario no pega.
+1. **Unconditional truths first** — what's accepted as is, with no caveats.
+   It sticks instantly and gives solid ground to build on.
+2. **"How could I have discovered this myself?"** — nothing appears out of
+   nowhere. Every step is motivated, 3Blue1Brown style. A fact that feels
+   arbitrary doesn't stick.
 
-El objetivo no es recitar: es que el hecho sea *derivable* de cosas que ya
-aceptás. Eso se sostiene solo; lo memorizado se pudre.
+The goal isn't to recite: it's for the fact to be *derivable* from things you
+already accept. That holds on its own; what's memorized rots.
 
-Tres fases, siempre, escalando el tamaño y nunca la forma:
+Three phases, always, scaling the size and never the shape:
 
-1. **Sondear.** Te toma preguntas corregidas hasta encontrar el borde de lo que
-   sabés — acotado por los dos lados: algo que contestás bien y algo que
-   contestás mal. Si acertás todo, las preguntas eran fáciles y sube. Después te
-   pregunta, abierto, qué querés entender exactamente.
-2. **Planificar.** Te muestra el plan como grafo de dependencias: verdades
-   incondicionales en las raíces, tu objetivo en el destino. **Para y espera tu
-   visto bueno** — una raíz equivocada es barata de arreglar acá y cara a mitad
-   de lección.
-3. **Enseñar.** Nodo por nodo: motivar → establecer → conectar → control. Cada
-   nodo se confirma con una pregunta antes de construirle algo encima.
-
-```
-/notas-ensenar acoplamiento y cohesión
-```
-
-Al final la lección queda escrita en `temas/<tema>/notas/`, con el grafo de
-dependencias como fence `mermaid`, y te ofrece pasar a `notas-examen` o a
-`notas-ejercicios`.
-
-Dos cosas que conviene saber:
-
-- **Es lento a propósito.** La fase de sondeo puede llevar diez preguntas. Ese
-  es el trabajo, no el preámbulo: sin saber dónde está tu borde no hay forma de
-  enseñar adentro de él.
-- **El modo caveman se apaga mientras enseña.** La prosa comprimida sirve para
-  responder consultas, no para construir un grafo de dependencias.
-
-Editá `agente/skills/notas-ensenar/SKILL.md` si querés que enseñe distinto:
-está escrito para una sola persona, y esa persona sos vos.
-
-### `aprendizaje.md` — la memoria de cada tema
-
-`/notas-ensenar` guarda en `temas/<tema>/aprendizaje.md` lo que sabe de vos **como
-alumno**, y lo lee antes de sondear. Sin eso cada sesión arranca de cero. Tres
-partes:
-
-- **Misión** — por qué estudiás el tema, en concreto. Ancla todas las decisiones:
-  qué enseñar después, qué recortar. Si es vaga, lo primero que hace es
-  interrogarla.
-- **Glosario** — un término entra **sólo cuando ya lo sabés usar**, no cuando te
-  lo explicaron. Por eso es a la vez lenguaje canónico y señal de progreso.
-- **Registro** — entradas numeradas de qué quedó entendido, qué sabías de antes,
-  y sobre todo **qué concepción equivocada se corrigió**. Esas últimas son las
-  más valiosas: predicen dónde vas a tropezar en temas vecinos, y son el material
-  de repaso de mayor rendimiento.
-
-No se escribe una entrada porque "se cubrió" un tema. Cubrir no es aprender: hace
-falta evidencia.
-
-### `/notas-repasar` — fluidez no es retención
-
-Contestar bien al final de la lección mide **fluidez**: recuperarlo ahora, con el
-tema fresco. Lo que importa es la **retención**: recuperarlo en tres semanas. Se
-sienten igual desde adentro, y ahí está la trampa.
-
-`/notas-repasar` arma un examen con dificultad deseable, con tarjetas Leitner:
-
-- **Tarjetas** — cada pregunta rendida es una tarjeta, con caja *rápida*,
-  *media* o *lenta*. Un acierto sube de caja; un fallo vuelve entera a la
-  rápida. Tres aciertos seguidos en la lenta retiran la tarjeta.
-- **Debilidad** — lo que falló pesa más, y las concepciones equivocadas de
-  `aprendizaje.md` entran sí o sí.
-- **Intercalado** — mezcla temas en la misma sesión. Un repaso de un solo
-  capítulo no es un repaso, es volver a rendir.
-- **Recordar, no reconocer** — reescribe los enunciados. Una pregunta vista
-  textual mide si te acordás del examen, no del concepto.
+1. **Probe.** It asks graded questions until it finds the edge of what you
+   know — bounded on both sides: something you get right and something you get
+   wrong. If you get everything right, the questions were easy and it goes up.
+   Then it asks you, open-ended, what exactly you want to understand.
+2. **Plan.** It shows you the plan as a dependency graph: unconditional truths
+   at the roots, your goal at the destination. **It stops and waits for your
+   go-ahead** — a wrong root is cheap to fix here and expensive halfway
+   through the lesson.
+3. **Teach.** Node by node: motivate → establish → connect → check. Each
+   node is confirmed with a question before anything is built on top of it.
 
 ```
-/notas-repasar
+/notes-teach coupling and cohesion
 ```
 
-Cada repaso es una carpeta fechada en `temas/repaso/examenes/`; las viejas
-quedan como registro de qué se estuvo olvidando. **El espaciado depende de que
-`notas-correjir` deje su fila en `progreso/log.md` de cada tema** — sin eso, la
-skill queda ciega.
+At the end the lesson is written to `topics/<slug>/notes/`, with the
+dependency graph as a `mermaid` fence, and it offers to move on to `notes-exam`
+or `notes-exercises`.
 
-### De dónde salen
+Two things worth knowing:
 
-`/notas-ensenar` viene del sistema de [amosblomqvist](https://github.com/amosblomqvist/learn)
-(el grafo de dependencias, las verdades incondicionales, el sondeo del borde).
-La memoria por tema, la misión, el glosario y `/notas-repasar` vienen de la skill
-`teach` de [Matt Pocock](https://github.com/mattpocock), adaptadas: su versión
-asume que el directorio entero es un workspace de enseñanza con lecciones en HTML
-suelto, que acá ya lo cubren el cuaderno y los exámenes.
+- **It's slow on purpose.** The probe phase can take ten questions. That's
+  the work, not the preamble: without knowing where your edge is there's no
+  way to teach inside it.
+- **Caveman mode turns off while it teaches.** Compressed prose is for
+  answering queries, not for building a dependency graph.
 
-## Formato de examen
+Edit `agent/skills/notes-teach/SKILL.md` if you want it to teach differently:
+it's written for one person, and that person is you.
 
-Un examen es una carpeta, `temas/<tema>/examenes/<slug>/`, con `examen.json`
-adentro. Antes de escribir preguntas, `/notas-examen` pregunta qué tipos
-incluir (podés no tener micrófono, o no querer grabar oral) — nunca asume las
-cuatro. Cada pregunta tiene un `tipo` (default `opcion_multiple` si no está):
+### `learning.md` — each topic's memory
+
+`/notes-teach` keeps in `topics/<slug>/learning.md` what it knows about you
+**as a student**, and reads it before probing. Without it every session starts
+from zero. Three parts:
+
+- **Mission** — why you're studying the topic, concretely. It anchors every
+  decision: what to teach next, what to cut. If it's vague, the first thing it
+  does is question it.
+- **Glossary** — a term goes in **only once you can use it**, not when it was
+  explained to you. That makes it both canonical vocabulary and a progress signal.
+- **Record** — numbered entries on what was understood, what you already knew,
+  and above all **which misconception was corrected**. Those last ones are the
+  most valuable: they predict where you'll trip in neighboring topics, and
+  they're the highest-yield review material.
+
+An entry isn't written because a topic "was covered". Covering isn't learning:
+it takes evidence.
+
+### `/notes-review` — fluency isn't retention
+
+Answering correctly at the end of the lesson measures **fluency**: recalling it
+now, with the topic fresh. What matters is **retention**: recalling it in three
+weeks. From the inside they feel the same, and that's the trap.
+
+`/notes-review` builds an exam with desirable difficulty, using Leitner cards:
+
+- **Cards** — every question you've answered is a card, in a *fast*, *medium*
+  or *slow* box. A correct answer moves it up a box; a miss sends it all the
+  way back to fast. Three correct answers in a row in the slow box retire the card.
+- **Weakness** — what you missed weighs more, and the misconceptions in
+  `learning.md` always go in.
+- **Interleaving** — it mixes topics in the same session. A review of a single
+  chapter isn't a review, it's retaking the exam.
+- **Recall, not recognition** — it rewrites the questions. A question seen
+  word for word measures whether you remember the exam, not the concept.
+
+```
+/notes-review
+```
+
+Each review is a dated folder in `topics/review/exams/`; old ones stay as a
+record of what you were forgetting. **The spacing depends on `notes-grade`
+leaving its row in each topic's `progress/log.md`** — without it, the skill is blind.
+
+### Where they come from
+
+`/notes-teach` comes from [amosblomqvist's](https://github.com/amosblomqvist/learn) system
+(the dependency graph, the unconditional truths, probing for the edge).
+Per-topic memory, the Mission, the Glossary and `/notes-review` come from
+[Matt Pocock's](https://github.com/mattpocock) `teach` skill, adapted: his version
+assumes the whole directory is a teaching workspace with lessons as loose HTML,
+which here the notebook and the exams already cover.
+
+## Exam format
+
+An exam is a folder, `topics/<slug>/exams/<slug>/`, with `exam.json`
+inside. Before writing questions, `/notes-exam` asks which types to include
+(you may not have a microphone, or may not want to record oral answers) — it
+never assumes all of them. Each question has a `type` (default `multiple_choice`
+if missing):
 
 ```json
 {
-  "titulo": "FoSA — Cap 1",
-  "preguntas": [
+  "title": "FoSA — Ch 1",
+  "questions": [
     {
-      "tipo": "opcion_multiple",
-      "q": "¿Pregunta?",
-      "opciones": ["A", "B", "C", "D"],
-      "correcta": 2,
-      "explicacion": "Por qué C y por qué no las otras."
+      "type": "multiple_choice",
+      "q": "Question?",
+      "options": ["A", "B", "C", "D"],
+      "answer": 2,
+      "explanation": "Why C and why not the others."
     },
     {
-      "tipo": "desarrollo",
-      "q": "Explicá cuándo un topic es preferible a una cola y por qué.",
-      "rubrica": ["Menciona extensibilidad/acoplamiento", "Da un criterio de decisión, no solo pros/contras"]
+      "type": "open",
+      "q": "Explain when a topic is preferable to a queue and why.",
+      "rubric": ["Mentions extensibility/coupling", "Gives a decision criterion, not just pros/cons"]
     }
   ]
 }
 ```
 
-`correcta` es índice desde 0 y las preguntas de `opcion_multiple` se mezclan y
-autocorrigen en el cliente, igual que siempre. `desarrollo`, `oral` y
-`practico` no tienen `correcta`: tienen `rubrica`, y no hay forma de
-autocorregirlas en el navegador. `oral` graba por voz (mismo mecanismo que el
-dictado del cuaderno) y transcribe antes de guardar.
+`answer` is a 0-based index, and `multiple_choice` questions are shuffled and
+auto-graded in the client. `open`, `oral` and `practical` have no `answer`:
+they have a `rubric`, and there's no way to auto-grade them in the browser.
+`oral` records by voice (same mechanism as the notebook's dictation) and
+transcribes before saving.
 
-Al terminar, `examen.html` guarda el intento entero con `POST /api/intento` en
-`examenes/<slug>/intentos/<fecha>.json`. Si el examen tenía preguntas no-MC,
-corré `/notas-correjir` sobre ese intento: chequea cada punto de la rúbrica,
-escribe `intentos/<fecha>.md` con el feedback y actualiza `aprendizaje.md` y
-`progreso/`. La misma skill corrige los ejercicios de `/notas-ejercicios`
-contra su `enunciado.md` en vez de una rúbrica.
+When you finish, `exam.html` saves the whole attempt with `POST /api/attempt` to
+`exams/<slug>/attempts/<date>.json`. If the exam had non-MC questions,
+run `/notes-grade` on that attempt: it checks each rubric point, writes
+`attempts/<date>.md` with the feedback and updates `learning.md` and
+`progress/`. The same skill grades `/notes-exercises` exercises against their
+`prompt.md` instead of a rubric.

@@ -6,43 +6,43 @@
 #   "faster-whisper; sys_platform != 'win32' or platform_machine != 'ARM64'",
 # ]
 # ///
-"""Servidor local del sistema de estudio. Solo stdlib: python3 app/server.py
+"""Local server for the study system. Stdlib only: python3 app/server.py
 
-El dictado es lo unico que necesita algo mas: mlx-whisper en Mac Apple Silicon,
-faster-whisper en el resto. `npm run app` (uv run) trae el que corresponde;
-sin eso todo anda igual menos el microfono.
+Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
+faster-whisper everywhere else. `npm run app` (uv run) brings the right one;
+without it everything works except the microphone.
 """
 import base64, datetime, hashlib, http.server, json, os, pathlib, re, sys, threading, urllib.parse, webbrowser
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import texto
+import text
 
-RAIZ = pathlib.Path(__file__).resolve().parent.parent
-TEMAS = RAIZ / "temas"
-PUERTO = 8321
-MODELO_VOZ = "mlx-community/whisper-large-v3-turbo"   # ~1,6 GB, se baja la primera vez
-CPU_VOICE_MODEL = os.environ.get("NOTAS_MODELO_VOZ", "small")   # ponytail: CPU int8 only, set NOTAS_MODELO_VOZ=turbo on a fast box; CUDA needs device="auto" + cuDNN
-candado_voz = threading.Lock()
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+TOPICS = ROOT / "topics"
+PORT = 8321
+VOICE_MODEL = "mlx-community/whisper-large-v3-turbo"   # ~1.6 GB, downloaded the first time
+CPU_VOICE_MODEL = os.environ.get("NOTES_VOICE_MODEL", "small")   # ponytail: CPU int8 only, set NOTES_VOICE_MODEL=turbo on a fast box; CUDA needs device="auto" + cuDNN
+voice_lock = threading.Lock()
 cpu_model = None
-LIMITE_CUERPO = 20 * 1024 * 1024   # ponytail: cap parejo para todo POST, un solo usuario local
-EXT_AUDIO = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "mp4",
+BODY_LIMIT = 20 * 1024 * 1024   # ponytail: one flat cap for every POST, single local user
+AUDIO_EXT = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "mp4",
              "audio/wav": "wav", "audio/x-wav": "wav"}
 
 
-def ext_audio(mime):
-    """mime del MediaRecorder ('audio/webm;codecs=opus' -> 'webm'). Rechaza lo que no está en la whitelist."""
-    ext = EXT_AUDIO.get(mime.split(";")[0].strip().lower())
+def audio_ext(mime):
+    """MediaRecorder mime ('audio/webm;codecs=opus' -> 'webm'). Rejects anything not whitelisted."""
+    ext = AUDIO_EXT.get(mime.split(";")[0].strip().lower())
     if not ext:
-        raise ValueError("tipo de audio no permitido: " + mime)
+        raise ValueError("audio type not allowed: " + mime)
     return ext
 
 
-def whisper(audio, idioma):
+def whisper(audio, lang):
     global cpu_model
     try:
         import faster_whisper
     except ImportError:
-        raise ValueError("falta el motor de dictado, arranca con npm run app")
+        raise ValueError("dictation engine missing, start with npm run app")
     if isinstance(audio, str):
         audio = faster_whisper.decode_audio(audio)
     try:
@@ -50,261 +50,261 @@ def whisper(audio, idioma):
     except ImportError:
         mlx_whisper = None
     if mlx_whisper:
-        r = mlx_whisper.transcribe(audio, path_or_hf_repo=MODELO_VOZ, language=idioma)
+        r = mlx_whisper.transcribe(audio, path_or_hf_repo=VOICE_MODEL, language=lang)
         return [[s["start"], s["text"].strip()] for s in r["segments"]]
     if cpu_model is None:
         cpu_model = faster_whisper.WhisperModel(CPU_VOICE_MODEL, device="cpu", compute_type="int8")
-    segments, _ = cpu_model.transcribe(audio, language=idioma)
+    segments, _ = cpu_model.transcribe(audio, language=lang)
     return [[s.start, s.text.strip()] for s in segments]
 
 
-def transcribir(crudo):
-    """float32 mono a 16 kHz, tal cual lo manda el navegador."""
+def transcribe(raw, lang=None):
+    """float32 mono at 16 kHz, as the browser sends it. lang None = auto-detect."""
     try:
-        import numpy   # aca adentro: el resto del server no lo necesita
+        import numpy   # in here: the rest of the server doesn't need it
     except ImportError:
-        raise ValueError("falta el motor de dictado, arranca con npm run app")
-    with candado_voz:   # ponytail: una transcripcion a la vez, hay un solo usuario
-        segmentos = whisper(numpy.frombuffer(crudo, dtype="<f4"), "es")
-    # segmentos [inicio_s, texto]: el dictado en vivo fija los viejos y recorta el audio ahi
-    return {"texto": " ".join(t for _, t in segmentos).strip(), "segmentos": segmentos}
+        raise ValueError("dictation engine missing, start with npm run app")
+    with voice_lock:   # ponytail: one transcription at a time, there is a single user
+        segments = whisper(numpy.frombuffer(raw, dtype="<f4"), lang)
+    # segments [start_s, text]: live dictation pins the old ones and trims the audio there
+    return {"text": " ".join(t for _, t in segments).strip(), "segments": segments}
 
 
-def carpeta(slug):
-    """Carpeta del tema. Rechaza cualquier cosa que se escape de temas/."""
-    d = (TEMAS / slug).resolve()
-    if d.parent != TEMAS or not d.is_dir():
-        raise ValueError("tema inexistente: " + slug)
+def folder(slug):
+    """Topic folder. Rejects anything that escapes topics/."""
+    d = (TOPICS / slug).resolve()
+    if d.parent != TOPICS or not d.is_dir():
+        raise ValueError("no such topic: " + slug)
     return d
 
 
-TIPOS = ("libro", "certificación", "documentación", "curso")
+TYPES = ("book", "certification", "documentation", "course")
 
 
 def meta(d):
-    """Lo que describe al tema. `orden` manda en las listas; sin el, va al final."""
-    archivo = d / "tema.json"
-    guardado = json.loads(archivo.read_text(encoding="utf-8")) if archivo.exists() else {}
-    titulo = d.name if " " in d.name else d.name.replace("-", " ").capitalize()
-    return {"titulo": guardado.get("titulo") or titulo,
-            "subtitulo": guardado.get("subtitulo", ""),
-            "tipo": guardado.get("tipo", "libro"),
-            "orden": guardado.get("orden", 999),
-            "enlaces": guardado.get("enlaces", [])}
+    """What describes the topic. `order` rules the lists; without it, it goes last."""
+    file = d / "topic.json"
+    saved = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}
+    title = d.name if " " in d.name else d.name.replace("-", " ").capitalize()
+    return {"title": saved.get("title") or title,
+            "subtitle": saved.get("subtitle", ""),
+            "type": saved.get("type", "book"),
+            "order": saved.get("order", 999),
+            "links": saved.get("links", []),
+            "language": saved.get("language", {})}
 
 
-def recursos(d):
-    """PDFs, apuntes sueltos, lo que dejes en recursos/. Se sirven tal cual."""
-    carpeta_r = d / "recursos"
-    if not carpeta_r.is_dir():
+def resources(d):
+    """PDFs, loose notes, whatever you drop in resources/. Served as is."""
+    res = d / "resources"
+    if not res.is_dir():
         return []
-    return [{"nombre": f.name,
-             "ruta": f"/temas/{urllib.parse.quote(d.name)}/recursos/{urllib.parse.quote(f.name)}",
+    return [{"name": f.name,
+             "path": f"/topics/{urllib.parse.quote(d.name)}/resources/{urllib.parse.quote(f.name)}",
              "kb": round(f.stat().st_size / 1024)}
-            for f in sorted(carpeta_r.iterdir()) if f.is_file() and not f.name.startswith(".")]
+            for f in sorted(res.iterdir()) if f.is_file() and not f.name.startswith(".")]
 
 
-def ordenar(lista):
-    return sorted(lista, key=lambda l: (l["orden"], texto.slug(l["titulo"])))
+def sort_topics(items):
+    return sorted(items, key=lambda l: (l["order"], text.slug(l["title"])))
 
 
 EXT = {"png": ".png", "jpeg": ".jpg", "jpg": ".jpg", "gif": ".gif",
        "webp": ".webp", "avif": ".avif", "svg+xml": ".svg"}
-NOMBRE_IMG = re.compile(r"^[0-9a-f]{16}\.[a-z]+$")
+IMG_NAME = re.compile(r"^[0-9a-f]{16}\.[a-z]+$")
 
 
-def carpeta_img(slug):
-    return TEMAS / slug / "notas" / "img"
+def to_url(html, slug):
+    """notes/img/x.png -> URL the browser can request."""
+    return html.replace('src="img/', f'src="/topics/{urllib.parse.quote(slug)}/notes/img/')
 
 
-def a_url(html, slug):
-    """notas/img/x.png -> URL que el navegador puede pedir."""
-    return html.replace('src="img/', f'src="/temas/{urllib.parse.quote(slug)}/notas/img/')
+def to_path(html, slug):
+    return html.replace(f'src="/topics/{urllib.parse.quote(slug)}/notes/img/', 'src="img/')
 
 
-def a_ruta(html, slug):
-    return html.replace(f'src="/temas/{urllib.parse.quote(slug)}/notas/img/', 'src="img/')
+def extract_images(html, dest):
+    """Pulls pasted images out of the .md and stores them as separate files.
 
-
-def extraer_imagenes(html, destino):
-    """Saca las imagenes pegadas del .md y las deja como archivo aparte.
-
-    El nombre es el hash del contenido: pegar dos veces la misma captura no
-    duplica el archivo, y el .md queda con una referencia corta en vez de
-    cientos de KB de base64.
+    The name is the content hash: pasting the same screenshot twice doesn't
+    duplicate the file, and the .md keeps a short reference instead of
+    hundreds of KB of base64.
     """
-    def guardar(m):
-        crudo = base64.b64decode(m.group(2))
-        nombre = hashlib.sha1(crudo).hexdigest()[:16] + EXT.get(m.group(1), ".bin")
-        destino.mkdir(parents=True, exist_ok=True)
-        archivo = destino / nombre
-        if not archivo.exists():
-            archivo.write_bytes(crudo)
-        return f'src="img/{nombre}"'
+    def save(m):
+        raw = base64.b64decode(m.group(2))
+        name = hashlib.sha1(raw).hexdigest()[:16] + EXT.get(m.group(1), ".bin")
+        dest.mkdir(parents=True, exist_ok=True)
+        file = dest / name
+        if not file.exists():
+            file.write_bytes(raw)
+        return f'src="img/{name}"'
 
-    return re.sub(r'src="data:image/([a-z+]+);base64,([^"]+)"', guardar, html)
-
-
-def secciones(d):
-    return sorted((d / "notas").glob("*.md"))
+    return re.sub(r'src="data:image/([a-z+]+);base64,([^"]+)"', save, html)
 
 
-def titulos(d):
+def sections(d):
+    return sorted((d / "notes").glob("*.md"))
+
+
+def headings(d):
     return [re.sub(r"<[^>]+>|[*_~`\[\]]", "", l[2:]).strip()
-            for f in secciones(d) for l in f.read_text(encoding="utf-8").splitlines() if l.startswith("# ")]
+            for f in sections(d) for l in f.read_text(encoding="utf-8").splitlines() if l.startswith("# ")]
 
 
-def temas():
-    salida = [{"slug": d.name, **meta(d), "secciones": len(secciones(d)),
-               "recursos": len(recursos(d)), "indice": titulos(d)}
-              for d in TEMAS.glob("*") if d.is_dir()]
-    return ordenar(salida)
+def topics():
+    out = [{"slug": d.name, **meta(d), "sections": len(sections(d)),
+            "resources": len(resources(d)), "index": headings(d)}
+           for d in TOPICS.glob("*") if d.is_dir()]
+    return sort_topics(out)
 
 
-def leer_tema(slug):
-    d = carpeta(slug)
-    partes = [texto.md_a_html(f.read_text(encoding="utf-8")) for f in secciones(d)]
-    return {"slug": slug, **meta(d), "recursos": recursos(d),
-            "html": a_url("\n".join(partes), slug)}
+def read_topic(slug):
+    d = folder(slug)
+    parts = [text.md_to_html(f.read_text(encoding="utf-8")) for f in sections(d)]
+    return {"slug": slug, **meta(d), "resources": resources(d),
+            "html": to_url("\n".join(parts), slug)}
 
 
-def guardar_tema(slug, datos):
-    d = carpeta(slug)
-    notas = d / "notas"
-    notas.mkdir(exist_ok=True)
-    actual = meta(d)                       # conserva `orden`, que no viaja en el editor
-    actual.update({k: datos[k] for k in ("titulo", "subtitulo") if k in datos})
-    (d / "tema.json").write_text(json.dumps(actual, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+def save_topic(slug, data):
+    d = folder(slug)
+    notes = d / "notes"
+    notes.mkdir(exist_ok=True)
+    file = d / "topic.json"                 # keeps `order`, `language` and the rest, which don't travel in the editor
+    saved = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}
+    saved.update({k: data[k] for k in ("title", "subtitle") if k in data})
+    file.write_text(json.dumps(saved, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    html = extraer_imagenes(a_ruta(datos.get("html", ""), slug), notas / "img")
-    usadas = set(re.findall(r'src="img/([^"]+)"', html))   # antes de partir: html se reusa abajo
+    html = extract_images(to_path(data.get("html", ""), slug), notes / "img")
+    used = set(re.findall(r'src="img/([^"]+)"', html))   # before splitting: html is reused below
 
-    escritos = set()
-    for i, (titulo, trozo) in enumerate(texto.partir_por_h1(html), 1):
-        nombre = f"{i:02d}-{texto.slug(titulo)}.md"
-        (notas / nombre).write_text(texto.html_a_md(trozo), encoding="utf-8")
-        escritos.add(nombre)
-    for viejo in notas.glob("*.md"):          # secciones borradas o renombradas
-        if viejo.name not in escritos:
-            viejo.unlink()
+    written = set()
+    for i, (title, chunk) in enumerate(text.split_by_h1(html), 1):
+        name = f"{i:02d}-{text.slug(title)}.md"
+        (notes / name).write_text(text.html_to_md(chunk), encoding="utf-8")
+        written.add(name)
+    for old in notes.glob("*.md"):          # deleted or renamed sections
+        if old.name not in written:
+            old.unlink()
 
-    # imagenes que ya no referencia ningun .md. Solo las que genero el servidor,
-    # por si alguna vez dejas un archivo tuyo en esa carpeta.
-    img = notas / "img"
+    # images no .md references anymore. Only the ones the server generated,
+    # in case you ever drop a file of your own in that folder.
+    img = notes / "img"
     if img.is_dir():
         for f in img.iterdir():
-            if f.is_file() and f.name not in usadas and NOMBRE_IMG.match(f.name):
+            if f.is_file() and f.name not in used and IMG_NAME.match(f.name):
                 f.unlink()
-    return {"ok": True, "secciones": sorted(escritos)}
+    return {"ok": True, "sections": sorted(written)}
 
 
-def indice_examenes():
-    salida = [{"slug": d.name, **meta(d),
-               "examenes": [{"ruta": f"temas/{d.name}/examenes/{f.parent.name}/examen.json",
-                             "titulo": json.loads(f.read_text(encoding="utf-8")).get("titulo", f.parent.name)}
-                            for f in sorted((d / "examenes").glob("*/examen.json"))]}
-              for d in TEMAS.glob("*") if d.is_dir()]
-    return {"temas": ordenar(salida)}
+def exam_index():
+    out = [{"slug": d.name, **meta(d),
+            "exams": [{"path": f"topics/{d.name}/exams/{f.parent.name}/exam.json",
+                       "title": json.loads(f.read_text(encoding="utf-8")).get("title", f.parent.name)}
+                      for f in sorted((d / "exams").glob("*/exam.json"))]}
+           for d in TOPICS.glob("*") if d.is_dir()]
+    return {"topics": sort_topics(out)}
 
 
-def carpeta_examen(d, examen):
-    """Carpeta del examen dentro del tema. Mismo chequeo de escape que carpeta()."""
-    c = (d / "examenes" / examen).resolve()
-    if c.parent != (d / "examenes").resolve() or not (c / "examen.json").is_file():
-        raise ValueError("examen inexistente: " + examen)
+def exam_folder(d, exam):
+    """Exam folder inside the topic. Same escape check as folder()."""
+    c = (d / "exams" / exam).resolve()
+    if c.parent != (d / "exams").resolve() or not (c / "exam.json").is_file():
+        raise ValueError("no such exam: " + exam)
     return c
 
 
-def guardar_intento(slug, examen, respuestas):
-    """Escribe examenes/<examen>/intentos/<fecha-a-minuto>.json. Devuelve la ruta relativa.
+def save_attempt(slug, exam, answers):
+    """Writes exams/<exam>/attempts/<date-to-the-minute>.json. Returns the relative path.
 
-    Las respuestas orales con audio se guardan como archivo aparte
-    (intentos/<fecha>-p<i>.<ext>); el JSON se queda con el nombre, no el base64.
+    Oral answers with audio are saved as a separate file
+    (attempts/<date>-p<i>.<ext>); the JSON keeps the name, not the base64.
     """
-    c = carpeta_examen(carpeta(slug), examen)
-    intentos = c / "intentos"
-    intentos.mkdir(exist_ok=True)
-    fecha = datetime.datetime.now().strftime("%Y-%m-%dT%H%M")
-    for r in respuestas:
-        if r.get("tipo") == "oral" and "audio" in r:
-            ext = ext_audio(r.pop("mime", ""))
-            nombre = f"{fecha}-p{r['i']}.{ext}"
-            (intentos / nombre).write_bytes(base64.b64decode(r.pop("audio")))
-            r["audio"] = nombre
-    ruta = intentos / (fecha + ".json")
-    ruta.write_text(json.dumps({"examen": examen, "respuestas": respuestas}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return ruta.relative_to(RAIZ).as_posix()
+    c = exam_folder(folder(slug), exam)
+    attempts = c / "attempts"
+    attempts.mkdir(exist_ok=True)
+    date = datetime.datetime.now().strftime("%Y-%m-%dT%H%M")
+    for a in answers:
+        if a.get("type") == "oral" and "audio" in a:
+            ext = audio_ext(a.pop("mime", ""))
+            name = f"{date}-p{a['i']}.{ext}"
+            (attempts / name).write_bytes(base64.b64decode(a.pop("audio")))
+            a["audio"] = name
+    path = attempts / (date + ".json")
+    path.write_text(json.dumps({"exam": exam, "answers": answers}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path.relative_to(ROOT).as_posix()
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
-        super().__init__(*a, directory=str(RAIZ), **kw)
+        super().__init__(*a, directory=str(ROOT), **kw)
 
-    def responder(self, codigo, datos):
-        cuerpo = json.dumps(datos, ensure_ascii=False).encode()
-        self.send_response(codigo)
+    def respond(self, code, data):
+        body = json.dumps(data, ensure_ascii=False).encode()
+        self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(cuerpo)))
+        self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(cuerpo)
+        self.wfile.write(body)
 
     def do_GET(self):
-        ruta = urllib.parse.unquote(self.path.split("?")[0])
+        path = urllib.parse.unquote(self.path.split("?")[0])
         try:
-            if ruta == "/api/index":
-                return self.responder(200, indice_examenes())
-            if ruta == "/api/temas":
-                return self.responder(200, {"temas": temas()})
-            if ruta.startswith("/api/tema/"):
-                return self.responder(200, leer_tema(ruta[len("/api/tema/"):]))
+            if path == "/api/index":
+                return self.respond(200, exam_index())
+            if path == "/api/topics":
+                return self.respond(200, {"topics": topics()})
+            if path.startswith("/api/topic/"):
+                return self.respond(200, read_topic(path[len("/api/topic/"):]))
         except Exception as e:
-            return self.responder(400, {"error": str(e)})
+            return self.respond(400, {"error": str(e)})
         return super().do_GET()
 
     def do_POST(self):
-        ruta = urllib.parse.unquote(self.path.split("?")[0])
+        path, _, query = self.path.partition("?")
+        path = urllib.parse.unquote(path)
         try:
-            largo = int(self.headers["Content-Length"])
-            if largo > LIMITE_CUERPO:
-                return self.responder(400, {"error": "cuerpo demasiado grande"})
-            crudo = self.rfile.read(largo)
-            if ruta == "/api/voz":
-                return self.responder(200, transcribir(crudo))
-            if ruta == "/api/intento":
-                datos = json.loads(crudo)
-                return self.responder(200, {"ruta": guardar_intento(datos["slug"], datos["examen"], datos["respuestas"])})
-            if not ruta.startswith("/api/tema/"):
-                return self.responder(404, {"error": "no existe"})
-            self.responder(200, guardar_tema(ruta[len("/api/tema/"):], json.loads(crudo)))
+            length = int(self.headers["Content-Length"])
+            if length > BODY_LIMIT:
+                return self.respond(400, {"error": "body too large"})
+            raw = self.rfile.read(length)
+            if path == "/api/voice":
+                lang = urllib.parse.parse_qs(query).get("lang", [None])[0]
+                return self.respond(200, transcribe(raw, lang))
+            if path == "/api/attempt":
+                data = json.loads(raw)
+                return self.respond(200, {"path": save_attempt(data["slug"], data["exam"], data["answers"])})
+            if not path.startswith("/api/topic/"):
+                return self.respond(404, {"error": "not found"})
+            self.respond(200, save_topic(path[len("/api/topic/"):], json.loads(raw)))
         except Exception as e:
-            self.responder(400, {"error": str(e)})
+            self.respond(400, {"error": str(e)})
 
     def end_headers(self):
         if self.path.endswith((".html", ".css", ".js")):
-            self.send_header("Cache-Control", "no-store")   # editar y recargar, sin F5 duro
+            self.send_header("Cache-Control", "no-store")   # edit and reload, no hard refresh
         super().end_headers()
 
     def log_message(self, *a):
-        pass  # ponytail: sin ruido en consola; sacar el pass para debug
+        pass  # ponytail: no console noise; remove the pass to debug
 
 
 if __name__ == "__main__":
-    if sys.argv[1:2] == ["--transcribir"]:
-        print(" ".join(t for _, t in whisper(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "es")).strip())
+    if sys.argv[1:2] == ["--transcribe"]:
+        print(" ".join(t for _, t in whisper(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)).strip())
         sys.exit(0)
-    pagina = sys.argv[1] if len(sys.argv) > 1 else ""
-    url = f"http://localhost:{PUERTO}/{pagina}"
+    page = sys.argv[1] if len(sys.argv) > 1 else ""
+    url = f"http://localhost:{PORT}/{page}"
     try:
-        servidor = http.server.ThreadingHTTPServer(("127.0.0.1", PUERTO), Handler)
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     except OSError:
-        # ponytail: ya hay un server levantado, abrimos la pagina y listo
-        print(f"Ya habia un servidor en {PUERTO}. Abriendo {url}")
+        # ponytail: a server is already up, just open the page
+        print(f"A server was already running on {PORT}. Opening {url}")
         webbrowser.open(url)
         sys.exit(0)
-    print(f"Estudios en {url}  (ctrl+c para cortar)")
+    print(f"Study app at {url}  (ctrl+c to stop)")
     webbrowser.open(url)
     try:
-        servidor.serve_forever()
+        server.serve_forever()
     except KeyboardInterrupt:
-        print("\nServidor apagado.")  # ctrl+c sin traceback
+        print("\nServer stopped.")  # ctrl+c without traceback

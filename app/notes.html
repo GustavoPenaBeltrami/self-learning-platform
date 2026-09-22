@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=JetBrains+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+<script src="viz.js"></script>
+<script src="shell.js"></script>
+<style>
+  .page { max-width: calc(var(--width) + 2 * var(--gutter)); margin: 0 auto; padding: var(--spacing-24) var(--gutter) 0; }
+
+  :root[data-font="serif"] { --reading-font: var(--serif); }
+  :root[data-font="inter"] { --reading-font: Inter, "SF Pro Text", -apple-system, "Helvetica Neue", sans-serif; }
+  :root[data-font="mono"]  { --reading-font: var(--mono); }
+  .doc { font-family: var(--reading-font, var(--mono)); }
+  :root[data-font="serif"] .doc, :root[data-font="inter"] .doc { font-size: 15px; }
+
+  .cover { margin: 0 0 var(--spacing-32); }
+  .cover h1 { font-size: var(--text-display); line-height: var(--leading-display); margin: 0; outline: 0; color: var(--ink); }
+  .cover #subtitle { color: var(--muted); margin: .3rem 0 0; outline: 0; }
+  .cover #subtitle::before { content: '# '; color: var(--color-steel); }
+  .cover #subtitle:empty::after { content: 'topic subtitle'; color: var(--color-slate); }
+
+  .doc { position: relative; counter-reset: h1 ln; outline: 0; min-height: 40vh; caret-color: var(--ansi-green); }
+  .doc > :is(p, h1, h2, h3, h4, h5, h6, div, blockquote), .doc > :is(ul, ol) > li { position: relative; counter-increment: ln; }
+  .doc > :is(p, h1, h2, h3, h4, h5, h6, div, blockquote)::after, .doc > :is(ul, ol) > li::after {
+    content: counter(ln); position: absolute; top: 0; left: calc(-1 * var(--gutter));
+    width: calc(var(--gutter) - 1.4rem); text-align: right;
+    font-family: var(--mono); font-weight: 400; font-style: normal; color: var(--color-slate);
+  }
+  .doc > :is(ul, ol) > li::after { left: calc(-1 * var(--gutter) - 1.4rem); }
+  .doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6 { font-family: var(--mono); scroll-margin-top: calc(var(--bar-h) + 1rem); }
+  .doc h1 { counter-increment: h1 ln; counter-reset: h2; font-size: 17px; line-height: 1.5; color: var(--ansi-blue); margin-top: 2.5rem; }
+  .doc h1:first-child { margin-top: 0; }
+  .doc h2 { counter-increment: h2 ln; counter-reset: h3; font-size: 15px; line-height: 1.6; color: var(--ansi-cyan); }
+  .doc h3 { counter-increment: h3 ln; font-size: 14px; line-height: 1.7; color: var(--ansi-green); }
+  .doc h4 { font-size: 14px; color: var(--ansi-yellow); }
+  .doc h5 { font-size: 14px; color: var(--ansi-magenta); }
+  .doc h1::before, .doc h2::before, .doc h3::before { color: var(--color-steel); font-weight: 400; }
+  .doc h1::before { content: counter(h1) ". "; }
+  .doc h2::before { content: counter(h1) "." counter(h2) "  "; }
+  .doc h3::before { content: counter(h1) "." counter(h2) "." counter(h3) "  "; }
+  .doc:empty::before { content: 'type /h1 to start the first section'; color: var(--muted); }
+  .doc ul { padding-left: 1.4rem; list-style-type: '- '; }
+  .doc ul ul { list-style-type: '· '; }
+  .doc ol { padding-left: 2rem; }
+  .doc li { margin: .15rem 0; }
+  .doc li::marker { color: var(--ansi-orange); }
+  .doc strong, .doc b { color: var(--color-paper); }
+  .doc em, .doc i { color: var(--ansi-yellow); }
+
+  mark { --c: #d8c06a; background: none; color: inherit; cursor: pointer; }
+  mark.mk-fondo { background: color-mix(in srgb, var(--c) 35%, transparent); padding: 0 .1em; }
+  mark.mk-sub { border-bottom: 2px solid var(--c); }
+  mark.mk-tacha { text-decoration: line-through; text-decoration-color: var(--c); text-decoration-thickness: 2px; }
+  mark[data-nota]::after { content: '\00b0'; color: var(--accent); font-size: .9em; vertical-align: super; }
+  mark.active { outline: 1px solid var(--accent); outline-offset: 2px; }
+
+  .ref { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
+
+  .bubble, .mark-menu, .tip {
+    position: fixed; background: var(--color-void); border: 1px solid var(--color-slate); border-radius: 0;
+  }
+  .bubble {
+    z-index: 60; max-width: 24rem; max-height: 14rem; overflow: hidden; padding: .7rem .9rem;
+    font: 400 13px/1.6 var(--mono); color: var(--ink);
+  }
+  .bubble h4 { font: 700 12px/1.3 var(--mono); margin: 0 0 .35rem; color: var(--ansi-cyan); }
+  .bubble.broken { color: var(--muted); }
+
+  .mark-menu { z-index: 70; display: flex; align-items: center; gap: .1rem; padding: .25rem; }
+  .mark-menu button {
+    border: 0; background: none; border-radius: 0; color: var(--ink);
+    padding: .35rem .4rem; display: grid; place-items: center; min-width: 1.8rem;
+  }
+  .mark-menu button:hover { background: var(--color-iron); }
+  .mark-menu .swatch { width: 12px; height: 12px; min-width: 0; padding: 0; border-radius: 50%; margin: 0 .15rem; }
+  .mark-menu .swatch[aria-pressed="true"] { outline: 1.5px solid var(--ink); outline-offset: 2px; }
+  .mark-menu .sep { width: 1px; height: 1.1rem; background: var(--line); margin: 0 .25rem; }
+  .mark-menu select { border: 0; background: none; color: var(--ink); font: 400 12px/1 var(--mono); max-width: 18rem; padding: .35rem; }
+  .mark-menu input[type="range"] { width: 8rem; accent-color: var(--accent); padding: 0 .4rem; }
+  .mark-menu .readout { font: 400 12px/1 var(--mono); color: var(--muted); min-width: 2.4rem; text-align: right; }
+  .mark-menu input[type="text"] {
+    border: 0; background: none; color: var(--ink); outline: 0;
+    font: 400 12px/1 var(--mono); width: 12rem; padding: .35rem .5rem;
+  }
+  .mark-menu input::placeholder { color: var(--muted); }
+
+  .tarjeta {
+    position: absolute; z-index: 10; width: 14rem; margin: 0; overflow: hidden;
+    background: var(--color-graphite); border: 1px solid var(--line);
+    border-left: 2px solid var(--c, var(--accent)); border-radius: 0;
+    font: 400 13px/1.6 var(--mono);
+    opacity: .55; transition: opacity .15s ease;
+  }
+  .tarjeta:hover, .tarjeta:focus-within { opacity: 1; }
+  .tarjeta .cuerpo { padding: .6rem .8rem; outline: 0; min-height: 2.4rem; }
+  .tarjeta .cuerpo:empty::before { content: 'margin note'; color: var(--muted); }
+  .tarjeta .handle {
+    position: absolute; top: .25rem; right: .25rem; display: flex; gap: .1rem;
+    opacity: 0; background: var(--color-void); border: 1px solid var(--line);
+  }
+  .tarjeta:hover .handle, .tarjeta:focus-within .handle { opacity: 1; }
+  .tarjeta .handle span, .tarjeta .handle button {
+    border: 0; background: none; padding: .15rem .35rem;
+    font: 400 12px/1.4 var(--mono); color: var(--muted);
+  }
+  .tarjeta .handle span { cursor: grab; }
+  .tarjeta.dragging { outline: 1px solid var(--accent); }
+  .tarjeta img { display: block; width: 100%; height: auto; }
+  .tarjeta figcaption { padding: .5rem .8rem; color: var(--muted); outline: 0; font-size: 12px; }
+  .tarjeta figcaption:empty::before { content: 'caption'; color: var(--color-slate); }
+
+  .doc img.inline { display: block; max-width: 100%; height: auto; margin: var(--spacing-24) auto; cursor: pointer; }
+  .doc img.inline.active { outline: 1px solid var(--accent); outline-offset: 3px; }
+
+  .tip {
+    z-index: 80; pointer-events: none; padding: .25rem .5rem;
+    font: 400 12px/1.4 var(--mono); color: var(--ink); white-space: nowrap;
+  }
+  .pill button.recording { color: var(--bad); animation: pulse .8s ease-in-out infinite alternate; }
+  @keyframes pulse { to { opacity: .35; } }
+  .provisional { color: var(--muted); }
+
+  .tree .fold {
+    flex: 0 0 1rem; padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--muted); font: 400 13px/1 var(--mono); transition: transform .15s;
+  }
+  .tree .fold:hover { color: var(--accent); }
+  .tree .fold[aria-expanded="true"] { transform: rotate(90deg); }
+  .tree a.n2 { padding-left: 1rem; } .tree a.n3 { padding-left: 2rem; }
+  .tree #index a.n1 { color: var(--ansi-blue); }
+  .tree .nothing { color: var(--color-steel); padding: 0 .3rem; margin: 0; }
+
+  @media (max-width: 1280px) {
+    .tarjeta { position: static !important; width: auto; margin: 1rem 0; }
+  }
+</style>
+
+<body>
+<script>
+/* Highlight and card palette. Edit this array and the whole app changes. */
+const COLORS = ['#d8c06a', '#8fbf7f', '#d67a6a', '#5a9be0', '#a88cc4', '#66b8c4', '#d08a4c'];
+
+/* Icons. viewBox 20x20, 1.5 stroke, they inherit the button color. */
+const ICON = {
+  back:      '<path d="M9 4.5 3.5 10 9 15.5"/><path d="M3.5 10h13"/>',
+  highlight: '<path d="M3.5 16.5h13"/><path d="M6.5 13.5 12.5 3.5l3.5 2.2-6 10.3z"/><path d="M6.5 13.5 10 15.7"/>',
+  underline: '<path d="M6 3v5.5a4 4 0 0 0 8 0V3"/><path d="M4.5 16.8h11"/>',
+  strike:    '<path d="M3.5 10h13"/><path d="M13.5 5.6a3.4 2.7 0 0 0-6.2 1.1c0 1.6 1.7 2.2 3.2 2.6"/><path d="M7 13.4a3.4 2.7 0 0 0 6.4-.6"/>',
+  reference: '<path d="M8.6 11.4a3.2 3.2 0 0 0 4.5 0l2.6-2.6a3.2 3.2 0 0 0-4.5-4.5l-.9.9"/><path d="M11.4 8.6a3.2 3.2 0 0 0-4.5 0L4.3 11.2a3.2 3.2 0 0 0 4.5 4.5l.9-.9"/>',
+  note:      '<path d="M4 3.5h12v8.5l-3.5 4H4z"/><path d="M16 12h-3.5v4"/>',
+  voice:     '<rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0"/><path d="M10 15v2.5"/>',
+  image:     '<rect x="3" y="4" width="14" height="12" rx="1.5"/><circle cx="7.3" cy="8" r="1.2"/><path d="M3.6 14.2 8 10l3 2.8 2.2-2 3.2 3"/>',
+  sun:       '<circle cx="10" cy="10" r="3.3"/><path d="M10 2.2v1.9M10 15.9v1.9M2.2 10h1.9M15.9 10h1.9M4.6 4.6l1.3 1.3M14.1 14.1l1.3 1.3M15.4 4.6l-1.3 1.3M5.9 14.1l-1.3 1.3"/>',
+  moon:      '<path d="M16.3 11.8A6.6 6.6 0 0 1 8.2 3.7a6.6 6.6 0 1 0 8.1 8.1z"/>',
+  comment:   '<path d="M3.5 4h13v8.5h-8L4.5 16v-3.5h-1z"/>',
+  remove:    '<path d="M5 5l10 10M15 5 5 15"/>',
+  diagram:   '<rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="1.8" y="13.5" width="5.4" height="4" rx="1"/><rect x="12.8" y="13.5" width="5.4" height="4" rx="1"/><path d="M10 6.5v3M4.5 13.5v-2.5h11v2.5"/>',
+  formula:   '<path d="M14.6 4.2H6.4l4.6 5.8-4.6 5.8h8.2"/>',
+  drag:      '<circle cx="7" cy="6" r="1"/><circle cx="13" cy="6" r="1"/><circle cx="7" cy="10" r="1"/><circle cx="13" cy="10" r="1"/><circle cx="7" cy="14" r="1"/><circle cx="13" cy="14" r="1"/>',
+};
+const svg = (n, t = 16) => `<svg viewBox="0 0 20 20" width="${t}" height="${t}" fill="none"
+  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
+
+document.documentElement.dataset.font = localStorage.getItem('font') || 'mono';
+
+const { app, tree, tools, path, mode } = mountShell('notes');
+const zoom = () => parseFloat(app.style.zoom) || 1;
+const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
+
+let color = COLORS[0], doc, titleEl, subtitle, index, topic, lastRange;
+
+/* ---------- topic menu ---------- */
+async function loadTopics() {
+  return (await (await fetch('/api/topics')).json()).topics;
+}
+
+function buildTree(topics, current) {
+  tree.innerHTML = topics.map(t => `<details open${t.slug === current ? ' class="current"' : ''}>
+    <summary title="${esc(t.title)}"><span class="name">${esc(t.slug)}/</span><span class="count">${t.sections}</span></summary>
+    ${t.slug === current ? '<div id="resources"></div><div id="index"></div>'
+      : `<ol>${t.index.map((h, i) => `<li><a href="?topic=${encodeURIComponent(t.slug)}#${slug(h)}">
+          <span class="n">${i + 1}</span><span>${esc(h)}</span></a></li>`).join('')
+        || '<li class="empty">(empty)</li>'}</ol>`}
+  </details>`).join('');
+}
+
+async function menu() {
+  let topics;
+  try {
+    topics = await loadTopics();
+  } catch {
+    app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
+      <p>Open a terminal in the folder and run <code>npm run app</code>.</p></div>`;
+    return;
+  }
+  buildTree(topics, null);
+  path('~/notes/topics');
+  app.innerHTML = `
+    <div class="sheet">
+    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/topics</span> <span class="p-sig">❯</span> ls -l</p>
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">SECT</th><th class="num">RES</th></tr></thead>
+      <tbody>${topics.map(l => `
+        <tr onclick="location.search='?topic=${encodeURIComponent(l.slug)}'">
+          <td class="num">${l.order < 999 ? String(l.order).padStart(2, '0') : '—'}</td>
+          <td class="wide"><a href="?topic=${encodeURIComponent(l.slug)}">${esc(l.title)}</a><br><span class="sub">${esc(l.subtitle || '')}</span></td>
+          <td class="type">${esc(l.type)}</td>
+          <td class="num${l.sections ? '' : ' zero'}">${l.sections}</td>
+          <td class="num${l.resources ? '' : ' zero'}">${l.resources}</td>
+        </tr>`).join('')}</tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+}
+
+/* ---------- notebook ---------- */
+async function openTopic(name) {
+  const [t, topics] = await Promise.all([
+    fetch('/api/topic/' + encodeURIComponent(name)).then(r => r.json()), loadTopics()]);
+  topic = t;
+  if (topic.error) throw new Error(topic.error);
+  document.title = topic.title;
+  buildTree(topics, topic.slug);
+  path(`~/notes/topics/${topic.slug}/notes`);
+
+  tools.innerHTML = `
+    <div class="wb-mod pill">
+      <select id="block" data-tip="Block type">
+        <option value="p">paragraph</option>
+        ${[1, 2, 3, 4, 5, 6].map(n => `<option value="h${n}">heading ${n}</option>`).join('')}
+        <option value="list">list</option>
+        <option value="ol">numbered list</option>
+      </select>
+      <select id="font" data-tip="Reading font">
+        <option value="mono">mono</option>
+        <option value="serif">serif</option>
+        <option value="inter">inter</option>
+      </select>
+    </div>
+    <div class="wb-mod pill">
+      <button data-cmd="bold" data-tip="Bold · ⌘B" style="font-weight:700">B</button>
+      <button data-cmd="italic" data-tip="Italic · ⌘I" style="font-style:italic">I</button>
+    </div>
+    <div class="wb-mod pill">
+      ${COLORS.map((c, i) => `<button class="swatch" style="--c:${c};background:${c}"
+        data-color="${c}" aria-pressed="${i === 0}" data-tip="Color ${c}"></button>`).join('')}
+      <button data-mark="mk-fondo" data-tip="Highlight">${svg('highlight')}</button>
+      <button data-mark="mk-sub" data-tip="Underline">${svg('underline')}</button>
+      <button data-mark="mk-tacha" data-tip="Strikethrough">${svg('strike')}</button>
+    </div>
+    <div class="wb-mod pill">
+      <button id="reference" data-tip="Reference to a section · or type [[name]]">${svg('reference')}</button>
+      <button id="card" data-tip="Margin note">${svg('note')}</button>
+      <button id="image" data-tip="Image · you can also paste or drop it">${svg('image')}</button>
+      <input type="file" id="image-file" accept="image/*" hidden>
+      <button id="diagram" data-tip="Diagram · Mermaid">${svg('diagram')}</button>
+      <button id="formula" data-tip="Formula · LaTeX">${svg('formula')}</button>
+      <button id="voice" data-tip="Dictate · ⌃M to start and stop">${svg('voice')}</button>
+    </div>`;
+  app.innerHTML = `
+
+    <div class="page">
+      <header class="cover">
+        <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/topics/${esc(topic.slug)}</span> <span class="p-sig">❯</span> nvim notes/</p>
+        <h1 id="title" contenteditable>${esc(topic.title)}</h1>
+        <p id="subtitle" contenteditable>${esc(topic.subtitle || '')}</p>
+      </header>
+      <div class="doc" id="doc" contenteditable spellcheck="true"></div>
+      <div class="tildes"></div>
+    </div>`;
+
+  doc = document.getElementById('doc');
+  titleEl = document.getElementById('title');
+  subtitle = document.getElementById('subtitle');
+  index = document.getElementById('index');
+  buildResources();
+  doc.innerHTML = topic.html || '';
+  vizPaint(doc);
+  placeCards();
+  buildIndex();
+  if (location.hash) goTo(decodeURIComponent(location.hash.slice(1)));
+
+  doc.addEventListener('focusin', () => mode('INSERT', 'insert'));
+  doc.addEventListener('focusout', () => mode('NORMAL'));
+  const fontSel = document.getElementById('font');
+  fontSel.value = localStorage.getItem('font') || 'mono';
+  fontSel.onchange = () => {
+    document.documentElement.dataset.font = fontSel.value;
+    localStorage.setItem('font', fontSel.value);
+  };
+  doc.addEventListener('input', () => {
+    if (!shortcuts()) autoRef();
+    buildIndex();
+    save();
+  });
+  [titleEl, subtitle].forEach(e => e.addEventListener('input', save));
+
+  doc.onclick = e => {
+    const a = e.target.closest?.('.ref');
+    if (a) { e.preventDefault(); return goTo(a.hash.slice(1)); }
+    const fig = e.target.closest?.('figure.viz');
+    if (fig) return vizMenu(fig);
+    const img = e.target.closest?.('img.inline');
+    if (img) return imageMenu(img);
+    const m = e.target.closest?.('mark');
+    m ? markMenu(m) : closeMenu();
+  };
+  doc.addEventListener('mouseover', e => {
+    const a = e.target.closest?.('.ref');
+    if (a) return refBubble(a);
+    const m = e.target.closest?.('mark[data-nota]');
+    if (m) commentBubble(m);
+  });
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeMenu(); closeBubble(); closeTip(); }
+    // ⌘M never arrives: macOS uses it to minimize before the browser sees it
+    if (e.ctrlKey && e.code === 'KeyM') { e.preventDefault(); dictate(document.getElementById('voice')); }
+  });
+
+  document.getElementById('block').onchange = e => {
+    restore();
+    applyBlock(e.target.value);
+    buildIndex(); save();
+  };
+  // mousedown on the bar would move focus out of the editable and execCommand
+  // would stop applying. Cancelling it keeps the caret and selection.
+  tools.querySelectorAll('button').forEach(b => b.onmousedown = e => e.preventDefault());
+  tools.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-tip]');
+    if (el) showTip(el);
+  });
+  tools.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => {
+    // ponytail: execCommand for bold/italic only. Deprecated but works in
+    // every current browser and avoids writing a whole editor.
+    restore(); document.execCommand(b.dataset.cmd); save();
+  });
+  tools.querySelectorAll('[data-color]').forEach(b => b.onclick = () => {
+    color = b.dataset.color;
+    tools.querySelectorAll('[data-color]').forEach(o => o.setAttribute('aria-pressed', o === b));
+  });
+  tools.querySelectorAll('[data-mark]').forEach(b => b.onclick = () => mark(b.dataset.mark));
+  document.getElementById('reference').onclick = e => referenceMenu(e.currentTarget);
+  document.getElementById('card').onclick = () => { createCard({}); save(); };
+  document.getElementById('image').onclick = () => document.getElementById('image-file').click();
+  document.getElementById('image-file').onchange = e => insertImage(e.target.files[0]);
+  document.getElementById('diagram').onclick = () => insertViz('mermaid');
+  document.getElementById('formula').onclick = () => insertViz('math');
+  document.getElementById('voice').onclick = e => dictate(e.currentTarget);
+  doc.addEventListener('paste', e => {
+    const dt = e.clipboardData;
+    // a screenshot arrives in `items`, a file from Finder in `files`
+    const f = [...(dt.files || [])].find(x => x.type.startsWith('image/'))
+      || [...(dt.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/'))
+           .map(i => i.getAsFile())[0];
+    if (f) { e.preventDefault(); insertImage(f); }
+  });
+  doc.addEventListener('dragover', e => e.preventDefault());
+  doc.addEventListener('drop', e => {
+    const f = [...e.dataTransfer.files].find(f => f.type.startsWith('image/'));
+    if (f) { e.preventDefault(); insertImage(f); }
+  });
+}
+
+/* Image in the text flow. For a floating one: create a margin note and
+   paste the image inside it; the same handler inserts it at the caret. */
+function insertImage(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    restore();
+    document.execCommand('insertHTML', false, `<img class="inline" src="${reader.result}" alt="">`);
+    save();
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ---------- dictation ---------- */
+/* Local Whisper in server.py. It doesn't transcribe in streaming: while you
+   talk, the accumulated audio is re-transcribed in a loop and the provisional
+   (grey) text keeps getting overwritten, like a phone keyboard. After COMMIT_S
+   seconds everything but the last segment is committed and the audio is
+   trimmed there, so each round stays short. Float32 at 16 kHz straight from
+   the microphone: the server doesn't need ffmpeg. */
+const RATE = 16000, COMMIT_S = 15;
+let dictation;
+
+async function dictate(button) {
+  if (dictation) return dictation.done = true;
+  const status = document.getElementById('status');
+  let mic;
+  try {
+    mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    return status.textContent = 'No microphone: ' + e.message;
+  }
+  const d = dictation = { chunks: [], length: 0, done: false };
+  const ctx = new AudioContext({ sampleRate: RATE });
+  // ponytail: ScriptProcessor is deprecated but works in every browser and avoids
+  // an AudioWorklet in a separate file. Move to AudioWorklet if one drops it.
+  const node = ctx.createScriptProcessor(4096, 1, 1);
+  node.onaudioprocess = e => {
+    const c = e.inputBuffer.getChannelData(0).slice();
+    d.chunks.push(c);
+    d.length += c.length;
+  };
+  ctx.createMediaStreamSource(mic).connect(node);
+  node.connect(ctx.destination);   // without this Chrome doesn't fire onaudioprocess; the output is silence
+
+  restore();
+  const span = document.createElement('span');
+  span.className = 'provisional';
+  const sel = getSelection();
+  sel.rangeCount ? sel.getRangeAt(0).insertNode(span) : doc.append(span);
+  button.classList.add('recording');
+  status.textContent = 'Listening… click the microphone to finish';
+
+  const lang = topic.language?.notes;
+  const voiceUrl = '/api/voice' + (lang ? '?lang=' + encodeURIComponent(lang) : '');
+  let sent = 0, error;
+  try {
+    while (true) {
+      const done = d.done;
+      if (done) { mic.getTracks().forEach(t => t.stop()); node.disconnect(); }
+      // nothing new, or less than 1 s (a short silence makes Whisper hallucinate)
+      if (d.length === sent || (!done && d.length < RATE)) {
+        if (done) break;
+        await new Promise(r => setTimeout(r, 200));
+        continue;
+      }
+      const n = d.chunks.length, audio = new Float32Array(d.length);
+      d.chunks.reduce((o, t) => (audio.set(t, o), o + t.length), 0);
+      sent = audio.length;
+      const r = await (await fetch(voiceUrl, { method: 'POST', body: audio })).json();
+      if (r.error) throw new Error(r.error);
+
+      if (done) { if (r.text) span.before(r.text + ' '); break; }
+      const segs = r.segments;
+      if (audio.length > COMMIT_S * RATE && segs.length > 1) {
+        span.before(segs.slice(0, -1).map(s => s[1]).join(' ') + ' ');
+        const from = Math.round(segs.at(-1)[0] * RATE);
+        d.chunks.splice(0, n, audio.slice(from));   // whatever arrived during the fetch stays behind
+        d.length -= from;
+        sent -= from;
+        span.textContent = segs.at(-1)[1];
+      } else {
+        span.textContent = r.text;
+      }
+    }
+  } catch (e) {
+    error = e;
+  } finally {
+    mic.getTracks().forEach(t => t.stop());
+    ctx.close();
+    span.remove();
+    dictation = null;
+    button.classList.remove('recording');
+    buildIndex();
+  }
+  // ponytail: on error don't save so the message isn't overwritten; committed text is saved on the next keystroke
+  error ? status.textContent = 'Not transcribed: ' + error.message : save();
+}
+
+/* ---------- selection ---------- */
+document.addEventListener('selectionchange', () => {
+  const sel = getSelection();
+  if (!sel.rangeCount || !doc?.contains(sel.anchorNode)) return;
+  lastRange = sel.getRangeAt(0);
+  document.getElementById('block').value = currentBlock();
+});
+
+function restore() {
+  doc.focus();
+  if (!lastRange) return;
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(lastRange);
+}
+
+function wrap(create) {
+  restore();
+  const sel = getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  const el = create();
+  el.appendChild(range.extractContents());
+  range.insertNode(el);
+  sel.removeAllRanges();
+  save();
+  return el;
+}
+
+function mark(cls) {
+  const m = wrap(() => {
+    const el = document.createElement('mark');
+    el.className = cls;
+    el.style.setProperty('--c', color);
+    return el;
+  });
+  if (m) markMenu(m);
+  return m;
+}
+
+/* ---------- blocks: heading, paragraph, list ---------- */
+/* No execCommand('formatBlock'): it doesn't apply to loose text inside the
+   contenteditable, which is exactly the case of an empty document. */
+const BLOCKS = 'h1,h2,h3,h4,h5,h6,p,li,blockquote';
+
+function blockOf(node) {
+  const el = node?.nodeType === 3 ? node.parentElement : node;
+  const b = el?.closest(BLOCKS);
+  return b && doc.contains(b) ? b : null;
+}
+
+function caretAtEnd(el) {
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.collapse(false);
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+function currentBlock() {
+  const b = blockOf(getSelection().anchorNode);
+  if (!b) return 'p';
+  if (b.tagName === 'LI') return b.parentElement.tagName === 'OL' ? 'ol' : 'list';
+  return /^H[1-6]$/.test(b.tagName) ? b.tagName.toLowerCase() : 'p';
+}
+
+function keepCaret(change) {
+  const sel = getSelection();
+  const n = sel.anchorNode, o = sel.anchorOffset;
+  const el = change();
+  if (!el.textContent && !el.querySelector('img')) el.innerHTML = '<br>';
+  if (!n?.isConnected || !el.contains(n)) return caretAtEnd(el);
+  const r = document.createRange();
+  r.setStart(n, Math.min(o, n.nodeType === 3 ? n.length : n.childNodes.length));
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+function applyBlock(tag) {
+  const node = getSelection().anchorNode;
+  if (!node || !doc.contains(node)) return;
+  const b = blockOf(node);
+  const li = b?.tagName === 'LI' ? b : null;
+
+  if (tag === 'list' || tag === 'ul' || tag === 'ol') {
+    const type = tag === 'ol' ? 'OL' : 'UL';
+    if (li) return li.parentElement.tagName === type || keepCaret(() => {
+      const old = li.parentElement, fresh = document.createElement(type);
+      fresh.append(...old.childNodes);
+      old.replaceWith(fresh);
+      return li;
+    });
+    return keepCaret(() => {
+      const list = document.createElement(type);
+      const item = list.appendChild(document.createElement('li'));
+      move(node, list, item);
+      return item;
+    });
+  }
+  keepCaret(() => {
+    const el = document.createElement(tag);
+    if (!li) {
+      move(node, el, el);
+      return el;
+    }
+    const list = li.parentElement;
+    const rest = [];
+    for (let n = li.nextElementSibling; n; n = n.nextElementSibling) rest.push(n);
+    if (rest.length) {
+      const tail = document.createElement(list.tagName);
+      tail.append(...rest);
+      list.after(tail);
+    }
+    el.append(...li.childNodes);
+    list.after(el);
+    li.remove();
+    if (!list.children.length) list.remove();
+    return el;
+  });
+}
+
+/* Puts the current line inside `container`, leaving the content in `target`. */
+function move(node, container, target) {
+  const block = blockOf(node);
+  const parent = node.nodeType === 3 ? node.parentElement : node;
+  if (block) {
+    target.append(...block.childNodes);
+    block.replaceWith(container);
+  } else if (parent && parent !== doc && parent.tagName === 'DIV' && doc.contains(parent)) {
+    target.append(...parent.childNodes);   // the <div> Chrome creates on Enter
+    parent.replaceWith(container);
+  } else {
+    node.replaceWith(container);
+    target.appendChild(node);
+  }
+}
+
+/* ---------- typing shortcuts: /h1, /list, "- " ---------- */
+function shortcuts() {
+  const sel = getSelection();
+  const n = sel.anchorNode;
+  if (!n || n.nodeType !== 3 || !doc.contains(n)) return false;
+
+  const before = n.data.slice(0, sel.anchorOffset).replace(/ /g, ' ');
+  const m = /^(?:\/(h[1-6]|p|list|ul|ol)|([-*]) |(\d+)\. )$/i.exec(before);
+  if (!m) return false;
+  // it has to be the start of the line: nothing typed before it in the same block
+  if (n.previousSibling?.textContent.trim()) return false;
+
+  n.deleteData(0, sel.anchorOffset);
+  applyBlock(m[1] ? m[1].toLowerCase() : m[2] ? 'list' : 'ol');
+  return true;
+}
+
+/* ---------- references ---------- */
+/* Turns [[text]] into a reference as soon as the bracket closes. */
+function autoRef() {
+  const sel = getSelection();
+  const n = sel.anchorNode;
+  if (!n || n.nodeType !== 3) return;
+  const m = /\[\[([^\[\]]+)\]\]$/.exec(n.data.slice(0, sel.anchorOffset));
+  if (!m) return;
+  const range = document.createRange();
+  range.setStart(n, sel.anchorOffset - m[0].length);
+  range.setEnd(n, sel.anchorOffset);
+  range.deleteContents();
+  const a = document.createElement('a');
+  a.className = 'ref';
+  a.href = '#' + slug(m[1]);
+  a.textContent = m[1];
+  range.insertNode(a);
+  const tail = document.createTextNode(' ');
+  a.after(tail);
+  const r2 = document.createRange();
+  r2.setStart(tail, 1);
+  r2.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r2);
+}
+
+const headings = () => [...doc.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+
+function goTo(id) {
+  headings().find(h => h.id === id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---------- reading bubbles ---------- */
+let bubble;
+const closeBubble = () => { bubble?.remove(); bubble = null; };
+
+function showBubble(anchor, html, broken) {
+  closeBubble();
+  bubble = document.createElement('div');
+  bubble.className = 'bubble' + (broken ? ' broken' : '');
+  bubble.innerHTML = html;
+  document.body.appendChild(bubble);
+  const c = anchor.getBoundingClientRect();
+  bubble.style.left = Math.max(8, Math.min(c.left, innerWidth - bubble.offsetWidth - 16)) + 'px';
+  bubble.style.top = (c.bottom + 8 + bubble.offsetHeight > innerHeight
+    ? c.top - bubble.offsetHeight - 8 : c.bottom + 8) + 'px';
+  const leave = () => { closeBubble(); anchor.removeEventListener('mouseleave', leave); };
+  anchor.addEventListener('mouseleave', leave);
+}
+
+function commentBubble(m) {
+  showBubble(m, `<h4>Comment</h4>${esc(m.dataset.nota)}`);
+}
+
+function refBubble(a) {
+  const id = a.hash.slice(1);
+  const target = headings().find(h => h.id === id);
+  if (!target) return showBubble(a, 'No section with that name exists yet.', true);
+  const level = +target.tagName[1];
+  const parts = [];
+  for (let n = target.nextElementSibling; n; n = n.nextElementSibling) {
+    if (/^H[1-6]$/.test(n.tagName) && +n.tagName[1] <= level) break;
+    if (!n.classList.contains('tarjeta')) parts.push(n.textContent);
+  }
+  const body = parts.join(' ').replace(/\s+/g, ' ').trim();
+  showBubble(a, `<h4>${esc(target.textContent)}</h4>` +
+    esc(body.slice(0, 420) || 'Empty section.') + (body.length > 420 ? '…' : ''));
+}
+
+/* ---------- floating menus: mark, image, reference ---------- */
+let menu2, active;
+
+function closeMenu() {
+  menu2?.remove();
+  menu2 = null;
+  active?.classList.remove('active');
+  active = null;
+}
+
+function openMenu(anchor, html) {
+  closeMenu();
+  closeBubble();
+  active = anchor;
+  anchor.classList.add('active');
+  menu2 = document.createElement('div');
+  menu2.className = 'mark-menu';
+  menu2.innerHTML = html;
+  document.body.appendChild(menu2);
+  const c = anchor.getBoundingClientRect();
+  menu2.style.left = Math.max(8, Math.min(c.left, innerWidth - menu2.offsetWidth - 16)) + 'px';
+  menu2.style.top = (c.bottom + 8 + menu2.offsetHeight > innerHeight
+    ? c.top - menu2.offsetHeight - 8 : c.bottom + 8) + 'px';
+  // don't steal focus from the editor, except in fields where you type or pick
+  menu2.onmousedown = e => { if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) e.preventDefault(); };
+  return menu2;
+}
+
+function markMenu(markEl) {
+  const current = markEl.style.getPropertyValue('--c').trim();
+  const m = openMenu(markEl,
+    COLORS.map(c => `<button class="swatch" data-color="${c}" style="background:${c}"
+        aria-pressed="${c === current}" data-tip="${c}"></button>`).join('')
+    + '<span class="sep"></span>'
+    + `<input type="text" id="mark-comment" placeholder="Comment…" value="${esc(markEl.dataset.nota || '')}">`
+    + `<button data-action="remove" data-tip="Remove the mark">${svg('remove', 14)}</button>`);
+
+  m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => {
+    markEl.style.setProperty('--c', b.dataset.color);
+    m.querySelectorAll('[data-color]').forEach(o => o.setAttribute('aria-pressed', o === b));
+    save();
+  });
+  const field = m.querySelector('#mark-comment');
+  field.oninput = () => {
+    field.value.trim() ? markEl.dataset.nota = field.value.trim() : delete markEl.dataset.nota;
+    save();
+  };
+  field.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); closeMenu(); } };
+  m.querySelector('[data-action="remove"]').onclick = () => {
+    markEl.replaceWith(...markEl.childNodes);
+    closeMenu();
+    save();
+  };
+}
+
+const VIZ_SEED = {
+  mermaid: 'graph TD\n  A[Unconditional truth] --> B[Derived step]',
+  math: 'p_{99} = \\frac{a}{b}',
+};
+
+function insertViz(kind) {
+  restore();
+  document.execCommand('insertHTML', false,
+    vizBlock(kind, VIZ_SEED[kind]).replace('<figure ', '<figure data-new="1" ') + '<p><br></p>');
+  const fig = doc.querySelector('figure.viz[data-new]');
+  save();
+  if (!fig) return;
+  delete fig.dataset.new;
+  vizPaint(fig).then(() => vizMenu(fig));
+}
+
+function vizMenu(fig) {
+  const source = fig.querySelector('.src');
+  const m = openMenu(fig,
+    `<textarea class="editor-viz" spellcheck="false">${esc(source.textContent)}</textarea>`
+    + `<button data-action="remove" data-tip="Delete the drawing">${svg('remove', 14)}</button>`);
+
+  const field = m.querySelector('textarea');
+  field.focus();
+  let repaint;
+  field.oninput = () => {
+    source.textContent = field.value;
+    clearTimeout(repaint);
+    repaint = setTimeout(() => vizPaint(fig), 350);
+    save();
+  };
+  m.querySelector('[data-action="remove"]').onclick = () => {
+    fig.remove();
+    closeMenu();
+    save();
+  };
+}
+
+function imageMenu(img) {
+  const width = parseInt(img.style.width) || 100;
+  const m = openMenu(img,
+    `<input type="range" min="20" max="100" step="5" value="${width}">`
+    + `<span class="readout">${width}%</span><span class="sep"></span>`
+    + `<button data-action="remove" data-tip="Delete the image">${svg('remove', 14)}</button>`);
+
+  const slider = m.querySelector('input');
+  const readout = m.querySelector('.readout');
+  slider.oninput = () => {
+    img.style.width = slider.value + '%';
+    readout.textContent = slider.value + '%';
+    save();
+  };
+  m.querySelector('[data-action="remove"]').onclick = () => {
+    img.remove();
+    closeMenu();
+    save();
+  };
+}
+
+function referenceMenu(button) {
+  const list = headingList();
+  if (!list.length) return openMenu(button,
+    '<span class="readout" style="min-width:0">No sections to point to yet.</span>');
+
+  const m = openMenu(button, `<select id="ref-target" size="1">
+      ${list.map(h => `<option value="${h.id}">${' '.repeat((h.level - 1) * 3)}${esc(h.number)} ${esc(h.text)}</option>`).join('')}
+    </select>`);
+  const sel = m.querySelector('select');
+  sel.focus();
+  sel.onchange = () => {
+    const h = list.find(x => x.id === sel.value);
+    insertRef(h.id, h.text);
+    closeMenu();
+  };
+}
+
+function insertRef(id, text) {
+  restore();
+  const sel = getSelection();
+  if (sel.rangeCount && !sel.isCollapsed) {
+    wrap(() => {
+      const a = document.createElement('a');
+      a.className = 'ref';
+      a.href = '#' + id;
+      return a;
+    });
+  } else {
+    document.execCommand('insertHTML', false, `<a class="ref" href="#${id}">${esc(text)}</a>&nbsp;`);
+  }
+  save();
+}
+
+/* ---------- hover help on the bar ---------- */
+let tip;
+const closeTip = () => { tip?.remove(); tip = null; };
+
+function showTip(el) {
+  closeTip();
+  tip = document.createElement('div');
+  tip.className = 'tip';
+  tip.textContent = el.dataset.tip;
+  el.removeAttribute('title');   // the native one would duplicate this same text
+  document.body.appendChild(tip);
+  const c = el.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(c.left + c.width / 2 - tip.offsetWidth / 2,
+    innerWidth - tip.offsetWidth - 8)) + 'px';
+  tip.style.top = c.bottom + 6 + 'px';
+  el.addEventListener('mouseleave', closeTip, { once: true });
+}
+
+/* ---------- resources: files in resources/ and links from topic.json ---------- */
+function buildResources() {
+  const box = document.getElementById('resources');
+  const rows = [
+    ...(topic.resources || []).map(r =>
+      `<li><a href="${r.path}" target="_blank" title="${esc(r.name)}"><span>${esc(r.name)}</span><span class="size">${r.kb} KB</span></a></li>`),
+    ...(topic.links || []).map(e =>
+      `<li><a href="${esc(e.url)}" target="_blank" title="${esc(e.url)}"><span>${esc(e.title)}</span><span class="size">↗</span></a></li>`),
+  ];
+  box.innerHTML = rows.length ? `<div class="folder">resources/</div><ul>${rows.join('')}</ul>` : '';
+}
+
+/* ---------- index ---------- */
+/* Headings with their computed numbering. Used by the index and the
+   reference picker, so the numbering is computed in one place. */
+function headingList() {
+  const n = [0, 0, 0];
+  return headings().map(h => {
+    const level = +h.tagName[1];
+    if (level <= 3) {
+      n[level - 1]++;
+      for (let i = level; i < 3; i++) n[i] = 0;
+    }
+    h.id = slug(h.textContent);
+    return { id: h.id, level, text: h.textContent, number: level <= 3 ? n.slice(0, level).join('.') : '' };
+  });
+}
+
+/* Foldable: starts fully folded and each arrow unfolds only its direct
+   children. Lives outside because the index is rebuilt on every keystroke. */
+const expanded = new Set();
+
+function buildIndex() {
+  const list = headingList();
+  const ancestors = [];
+  const rows = list.map((h, i) => {
+    while (ancestors.length && ancestors.at(-1).level >= h.level) ancestors.pop();
+    const hidden = ancestors.some(a => !expanded.has(a.id));
+    ancestors.push(h);
+    const arrow = list[i + 1]?.level > h.level
+      ? `<button class="fold" data-id="${h.id}" aria-expanded="${expanded.has(h.id)}" aria-label="Fold or unfold">›</button>`
+      : '<span class="fold"></span>';
+    return `<li${hidden ? ' hidden' : ''}>${arrow}<a href="#${h.id}" class="n${h.level}">
+      <span class="n">${esc(h.number)}</span><span>${esc(h.text)}</span></a></li>`;
+  });
+  index.innerHTML = rows.length
+    ? `<div class="folder">notes/</div><ol>${rows.join('')}</ol>`
+    : '<p class="nothing">(no headings)</p>';
+  index.querySelectorAll('a').forEach(a => a.onclick = e => {
+    e.preventDefault(); goTo(a.hash.slice(1));
+  });
+  index.querySelectorAll('button.fold').forEach(b => b.onclick = () => {
+    expanded.delete(b.dataset.id) || expanded.add(b.dataset.id);
+    buildIndex();
+  });
+}
+
+/* ---------- cards ---------- */
+function createCard({ x, y, c, body = '', img = null, caption = '' }) {
+  const el = document.createElement('aside');
+  el.className = 'tarjeta';
+  el.contentEditable = 'false';
+  el.style.setProperty('--c', c || color);
+  el.dataset.x = x ?? doc.offsetWidth + 32;
+  el.dataset.y = y ?? Math.max(0, Math.round(scrollY / zoom() + 100 - doc.offsetTop));
+  el.innerHTML = handle()
+    + (img ? `<img src="${img}" alt=""><figcaption contenteditable>${esc(caption)}</figcaption>`
+           : `<div class="cuerpo" contenteditable>${body}</div>`);
+  doc.appendChild(el);
+  activateCard(el);
+  place(el);
+  return el;
+}
+
+const handle = () => `<div class="handle"><span title="Drag">${svg('drag', 13)}</span>
+  <button title="Delete">${svg('remove', 12)}</button></div>`;
+
+function place(el) {
+  el.style.left = el.dataset.x + 'px';
+  el.style.top = el.dataset.y + 'px';
+}
+
+function placeCards() {
+  doc.querySelectorAll('.tarjeta').forEach(el => {
+    el.contentEditable = 'false';
+    if (!el.querySelector('.handle')) el.insertAdjacentHTML('afterbegin', handle());
+    place(el);
+    activateCard(el);
+  });
+}
+
+function activateCard(el) {
+  el.querySelector('.handle button').onclick = () => { el.remove(); save(); };
+  el.querySelectorAll('[contenteditable=""],[contenteditable="true"]')
+    .forEach(c => c.addEventListener('input', save));
+
+  const grip = el.querySelector('.handle span');
+  grip.onpointerdown = e => {
+    const z = zoom(), dx = e.clientX / z - el.offsetLeft, dy = e.clientY / z - el.offsetTop;
+    grip.setPointerCapture(e.pointerId);
+    el.classList.add('dragging');
+    grip.onpointermove = m => {
+      el.dataset.x = Math.round(Math.min(doc.offsetWidth + 340, Math.max(-280, m.clientX / z - dx)));
+      el.dataset.y = Math.max(0, Math.round(m.clientY / z - dy));
+      place(el);
+    };
+    grip.onpointerup = () => {
+      grip.onpointermove = grip.onpointerup = null;
+      el.classList.remove('dragging');
+      save();
+    };
+  };
+}
+
+/* ---------- saving ---------- */
+function snapshot() {
+  const copy = doc.cloneNode(true);
+  copy.querySelectorAll('mark').forEach(m => m.classList.remove('active'));
+  copy.querySelectorAll('.provisional').forEach(s => s.remove());   // half-transcribed dictation
+  copy.querySelectorAll('figure.viz').forEach(f => {
+    f.classList.remove('painted', 'active');   // the SVG is derived: the <pre class="src"> rules
+    f.removeAttribute('data-error');
+    f.querySelector('.view')?.replaceChildren();
+  });
+  copy.querySelectorAll('.tarjeta').forEach(t => {
+    t.removeAttribute('style');            // the position lives in data-x / data-y
+    t.removeAttribute('contenteditable');
+    t.querySelector('.handle')?.remove();  // the handle is injected again on open
+  });
+  return copy.innerHTML;
+}
+
+let pending;
+function save() {
+  clearTimeout(pending);
+  const status = document.getElementById('status');
+  status.textContent = 'saving…';
+  pending = setTimeout(async () => {
+    try {
+      const r = await (await fetch('/api/topic/' + encodeURIComponent(topic.slug), {
+        method: 'POST',
+        body: JSON.stringify({
+          title: titleEl.textContent.trim(),
+          subtitle: subtitle.textContent.trim(),
+          html: snapshot()
+        })
+      })).json();
+      if (r.error) throw new Error(r.error);
+      const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      status.textContent = `${time} · ${r.sections.length} ${r.sections.length === 1 ? 'section' : 'sections'}`;
+    } catch (e) {
+      status.textContent = 'Not saved: ' + e.message;
+    }
+  }, 900);
+}
+
+/* Starts at the end: openTopic() uses the `let` variables above. */
+const topicSlug = new URLSearchParams(location.search).get('topic');
+topicSlug
+  ? openTopic(topicSlug).catch(e => app.innerHTML =
+      `<div class="sheet"><h1>Could not open the topic</h1><p class="minor">${esc(e.message)}</p>
+       <p><a href="notes.html">Back</a></p></div>`)
+  : menu();
+</script>

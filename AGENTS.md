@@ -1,42 +1,50 @@
-# Notas — instrucciones para el agente
+# Notes — instructions for the agent
 
-Este repo es un sistema de estudio: skills y agentes (`agente/`), un filesystem
-de temas (`temas/<slug>/`) y una app local (`npm run app`). Vos sos la tercera
-ventana: el usuario estudia en una, rinde y toma notas en la app, y te habla a
-vos en esta.
+This repo is a study system: skills and agents (`agent/`), a filesystem of
+topics (`topics/<slug>/`) and a local app (`npm run app`). You are the third
+window: the user studies in one, takes exams and notes in the app, and talks
+to you in this one.
 
-## Primera vez
+## First time
 
-Si tu herramienta todavía no ve las skills de `agente/skills/` como propias,
-leé `agente/skills/notas-setup-agente/SKILL.md` y seguilo. Deja el proyecto
-configurado para vos sin tocar nada versionado.
+If your tool doesn't see the skills in `agent/skills/` as its own yet, read
+`agent/skills/notes-setup-agent/SKILL.md` and follow it. It configures the
+project for you without touching anything under version control.
 
 ## Skills
 
-Cada skill es `agente/skills/<nombre>/SKILL.md` (formato Agent Skills:
-frontmatter `name` + `description`, instrucciones abajo). Si tu herramienta no
-carga skills sola, cuando el pedido encaje con una `description`, leé ese
-`SKILL.md` entero y seguilo. La puerta de entrada es `notas-sesion`.
+Each skill is `agent/skills/<name>/SKILL.md` (Agent Skills format:
+`name` + `description` frontmatter, instructions below). If your tool doesn't
+load skills on its own, whenever a request matches a `description`, read that
+whole `SKILL.md` and follow it. The entry point is `notes-session`.
 
-Los agentes de `agente/agents/*.md` son subagentes: `investigador` y un
-`profesor-<tema>` por tema. Sin subagentes, leé el archivo y hacé su trabajo
-vos mismo, en un paso aparte.
+The agents in `agent/agents/*.md` are subagents: `researcher` and one
+`teacher-<slug>` per topic. Without subagents, read the file and do its work
+yourself, as a separate step.
 
-## Nombres de herramientas
+## Tool names
 
-Las skills nombran herramientas de Claude Code. Traducilas a las tuyas:
+The skills name Claude Code tools. Map them to yours:
 
-| En la skill | Qué significa |
+| In the skill | What it means |
 |---|---|
-| `AskUserQuestion` | Preguntar con opciones. Sin esa herramienta: pregunta numerada en el chat y esperá la respuesta. |
-| `Agent` / `subagent_type: X` | Delegar en el subagente `agente/agents/X.md`. Sin subagentes: seguí ese archivo vos. |
-| `WebSearch` / `WebFetch` | Buscar y leer en la web. Sin web: decilo y no afirmes de memoria. |
-| `Read` / `Write` / `Edit` / `Grep` / `Glob` | Leer, escribir y buscar archivos. |
+| `AskUserQuestion` | Ask with options. Without that tool: ask a numbered question in the chat and wait for the answer. |
+| `Agent` / `subagent_type: X` | Delegate to the subagent `agent/agents/X.md`. Without subagents: follow that file yourself. |
+| `WebSearch` / `WebFetch` | Search and read the web. Without web access: say so and don't state things from memory. |
+| `Read` / `Write` / `Edit` / `Grep` / `Glob` | Read, write and search files. |
 
-## Reglas del repo
+## Language
 
-- Todo lo que producen las skills va a `temas/`, no al chat.
-- `temas/*` está ignorado salvo `temas/ejemplo/`: los temas reales son del usuario.
-- Los `profesor-*` de `agente/agents/` son personales y están ignorados.
-- La config propia de cada agente (`.claude/`, `CLAUDE.md`, etc.) va a
-  `.git/info/exclude`, nunca a `.gitignore`.
+Chat with the user in the language they write in. For generated files,
+`topic.json` `language` sets the defaults: `notes` for notes, summaries and
+lessons; `exams` for exams, exercises and grading feedback; `source` is the
+language of the material. An explicit request ("give me the exam in English")
+overrides the default for that output.
+
+## Repo rules
+
+- Everything the skills produce goes to `topics/`, not to the chat.
+- `topics/*` is ignored except `topics/example/`: real topics belong to the user.
+- The `teacher-*` agents in `agent/agents/` are personal and ignored.
+- Each agent's own config (`.claude/`, `CLAUDE.md`, etc.) goes to
+  `.git/info/exclude`, never to `.gitignore`.

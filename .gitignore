@@ -1,9 +1,9 @@
-temas/*
-!temas/ejemplo/
+topics/*
+!topics/example/
 .DS_Store
 __pycache__/
 node_modules/
 .claude/settings.local.json
 referencias/
 plan.md
-agente/agents/profesor-*
+agent/agents/teacher-*
