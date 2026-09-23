@@ -27,7 +27,7 @@ def with_temp_root(f):
 @with_temp_root
 def test_resolution_order():
     assert server.voice_model(True) == server.VOICE_MODEL
-    assert server.voice_model(False) == "small"
+    assert server.voice_model(False) == "turbo", "the online profile defaults to the largest model"
     os.environ["NOTES_VOICE_MODEL"] = "turbo"
     assert server.voice_model(False) == "turbo"
     assert server.voice_model(True) == server.VOICE_MODEL, "a size must map to the mlx repo on GPU"

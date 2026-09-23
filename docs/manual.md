@@ -5,15 +5,29 @@ Full reference. The introduction is in the [README](../README.md).
 ## Getting started
 
 ```sh
+./notes setup    # once, the only step that uses the network (Windows: notes setup)
 ./notes          # opens the notebooks; exams are in the nav (Windows: notes)
 ```
 
-Starts the server at `http://localhost:8321/` and opens `notes.html`. If one is
-already running, it opens the tab and exits. No install step and no build: it runs on the Python stdlib.
-The only exception is dictation: `./notes` starts with `uv run`, which reads
-the dependencies from the header of `app/server.py` and downloads the right one
-the first time — `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU)
-on Linux, Windows and Intel Macs. The model is set in `/settings` (see Dictation below). On Windows ARM, dictation needs x64 Python
+`./notes setup` is interactive and safe to re-run (it offers to keep the
+current choices). It fetches the dependencies in the header of `app/server.py`
+— `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU) on Linux,
+Windows and Intel Macs — asks for the profile and resolves the dictation model:
+
+- **Online** (recommended): downloads `turbo` (~1.6 GB), no more questions.
+- **Offline**: shows the machine's RAM and free disk next to each size (`tiny`,
+  `base`, `small`, `turbo`) and asks for a size, the path to a model folder you
+  already have, or `none`.
+
+The model goes to `models/` at the repo root (git-ignored) and its path, with
+the profile, to `settings.json`. The profile also sets the default
+`sources_mode` for new topics: `both` for Online, `local` for Offline. A failed
+download or `none` leaves dictation on the OS fallback; nothing else changes.
+
+`./notes` starts the server at `http://localhost:8321/` and opens `notes.html`. If one is
+already running, it opens the tab and exits. No build: it runs on the Python stdlib,
+with `uv run --offline` so daily use never touches the network. If setup never
+ran, it falls back to `python3`: everything works except dictation. The model is set in `/settings` (see Dictation below). On Windows ARM, dictation needs x64 Python
 (emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html`.
 Without `uv`, `python3 app/server.py app/notes.html` starts everything except dictation.
 
@@ -21,7 +35,7 @@ Without `uv`, `python3 app/server.py app/notes.html` starts everything except di
 
 ```
 README.md            The introduction.
-notes, notes.cmd     Launcher: `./notes` (or `./notes app`) starts the app; `notes` on Windows.
+notes, notes.cmd     Launcher: `./notes` (or `./notes app`) starts the app, `./notes setup` sets it up; `notes` on Windows.
 LICENSE              MIT.
 AGENTS.md            Entry point for any agent: where the skills are and how to map tools.
 agent/
@@ -35,6 +49,7 @@ app/
     test_offline.py  Fails if the app loads anything from an external host.
     test_dictation.py Tests for the dictation model choice and the OS-dictation fallback.
     test_fonts.py    Tests for uploading user fonts.
+    test_setup.py    Tests for ./notes setup, profile defaults and the model download.
     style.css        Shared visual system. Tokens and color themes.
     theme.js         Color theme list and picker, shared.
     shell.js         Waybar, explorer and statusline, shared.
@@ -226,14 +241,16 @@ renames the file. The file order (`01-`, `02-`…) is the document order.
 - **Dictation**: click the microphone or `⌃M` (Control, not Command: macOS uses
   `⌘M` to minimize), speak, and do the same to finish. The text goes where the
   cursor is. Whisper transcribes locally, detecting the language when none is
-  given, with no internet except the first time it downloads the model.
+  given, with no internet once `./notes setup` downloaded the model.
   - **Model**: `voice_model` in `/settings` wins, then the `NOTES_VOICE_MODEL`
-    environment variable, then the default: `whisper-large-v3-turbo` on the GPU
-    on Apple Silicon (~1.6 GB, the largest; right for the Online profile) and
+    environment variable, then the profile default: `turbo` (~1.6 GB, the
+    largest) for Online; for Offline, `turbo` on the GPU on Apple Silicon and
     `small` on CPU. The Offline profile picks what the hardware handles (`small`
     or `base` on a modest CPU, `turbo` on a fast one) or a model you already
     have. The `/settings` dropdown offers the sizes (`tiny` to `large-v3`), which
-    work on both engines. For a local folder (MLX for mlx-whisper, CTranslate2
+    work on both engines; its **download** button saves the selected size to
+    `models/` and sets `voice_model` to that folder, so it works offline (a bare
+    size is fetched on first use instead). For a local folder (MLX for mlx-whisper, CTranslate2
     for faster-whisper), write its path as `voice_model` in `settings.json`: it
     is used as-is, with no download, and shows up in the dropdown.
   - **Fallback**: with no engine (started without `uv`) or no model (a skipped

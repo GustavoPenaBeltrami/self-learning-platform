@@ -12,7 +12,7 @@ Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
 faster-whisper everywhere else. `./notes` (uv run) brings the right one;
 without it everything works except the microphone.
 """
-import base64, datetime, hashlib, http.server, json, os, pathlib, re, sys, threading, urllib.parse, webbrowser
+import base64, datetime, hashlib, http.server, json, os, pathlib, platform, re, shutil, sys, threading, urllib.parse, webbrowser
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import text
@@ -25,6 +25,10 @@ CPU_VOICE_MODEL = "small"   # ponytail: CPU int8 only, set voice_model=turbo on 
 MLX_MODELS = {"tiny": "mlx-community/whisper-tiny-mlx", "base": "mlx-community/whisper-base-mlx",
               "small": "mlx-community/whisper-small-mlx", "medium": "mlx-community/whisper-medium-mlx",
               "turbo": VOICE_MODEL, "large-v3": "mlx-community/whisper-large-v3-mlx"}
+CPU_MODELS = {"tiny": "Systran/faster-whisper-tiny", "base": "Systran/faster-whisper-base",
+              "small": "Systran/faster-whisper-small", "medium": "Systran/faster-whisper-medium",
+              "turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo", "large-v3": "Systran/faster-whisper-large-v3"}
+SIZES = {"tiny": ("~75 MB", "~1 GB"), "base": ("~145 MB", "~1 GB"), "small": ("~480 MB", "~2 GB"), "turbo": ("~1.6 GB", "~6 GB")}
 voice_lock = threading.Lock()
 cpu_model = None
 BODY_LIMIT = 20 * 1024 * 1024   # ponytail: one flat cap for every POST, single local user
@@ -45,10 +49,28 @@ class NoDictation(ValueError):
 
 
 def voice_model(gpu):
-    """settings.json voice_model, then NOTES_VOICE_MODEL, then the engine default. A size maps to the mlx repo on GPU; a local path is used as-is."""
-    model = read_settings()["voice_model"] or os.environ.get("NOTES_VOICE_MODEL") or (VOICE_MODEL if gpu else CPU_VOICE_MODEL)
+    """settings.json voice_model, then NOTES_VOICE_MODEL, then the profile default, then the engine default. A size maps to the mlx repo on GPU; a local path is used as-is."""
+    settings = read_settings()
+    model = (settings["voice_model"] or os.environ.get("NOTES_VOICE_MODEL")
+             or profile_defaults(settings["profile"])["voice_model"] or (VOICE_MODEL if gpu else CPU_VOICE_MODEL))
     model = os.path.expanduser(model)
     return MLX_MODELS.get(model, model) if gpu else model
+
+
+def download_voice_model(size, gpu=None):
+    """Downloads a size into models/<repo name> for the engine this machine runs. Returns the local path."""
+    if gpu is None:
+        gpu = platform.system() == "Darwin" and platform.machine() == "arm64"
+    repo = (MLX_MODELS if gpu else CPU_MODELS).get(size)
+    if not repo:
+        raise ValueError("unknown model size: " + str(size))
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError:
+        raise NoDictation("dictation engine missing, start with ./notes")
+    dest = ROOT / "models" / repo.split("/")[-1]
+    snapshot_download(repo_id=repo, local_dir=str(dest))
+    return str(dest)
 
 
 def whisper(audio, lang):
@@ -91,6 +113,53 @@ def transcribe(raw, lang=None):
 
 SETTINGS = {"profile": "online", "theme": "", "font": "mono", "voice_model": ""}
 PROFILES = ("online", "offline")
+
+
+def profile_defaults(profile):
+    """What a Profile decides: the dictation model when none is set, and sources_mode for new topics."""
+    online = profile != "offline"
+    return {"voice_model": "turbo" if online else "", "sources_mode": "both" if online else "local"}
+
+
+def ram_gb():
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
+    except (AttributeError, ValueError, OSError):
+        return 0   # ponytail: Windows has no sysconf, the suggestion falls to base
+
+
+def setup(ask=input):
+    """./notes setup: asks the Profile and the dictation model, downloads it, writes settings.json. Safe to re-run."""
+    current = read_settings()
+    if (ROOT / "settings.json").exists():
+        keep = ask(f"Current: profile {current['profile']}, voice_model {current['voice_model'] or 'default'}. Keep? [Y/n] ")
+        if keep.strip().lower() in ("", "y", "yes"):
+            return current
+    profile = "offline" if ask("Profile: 1) online (recommended)  2) offline [1] ").strip().lower() in ("2", "offline") else "online"
+    choice = "turbo"
+    if profile == "offline":
+        ram, free = ram_gb(), shutil.disk_usage(ROOT).free / 2**30
+        print(f"This machine: {ram:.0f} GB RAM, {free:.0f} GB free disk.")
+        for size, (disk, mem) in SIZES.items():
+            print(f"  {size:6} disk {disk:8} RAM {mem}")
+        suggested = "turbo" if ram >= 16 else "small" if ram >= 8 else "base"
+    while profile == "offline":
+        choice = ask(f"Dictation model: a size, the path to a model you have, or none [{suggested}] ").strip() or suggested
+        if choice in SIZES or choice == "none" or os.path.isdir(os.path.expanduser(choice)):
+            break
+        print("Not a size and no such folder: " + choice)
+    if choice == "none":
+        model = ""
+    elif choice not in SIZES:
+        model = os.path.abspath(os.path.expanduser(choice))
+    else:
+        print(f"Downloading {choice} ({SIZES[choice][0]})...")
+        try:
+            model = download_voice_model(choice)
+        except Exception as e:
+            model = ""
+            print(f"Download failed ({e}). The mic falls back to the OS dictation; run ./notes setup again to retry.")
+    return save_settings({"profile": profile, "voice_model": model})
 
 
 def read_settings():
@@ -350,6 +419,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     return self.respond(503, {"error": str(e), "fallback": True})
             if path == "/api/settings":
                 return self.respond(200, save_settings(json.loads(raw)))
+            if path == "/api/voice-model/download":
+                return self.respond(200, save_settings({"voice_model": download_voice_model(json.loads(raw).get("size"))}))
             if path == "/api/font":
                 return self.respond(200, save_font(urllib.parse.parse_qs(query).get("name", [""])[0], raw))
             if path == "/api/attempt":
@@ -371,6 +442,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--setup"]:
+        print("Setup done:", json.dumps(setup()), "\nStart the app with ./notes")
+        sys.exit(0)
     if sys.argv[1:2] == ["--transcribe"]:
         print(" ".join(t for _, t in whisper(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)).strip())
         sys.exit(0)
