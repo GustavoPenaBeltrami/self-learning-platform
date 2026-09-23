@@ -13,8 +13,7 @@ already running, it opens the tab and exits. No `npm install` and no build: it r
 The only exception is dictation: `npm run app` starts with `uv run`, which reads
 the dependencies from the header of `app/server.py` and downloads the right one
 the first time — `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU)
-on Linux, Windows and Intel Macs. On CPU it uses the `small` model; for another one,
-`NOTES_VOICE_MODEL=turbo npm run app`. On Windows ARM, dictation needs x64 Python
+on Linux, Windows and Intel Macs. The model is set in `/settings` (see Dictation below). On Windows ARM, dictation needs x64 Python
 (emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html`.
 Without `uv`, `python3 app/server.py app/notes.html` starts everything except dictation.
 
@@ -33,6 +32,7 @@ app/
     text.py          HTML <-> Markdown conversion. `python3 app/text.py` self-tests.
     test_attempt.py  Tests for saving exam attempts.
     test_offline.py  Fails if the app loads anything from an external host.
+    test_dictation.py Tests for the dictation model choice and the OS-dictation fallback.
     style.css        Shared visual system. Tokens and color themes.
     theme.js         Color theme list and picker, shared.
     shell.js         Waybar, explorer and statusline, shared.
@@ -220,11 +220,26 @@ renames the file. The file order (`01-`, `02-`…) is the document order.
 - **Light / dark mode** in the toolbar, for the whole interface.
 - **Dictation**: click the microphone or `⌃M` (Control, not Command: macOS uses
   `⌘M` to minimize), speak, and do the same to finish. The text goes where the
-  cursor is. Whisper transcribes locally (`large-v3-turbo` on the GPU on Apple
-  Silicon, `NOTES_VOICE_MODEL` on CPU), detecting the language when none is
-  given, with no internet except the first time it downloads the model
-  (~1.6 GB on Apple Silicon). The GPU model is set in `VOICE_MODEL` in
-  `app/server.py`.
+  cursor is. Whisper transcribes locally, detecting the language when none is
+  given, with no internet except the first time it downloads the model.
+  - **Model**: `voice_model` in `/settings` wins, then the `NOTES_VOICE_MODEL`
+    environment variable, then the default: `whisper-large-v3-turbo` on the GPU
+    on Apple Silicon (~1.6 GB, the largest; right for the Online profile) and
+    `small` on CPU. The Offline profile picks what the hardware handles (`small`
+    or `base` on a modest CPU, `turbo` on a fast one) or a model you already
+    have: a local folder is used as-is, with no download. The value depends on
+    the engine: a Hugging Face repo or MLX model folder for mlx-whisper, a size
+    (`small`, `turbo`…), repo or CTranslate2 folder for faster-whisper.
+  - **Fallback**: with no engine (started without `uv`) or no model (a skipped
+    Setup, offline before the first download, a wrong path) the microphone
+    doesn't break: the status tells you to use the OS dictation instead, which
+    types into the notebook like a keyboard.
+    - macOS: system dictation, press `Fn` twice (System Settings → Keyboard →
+      Dictation).
+    - Windows: voice typing, `Win+H`.
+    - Linux: [Speech Note](https://github.com/mkiol/dsnote), offline:
+      `flatpak install flathub net.mkiol.SpeechNote` (Arch: `yay -S dsnote`).
+      On Wayland it needs `ydotool` to type into other windows.
 - Saves on its own, 0.9 s after each change. The status shows in the toolbar.
 
 ### What's inside a `.md`
