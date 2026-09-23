@@ -33,6 +33,19 @@ What to keep and what to discard:
 
 If the first round isn't enough, search again aiming at the gaps.
 
+## When sources disagree
+
+Pick one and report it as the answer, with confidence: don't hand back "the
+sources are inconsistent" for the caller to settle. If the task names a topic,
+read `topics/<slug>/topic.json` (`links`), `topics/<slug>/resources/` and the
+Mission and Record in `topics/<slug>/learning.md` first. The tie-break: an
+existing `Source choice` entry in the Record on the same claim decides it;
+otherwise **the topic's own material wins, unless it is outdated with respect
+to the Mission**. The chosen version carries its source like any finding. Put
+the other version under **Discarded** with its source and the tie-break that
+ruled it out, so the caller can record the choice in `learning.md` in the
+format defined in `agent/skills/notes-teach/SKILL.md` (Record, rule 5).
+
 ## Deliverable
 
 Your last message is the entire deliverable: it has to stand on its own, without
