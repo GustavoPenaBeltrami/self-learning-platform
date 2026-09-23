@@ -5,7 +5,7 @@ Full reference. The introduction is in the [README](../README.md).
 ## Getting started
 
 ```sh
-./notes setup    # once, the only step that uses the network (Windows: notes setup)
+./notes setup    # once, fetches what needs the network (Windows: notes setup)
 ./notes          # opens the notebooks; exams are in the nav (Windows: notes)
 ```
 
@@ -14,9 +14,9 @@ current choices). It fetches the dependencies in the header of `app/server.py`
 — `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU) on Linux,
 Windows and Intel Macs — asks for the profile and resolves the dictation model:
 
-- **Online** (recommended): downloads `turbo` (~1.6 GB), no more questions.
-- **Offline**: shows the machine's RAM and free disk next to each size (`tiny`,
-  `base`, `small`, `turbo`) and asks for a size, the path to a model folder you
+- **Auto** (recommended) or **Online**: downloads `turbo` (~1.6 GB), no more questions.
+- **Offline**: shows the machine's RAM and free disk next to each size (`tiny`
+  to `large-v3`) and asks for a size, the path to a model folder you
   already have, or `none`.
 
 The model goes to `models/` at the repo root (git-ignored) and its path, with
@@ -35,20 +35,23 @@ Without `uv`, `python3 app/server.py app/notes.html` starts everything except di
 
 Everything is yours: topics and notes are plain files, the code is MIT, and
 any agent or model can be swapped without losing anything. The **Profile**
-(`profile` in `settings.json`: `online` or `offline`) is picked at Setup,
-changed any time in `/settings`, and only sets three defaults: the dictation
-model, the `sources_mode` of new topics, and which agents `notes-setup-agent`
-recommends. The core never reads it.
+(`profile` in `settings.json`: `auto`, `online` or `offline`) is picked at Setup,
+changed any time in `/settings`, and only decides whether missing dictation
+models may be fetched, the `sources_mode` of new topics, and which agents
+`notes-setup-agent` recommends. The core never reads it. `auto`, the default,
+works like Steam: the server checks for a connection when it starts and acts
+Online if it finds one, Offline if not. Pick `offline` by hand to never fetch.
 
-| | Online (recommended) | Offline |
+| | Online (auto with a connection) | Offline (auto without one) |
 |---|---|---|
 | Agent | A paid one: Claude Code, OpenAI Codex, Google Antigravity, Cursor… | The Reference stack below, or any agent on a local model |
-| Dictation | The largest model (`turbo`, ~1.6 GB), no questions | A size your RAM and disk handle, or a model you already have |
+| Dictation | The largest model (`turbo`, ~1.6 GB) at Setup; a missing size is fetched on first use | A size your RAM and disk handle, or a model you already have; nothing is fetched (Hugging Face cache only) |
 | New topics look things up in | Web and local sources (`both`) | Local sources (`local`) |
 
-**What the Setup fetches.** The Setup is the only moment that uses the network:
+**What the Setup fetches.** The Setup is the moment meant for the network:
 Python dependencies (dictation engine) and the dictation model, or a path to
-ones you already have. Fonts, Mermaid and KaTeX already ship in `app/vendor/`.
+ones you already have. Working offline afterwards is a goal, not a rule: the
+Online profile may still fetch a missing model, and `/settings` can download one. Fonts, Mermaid and KaTeX already ship in `app/vendor/`.
 
 **What works with no network.** The whole core: the app, notebooks, exams,
 review, settings and fonts. Dictation works once its model is on disk; without
@@ -58,8 +61,10 @@ use local sources and say they didn't verify on the web.
 
 **Settings and fonts.** `settings.json` (profile, theme, reading font,
 dictation model) and `fonts/` (your uploaded fonts) live at the repo root,
-git-ignored like `topics/`. The server reads and writes them; the browser
-doesn't keep its own copy, so they survive a new browser or cleared data.
+git-ignored like `topics/`. The server reads and writes them and builds the
+`@font-face` rules for your fonts (`/api/fonts.css`), so they survive a new
+browser or cleared data. The browser keeps a copy in localStorage only to paint
+the theme before the server answers; `settings.json` always wins.
 
 ### Reference stack
 
@@ -124,7 +129,9 @@ app/
     test_offline.py  Fails if the app loads anything from an external host.
     test_dictation.py Tests for the dictation model choice and the OS-dictation fallback.
     test_fonts.py    Tests for uploading user fonts.
-    test_setup.py    Tests for ./notes setup, profile defaults and the model download.
+    test_setup.py    Tests for ./notes setup and the model download.
+    test_settings.py Tests for the settings store.
+    migrate_names.py Renames old Spanish class names in topics/*/notes/*.md. Idempotent.
     style.css        Shared visual system. Tokens and color themes.
     theme.js         Color theme list and picker, shared.
     shell.js         Waybar, explorer and statusline, shared.
@@ -174,8 +181,11 @@ in individual rules.
 The notebook's reading font picker (mono / serif / inter) applies only to the
 body of the note. To read in your own typeface, upload a `.woff2`, `.ttf` or
 `.otf` file from `/settings`: it is stored in `fonts/` at the repo root
-(git-ignored, like `topics/`) and appears in both font pickers, offline.
-Anything that isn't a font, or bigger than 20 MB, is rejected.
+(git-ignored, like `topics/`) and appears in both font pickers, offline. The
+name is saved lowercase with dashes for spaces (`My Font.ttf` → `my-font.ttf`);
+the extension must already be lowercase. A font with the same name is refused
+instead of overwritten. Anything that isn't a font, or bigger than 20 MB, is
+rejected.
 
 ## Diagrams and formulas
 
@@ -326,18 +336,19 @@ renames the file. The file order (`01-`, `02-`…) is the document order.
   cursor is. Whisper transcribes locally, detecting the language when none is
   given, with no internet once `./notes setup` downloaded the model.
   - **Model**: `voice_model` in `/settings` wins, then the `NOTES_VOICE_MODEL`
-    environment variable, then the profile default: `turbo` (~1.6 GB, the
-    largest) for Online; for Offline, `turbo` on the GPU on Apple Silicon and
-    `small` on CPU. The Offline profile picks what the hardware handles (`small`
-    or `base` on a modest CPU, `turbo` on a fast one) or a model you already
-    have. The `/settings` dropdown offers the sizes (`tiny` to `large-v3`), which
-    work on both engines; its **download** button saves the selected size to
-    `models/` and sets `voice_model` to that folder, so it works offline (a bare
-    size is fetched on first use instead). For a local folder (MLX for mlx-whisper, CTranslate2
-    for faster-whisper), write its path as `voice_model` in `settings.json`: it
-    is used as-is, with no download, and shows up in the dropdown.
+    environment variable, then the engine default: `turbo` on the GPU on Apple
+    Silicon, `small` on CPU. Setup writes `voice_model`: `turbo` for Auto and
+    Online, what the hardware handles for Offline (`small` or `base` on a modest
+    CPU, `turbo` on a fast one) or a model you already have. The `/settings`
+    dropdown offers the sizes (`tiny` to `large-v3`), which work on both
+    engines; its **download** key saves the selected size to `models/` and sets
+    `voice_model` to that folder. A size already in `models/` is used from
+    there; otherwise Online fetches it on first use and Offline only looks in
+    the Hugging Face cache (`local_files_only`). For a model folder you already
+    have (MLX for mlx-whisper, CTranslate2 for faster-whisper), type its path in
+    **model path** and press **use path**: it is used as-is, never downloaded.
   - **Fallback**: with no engine (started without `uv`) or no model (a skipped
-    Setup, offline before the first download, a wrong path) the microphone
+    Setup, Offline with a size that isn't on disk) the microphone
     doesn't break: the status tells you to use the OS dictation instead, which
     types into the notebook like a keyboard.
     - macOS: system dictation, press `Fn` twice (System Settings → Keyboard →

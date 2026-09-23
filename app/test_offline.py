@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Fails if the app loads anything from an external host at runtime: python3 app/test_offline.py"""
 import pathlib, re
 
 APP = pathlib.Path(__file__).resolve().parent
@@ -19,7 +18,7 @@ def offenders():
         if f.suffix not in {".html", ".js", ".css", ".py"} or f.name.startswith("test_"):
             continue
         text = f.read_text(errors="ignore")
-        # ponytail: vendored minified source is full of XML namespaces and license links; only loader calls there are fetches
+        # ponytail: in vendored source only loader calls count, a URL built by string concatenation slips through; parse the JS if a library ever does that
         urls = LOADER.findall(text) if VENDOR in f.parents else [m.group(0) for m in URL.finditer(text)]
         found += [f"{f.relative_to(APP)}: {u}" for u in urls if external(u)]
     return found

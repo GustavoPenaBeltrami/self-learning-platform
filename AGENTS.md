@@ -48,3 +48,5 @@ overrides the default for that output.
 - The `teacher-*` agents in `agent/agents/` are personal and ignored.
 - Each agent's own config (`.claude/`, `CLAUDE.md`, etc.) goes to
   `.git/info/exclude`, never to `.gitignore`.
+- `local/` is the user's own scratch space (references, drafts), git-ignored.
+  Don't write there unless asked.

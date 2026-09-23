@@ -40,7 +40,8 @@ ask about** (even if the answer can be "none"):
   exist: warn in one line and keep it, never stop the interview.
 - `sources_mode` (`web`, `local` or `both`): where the agent looks things up.
   Offer the default from the Profile in `settings.json` at the repo root:
-  `profile: "offline"` → `local`, `online` or no file → `both`.
+  `offline` → `local`; `online` → `both`; `auto` or no file → `both` if you
+  have web access right now, `local` if not.
 
 Folder `slug`: snake_case of the title
 (e.g. `the_pragmatic_programmer`). If it already exists, stop and ask.

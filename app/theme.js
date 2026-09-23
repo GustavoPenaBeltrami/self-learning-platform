@@ -1,43 +1,46 @@
 (() => {
   const THEMES = { hypr: 'hypr', light: 'light', eink: 'e-ink', sakura: 'sakura', forest: 'forest', amber: 'amber crt' };
+  const FONTS = [['mono', 'mono'], ['serif', 'serif'], ['inter', 'inter']];
   const root = document.documentElement;
   const current = () => root.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'hypr');
   const cached = () => { try { return JSON.parse(localStorage.getItem('settings')) || {}; } catch { return {}; } };
   const apply = s => {
     if (THEMES[s.theme]) root.dataset.theme = s.theme; else delete root.dataset.theme;
     root.dataset.font = s.font || 'mono';
-    const sel = document.getElementById('theme-sel'), font = document.getElementById('font');
+    const sel = document.getElementById('theme-sel');
     if (sel) sel.value = current();
-    if (font) font.value = root.dataset.font;
+    dispatchEvent(new CustomEvent('settings-applied', { detail: s }));
   };
-  const keep = s => {
-    if (s.error) throw new Error(s.error);
+  const cacheAndApply = s => {
     try { localStorage.setItem('settings', JSON.stringify(s)); } catch {}
     apply(s);
     return s;
   };
 
-  // ponytail: localStorage is only a paint cache against a theme flash; settings.json is the source of truth
+  window.api = (url, body) => fetch(url, body === undefined ? {} : { method: 'POST', body })
+    .then(r => r.json()).then(r => { if (r.error) throw new Error(r.error); return r; });
+
+  window.esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+  window.optionTags = (pairs, value) => pairs.map(([k, name]) =>
+    `<option value="${esc(k)}"${k === value ? ' selected' : ''}>${esc(name)}</option>`).join('');
+
+  // ponytail: localStorage only paints before the server answers, a settings.json edited by hand flashes once; drop the cache if the flash never matters
   apply(cached());
   window.THEMES = THEMES;
-  window.settings = fetch('/api/settings').then(r => r.json()).then(keep).catch(cached);
+  window.settings = api('/api/settings').then(cacheAndApply).catch(cached);
 
-  window.userFonts = fetch('/api/fonts').then(r => r.json()).then(({ fonts }) => {
-    const style = document.createElement('style');
-    style.textContent = fonts.map(f => `@font-face { font-family: "${f}"; src: url("/fonts/${encodeURIComponent(f)}"); }
-      :root[data-font="${f}"] { --reading-font: "${f}", var(--mono); }`).join('\n');
-    document.head.append(style);
-    return fonts;
-  }).catch(() => []);
+  document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="/api/fonts.css">');
+  window.fontChoices = api('/api/fonts').then(({ fonts }) => fonts).catch(() => [])
+    .then(fonts => [...FONTS, ...fonts.map(f => [f, f.replace(/\.\w+$/, '')])]);
 
   window.saveSettings = patch => {
     apply({ ...cached(), ...patch });
-    return fetch('/api/settings', { method: 'POST', body: JSON.stringify(patch) }).then(r => r.json()).then(keep)
+    return api('/api/settings', JSON.stringify(patch)).then(cacheAndApply)
       .catch(e => { apply(cached()); throw e; });
   };
 
-  window.themeSelector = () => `<select id="theme-sel" aria-label="Theme">${Object.entries(THEMES).map(([k, name]) =>
-    `<option value="${k}"${k === current() ? ' selected' : ''}>${name}</option>`).join('')}</select>`;
+  window.themeSelector = () => `<select id="theme-sel" aria-label="Theme">${optionTags(Object.entries(THEMES), current())}</select>`;
 
   window.pickTheme = t => saveSettings({ theme: t }).catch(() => {});
 })();
