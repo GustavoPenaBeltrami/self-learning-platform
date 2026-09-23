@@ -113,7 +113,7 @@ cd Notas
 uv run slp setup
 ```
 
-Setup is the step meant for the network. It fetches the Python packages, asks for your **profile** — Auto (recommended: Online when there is a connection, Offline when not), Online (downloads the largest dictation model, turbo, ~1.6 GB) or Offline (pick a size that fits your RAM and disk, the path to a model you already have, or none) — and writes the choices to `settings.json`. Running it again offers to keep them. Skipping it only costs dictation.
+Setup is the step meant for the network. The first `uv run slp` of any kind installs the Python packages into `.venv/`; `setup` then asks for your **profile** — Auto (recommended: Online when there is a connection, Offline when not), Online (downloads the largest dictation model, turbo, ~1.6 GB) or Offline (pick a size that fits your RAM and disk, the path to a model you already have, or none) — and writes the choices to `settings.json`. Running it again offers to keep them. Skipping it leaves the Auto profile, which fetches the default dictation model the first time you use the mic online.
 
 Open your agent in the folder and ask it:
 

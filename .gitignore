@@ -11,3 +11,4 @@ local/
 /fonts/
 /models/
 /.venv/
+*.egg-info/
