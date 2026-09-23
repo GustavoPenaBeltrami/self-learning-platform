@@ -88,27 +88,28 @@
   .mark-menu input::placeholder { color: var(--muted); }
 
   .card {
-    position: absolute; z-index: 10; width: 14rem; margin: 0; overflow: hidden;
-    background: var(--color-graphite); border: 1px solid var(--line);
-    border-left: 2px solid var(--c, var(--accent)); border-radius: 0;
+    position: absolute; z-index: 10; width: 14rem; margin: 0;
+    background: var(--bg); border: 1px solid var(--c, var(--accent)); border-radius: 0;
     font: 400 13px/1.6 var(--mono);
     opacity: .55; transition: opacity .15s ease;
   }
-  .card:hover, .card:focus-within { opacity: 1; }
-  .card .card-body { padding: .6rem .8rem; outline: 0; min-height: 2.4rem; }
+  .card:hover, .card:focus-within, .card.dragging { opacity: 1; }
+  .card .card-body { padding: .7rem .8rem .5rem; outline: 0; min-height: 2.4rem; }
   .card .card-body:empty::before { content: 'margin note'; color: var(--muted); }
   .card .handle {
-    position: absolute; top: .25rem; right: .25rem; display: flex; gap: .1rem;
-    opacity: 0; background: var(--color-void); border: 1px solid var(--line);
+    position: absolute; top: -.6rem; left: .4rem; right: .4rem;
+    display: flex; justify-content: space-between; pointer-events: none;
   }
-  .card:hover .handle, .card:focus-within .handle { opacity: 1; }
   .card .handle span, .card .handle button {
-    border: 0; background: none; padding: .15rem .35rem;
-    font: 400 12px/1.4 var(--mono); color: var(--muted);
+    pointer-events: auto; border: 0; padding: 0 .4rem; background: var(--bg);
+    font: 700 12px/1.1 var(--mono); color: var(--c, var(--accent));
   }
   .card .handle span { cursor: grab; }
-  .card.dragging { outline: 1px solid var(--accent); }
-  .card img { display: block; width: 100%; height: auto; }
+  .card.dragging .handle span { cursor: grabbing; }
+  .card .handle button { cursor: pointer; color: var(--muted); opacity: 0; }
+  .card:hover .handle button, .card:focus-within .handle button { opacity: 1; }
+  .card .handle button:hover { color: var(--bad); }
+  .card img { display: block; width: 100%; height: auto; padding: .7rem .8rem 0; }
   .card figcaption { padding: .5rem .8rem; color: var(--muted); outline: 0; font-size: 12px; }
   .card figcaption:empty::before { content: 'caption'; color: var(--color-slate); }
 
@@ -159,7 +160,6 @@ const ICON = {
   remove:    '<path d="M5 5l10 10M15 5 5 15"/>',
   diagram:   '<rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="1.8" y="13.5" width="5.4" height="4" rx="1"/><rect x="12.8" y="13.5" width="5.4" height="4" rx="1"/><path d="M10 6.5v3M4.5 13.5v-2.5h11v2.5"/>',
   formula:   '<path d="M14.6 4.2H6.4l4.6 5.8-4.6 5.8h8.2"/>',
-  drag:      '<circle cx="7" cy="6" r="1"/><circle cx="13" cy="6" r="1"/><circle cx="7" cy="10" r="1"/><circle cx="13" cy="10" r="1"/><circle cx="7" cy="14" r="1"/><circle cx="13" cy="14" r="1"/>',
 };
 const svg = (n, t = 16) => `<svg viewBox="0 0 20 20" width="${t}" height="${t}" fill="none"
   stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
@@ -918,7 +918,7 @@ function createCard({ x, y, c, body = '', img = null, caption = '' }) {
   el.style.setProperty('--c', c || color);
   el.dataset.x = x ?? doc.offsetWidth + 32;
   el.dataset.y = y ?? Math.max(0, Math.round(scrollY / zoom() + 100 - doc.offsetTop));
-  el.innerHTML = handle()
+  el.innerHTML = handle(img)
     + (img ? `<img src="${img}" alt=""><figcaption contenteditable>${esc(caption)}</figcaption>`
            : `<div class="card-body" contenteditable>${body}</div>`);
   doc.appendChild(el);
@@ -927,8 +927,8 @@ function createCard({ x, y, c, body = '', img = null, caption = '' }) {
   return el;
 }
 
-const handle = () => `<div class="handle"><span title="Drag">${svg('drag', 13)}</span>
-  <button title="Delete">${svg('remove', 12)}</button></div>`;
+const handle = img => `<div class="handle"><span title="Drag">${img ? 'figure' : 'note'}</span>
+  <button title="Delete">✕</button></div>`;
 
 function place(el) {
   el.style.left = el.dataset.x + 'px';
@@ -938,7 +938,7 @@ function place(el) {
 function placeCards() {
   doc.querySelectorAll('.card').forEach(el => {
     el.contentEditable = 'false';
-    if (!el.querySelector('.handle')) el.insertAdjacentHTML('afterbegin', handle());
+    if (!el.querySelector('.handle')) el.insertAdjacentHTML('afterbegin', handle(el.querySelector('img')));
     place(el);
     activateCard(el);
   });

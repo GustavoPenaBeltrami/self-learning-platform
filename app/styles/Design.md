@@ -134,7 +134,7 @@ Buttons are `<kbd>` + label pairs: the key on `--color-void`, the label filled w
 - The block selector in the waybar always reflects the block under the caret: `paragraph`, `heading 1` … `heading 6`, `list`, `numbered list`. Picking a value converts the current line in place. From inside a list item, picking a paragraph or heading lifts that line out and splits the list around it. Picking the other list type converts the whole list.
 - Typed shortcuts at the start of a line: `/h1`…`/h6`, `/p`, `/list`, `/ol`, `- `, `* `, `1. `.
 - Marks: background, underline or strikethrough in the chosen swatch color. A comment adds a `°` in accent.
-- Margin cards: flat `--color-graphite`, 2px left border in the card's own color, 55% opacity until hovered.
+- Margin cards: a TUI panel like the explorer. `--bg` fill, 1px frame in the card's own color, and a bold `note` / `figure` title cut into the top border in that color; the title is the drag grip. `✕` sits on the right of the border and shows on hover. 55% opacity until hovered.
 - Names written into the note HTML stay as they were so saved `.md` files keep rendering: `mk`, `mk-highlight`, `mk-underline`, `mk-strike`, `data-comment`, `card`, `card-body`, `inline`, `ref`, `viz`, `data-kind`, `src`, `view`, `data-x`/`data-y` and the inline `--c`. Renaming any of them needs a migration of every note (see `app/tools/migrate_names.py`).
 - Floating menus, tooltips and reference previews: `--color-void` with a 1px `--color-slate` border, no radius.
 
