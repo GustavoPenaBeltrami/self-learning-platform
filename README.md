@@ -100,9 +100,9 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 |---|---|---|---|
 | macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `./notes` |
 | macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `./notes` (Windows: `notes`) |
-| Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html` |
+| Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server/server.py app/views/notes.html` |
 
-`./notes` runs `uv run --offline app/server.py app/notes.html`: it never touches the network, and if setup never ran it falls back to `python3`, which starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`; for a local model folder you already have, see the [manual](docs/manual.md).
+`./notes` runs `uv run --offline app/server/server.py app/views/notes.html`: it never touches the network, and if setup never ran it falls back to `python3`, which starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`; for a local model folder you already have, see the [manual](docs/manual.md).
 
 Without a dictation engine or model, the microphone points you to your OS dictation instead; the per-OS steps are in the [manual](docs/manual.md#notebook).
 

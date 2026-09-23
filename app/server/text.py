@@ -6,7 +6,7 @@ Raw:      mark, u, span, aside, figure, img are kept as HTML inside the .md.
           Markdown accepts inline HTML, so the file still opens fine
           in Obsidian and keeps colors, comments and positions.
 
-Self-check: python3 app/text.py
+Self-check: python3 app/server/text.py
 """
 import re
 import unicodedata

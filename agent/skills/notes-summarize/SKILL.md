@@ -25,7 +25,7 @@ If you already have the data (from the conversation context or because the user 
 
 ## Before writing
 
-Look at how the destination note is structured (and if needed, `app/text.py` / `app/server.py` to understand the general convention of `topics/*/notes/`):
+Look at how the destination note is structured (and if needed, `app/server/text.py` / `app/server/server.py` to understand the general convention of `topics/*/notes/`):
 
 - Each `.md` in `notes/` starts with a `# ` (h1, the note's title) — that h1 is what the editor uses to split the file into sections when saving from the UI. Don't add a second h1.
 - Topics within the note go as `##`; subtopics, as `###`.

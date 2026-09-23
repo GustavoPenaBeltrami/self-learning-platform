@@ -6,7 +6,7 @@
 #   "faster-whisper; sys_platform != 'win32' or platform_machine != 'ARM64'",
 # ]
 # ///
-"""Local server for the study system. Stdlib only: python3 app/server.py
+"""Local server for the study system. Stdlib only: python3 app/server/server.py
 
 Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
 faster-whisper everywhere else. `./notes` (uv run) brings the right one;
@@ -17,7 +17,7 @@ import base64, datetime, hashlib, http.server, json, os, pathlib, platform, re, 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import text
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 TOPICS = (ROOT / "topics").resolve()   # ponytail: a symlinked topics/ is resolved once at start, relinking it needs a restart, resolve per request if that matters
 PORT = 8321
 MODELS = {
@@ -425,7 +425,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             if path == "/settings":
                 self.send_response(302)
-                self.send_header("Location", "/app/settings.html")
+                self.send_header("Location", "/app/views/settings.html")
                 return self.end_headers()
             if path == "/api/settings":
                 return self.respond(200, {**read_settings(), "active_profile": active_profile()})

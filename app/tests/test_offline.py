@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pathlib, re
 
-APP = pathlib.Path(__file__).resolve().parent
+APP = pathlib.Path(__file__).resolve().parents[1]
 VENDOR = APP / "vendor"
 URL = re.compile(r"https?://([^/\s\"'`<>():]+)")
 LOADER = re.compile(r"""(?:\b(?:fetch|import|importScripts|url)\(\s*|@import\s+|\b(?:src|href)\s*=\s*)["'`]?(https?://[^\s"'`<>)]+)""")

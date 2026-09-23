@@ -10,7 +10,7 @@ Full reference. The introduction is in the [README](../README.md).
 ```
 
 `./notes setup` is interactive and safe to re-run (it offers to keep the
-current choices). It fetches the dependencies in the header of `app/server.py`
+current choices). It fetches the dependencies in the header of `app/server/server.py`
 — `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU) on Linux,
 Windows and Intel Macs — asks for the profile and resolves the dictation model:
 
@@ -28,8 +28,8 @@ download or `none` leaves dictation on the OS fallback; nothing else changes.
 already running, it opens the tab and exits. No build: it runs on the Python stdlib,
 with `uv run --offline` so daily use never touches the network. If setup never
 ran, it falls back to `python3`: everything works except dictation. The model is set in `/settings` (see Dictation below). On Windows ARM, dictation needs x64 Python
-(emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html`.
-Without `uv`, `python3 app/server.py app/notes.html` starts everything except dictation.
+(emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server/server.py app/views/notes.html`.
+Without `uv`, `python3 app/server/server.py app/views/notes.html` starts everything except dictation.
 
 ## Profiles, offline and ownership
 
@@ -123,21 +123,13 @@ agent/
     agents/          researcher (verifies before teaching) and one teacher-<slug> per topic (personal, ignored).
 docs/manual.md       This file.
 app/
-    server.py        Local server. Lists files, builds and saves the notebooks.
-    text.py          HTML <-> Markdown conversion. `python3 app/text.py` self-tests.
-    test_attempt.py  Tests for saving exam attempts.
-    test_offline.py  Fails if the app loads anything from an external host.
-    test_dictation.py Tests for the dictation model choice and the OS-dictation fallback.
-    test_fonts.py    Tests for uploading user fonts.
-    test_setup.py    Tests for ./notes setup and the model download.
-    test_settings.py Tests for the settings store.
-    migrate_names.py Renames old Spanish class names in topics/*/notes/*.md. Idempotent.
-    style.css        Shared visual system. Tokens and color themes.
-    theme.js         Color theme list and picker, shared.
-    shell.js         Waybar, explorer and statusline, shared.
-    exam.html        Exam simulator. Handles every question type.
-    notes.html       Notebook.
-    viz.js           Diagrams (Mermaid) and formulas (KaTeX). Shared.
+    server/server.py Local server. Lists files, builds and saves the notebooks.
+    server/text.py   HTML <-> Markdown conversion. `python3 app/server/text.py` self-tests.
+    views/           Pages: notes.html (notebook), exam.html (exam simulator, every question type), settings.html.
+    scripts/         Shared JS: theme.js (color themes, settings), shell.js (waybar, explorer, statusline), viz.js (Mermaid, KaTeX).
+    styles/style.css Shared visual system. Tokens and color themes.
+    tests/           Self-checks, one per area: `python3 app/tests/test_<name>.py`.
+    tools/migrate_names.py Renames old Spanish class names in topics/*/notes/*.md. Idempotent.
     vendor/          Mermaid 11.17.2 and KaTeX 0.16.11 with their fonts, Inter 4.1 and
                      JetBrains Mono 2.304 (OFL), to work offline.
     Design.md        The visual system: tokens, components, do's and don'ts.
@@ -307,7 +299,7 @@ renames the file. The file order (`01-`, `02-`…) is the document order.
   starts a list. The toolbar dropdown does the same if you prefer the mouse.
 - Highlight / underline / strikethrough with color: pick the color in the toolbar
   and then the action. The palette is the `COLORS` array at the top of the
-  script in `app/notes.html`.
+  script in `app/views/notes.html`.
 - **Comments**: only on text that's already highlighted, underlined or struck
   through. Click the mark and a menu opens with the six colors, the comment
   field and the button to remove the mark. A commented mark carries a `°`; the
@@ -366,7 +358,7 @@ Markdown lacks: colored highlights, comments, margin notes and blank lines
 (`<br>`, because Markdown can't represent one). It's valid HTML inside
 Markdown, so the files open fine in Obsidian or any editor.
 
-`python3 app/text.py` checks that the HTML↔MD round trip doesn't lose anything
+`python3 app/server/text.py` checks that the HTML↔MD round trip doesn't lose anything
 or move anything around.
 
 ## Topic order

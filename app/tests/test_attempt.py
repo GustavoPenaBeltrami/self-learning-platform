@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Self-check of save_attempt() (POST /api/attempt): python3 app/test_attempt.py"""
+"""Self-check of save_attempt() (POST /api/attempt): python3 app/tests/test_attempt.py"""
 import base64, json, pathlib, shutil, sys, tempfile
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "server"))
 import server
 
 

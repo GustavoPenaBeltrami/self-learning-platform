@@ -41,7 +41,7 @@ The only thing that changes is what you compare against.
   exam was actually written in if the user overrode it):
 
   ```bash
-  uv run app/server.py --transcribe \
+  uv run app/server/server.py --transcribe \
       topics/<slug>/exams/<exam>/attempts/<audio-file> [lang]
   ```
 

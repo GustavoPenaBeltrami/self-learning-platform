@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pathlib, shutil, sys, tempfile
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "server"))
 import server
 
 WOFF2 = b"wOF2" + b"\0" * 60

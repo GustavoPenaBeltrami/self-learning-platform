@@ -5,7 +5,7 @@ description: Builds a JSON exam from raw content the user pastes (a book chapter
 
 # Notes exam
 
-Turns raw study content into an exam consumed by `app/exam.html`.
+Turns raw study content into an exam consumed by `app/views/exam.html`.
 
 ## Prior audit (before writing a single question)
 

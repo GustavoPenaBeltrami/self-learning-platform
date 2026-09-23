@@ -11,14 +11,14 @@
     document.head.appendChild(js);
   });
 
-  const loadMermaid = () => (mermaidLoad ||= script('vendor/mermaid.min.js').then(() => window.mermaid));
+  const loadMermaid = () => (mermaidLoad ||= script('/app/vendor/mermaid.min.js').then(() => window.mermaid));
 
   const loadKatex = () => (katexLoad ||= (() => {
     const css = document.createElement('link');
     css.rel = 'stylesheet';
-    css.href = 'vendor/katex/katex.min.css';
+    css.href = '/app/vendor/katex/katex.min.css';
     document.head.appendChild(css);
-    return script('vendor/katex/katex.min.js').then(() => window.katex);
+    return script('/app/vendor/katex/katex.min.js').then(() => window.katex);
   })());
 
   const token = name => getComputedStyle(document.documentElement)

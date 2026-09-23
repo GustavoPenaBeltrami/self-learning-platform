@@ -135,7 +135,7 @@ Buttons are `<kbd>` + label pairs: the key on `--color-void`, the label filled w
 - Typed shortcuts at the start of a line: `/h1`…`/h6`, `/p`, `/list`, `/ol`, `- `, `* `, `1. `.
 - Marks: background, underline or strikethrough in the chosen swatch color. A comment adds a `°` in accent.
 - Margin cards: flat `--color-graphite`, 2px left border in the card's own color, 55% opacity until hovered.
-- Names written into the note HTML stay as they were so saved `.md` files keep rendering: `mk`, `mk-highlight`, `mk-underline`, `mk-strike`, `data-comment`, `card`, `card-body`, `inline`, `ref`, `viz`, `data-kind`, `src`, `view`, `data-x`/`data-y` and the inline `--c`. Renaming any of them needs a migration of every note (see `app/migrate_names.py`).
+- Names written into the note HTML stay as they were so saved `.md` files keep rendering: `mk`, `mk-highlight`, `mk-underline`, `mk-strike`, `data-comment`, `card`, `card-body`, `inline`, `ref`, `viz`, `data-kind`, `src`, `view`, `data-x`/`data-y` and the inline `--c`. Renaming any of them needs a migration of every note (see `app/tools/migrate_names.py`).
 - Floating menus, tooltips and reference previews: `--color-void` with a 1px `--color-slate` border, no radius.
 
 ## Shape and depth

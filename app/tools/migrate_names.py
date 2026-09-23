@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pathlib, re, sys
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 CLASSES = {"mk-fondo": "mk-highlight", "mk-sub": "mk-underline", "mk-tacha": "mk-strike",
            "tarjeta": "card", "cuerpo": "card-body"}
 
