@@ -22,6 +22,9 @@ TOPICS = ROOT / "topics"
 PORT = 8321
 VOICE_MODEL = "mlx-community/whisper-large-v3-turbo"   # ~1.6 GB, downloaded the first time
 CPU_VOICE_MODEL = "small"   # ponytail: CPU int8 only, set voice_model=turbo on a fast box; CUDA needs device="auto" + cuDNN
+MLX_MODELS = {"tiny": "mlx-community/whisper-tiny-mlx", "base": "mlx-community/whisper-base-mlx",
+              "small": "mlx-community/whisper-small-mlx", "medium": "mlx-community/whisper-medium-mlx",
+              "turbo": VOICE_MODEL, "large-v3": "mlx-community/whisper-large-v3-mlx"}
 voice_lock = threading.Lock()
 cpu_model = None
 BODY_LIMIT = 20 * 1024 * 1024   # ponytail: one flat cap for every POST, single local user
@@ -42,9 +45,10 @@ class NoDictation(ValueError):
 
 
 def voice_model(gpu):
-    """settings.json voice_model, then NOTES_VOICE_MODEL, then the engine default. A local path is used as-is."""
+    """settings.json voice_model, then NOTES_VOICE_MODEL, then the engine default. A size maps to the mlx repo on GPU; a local path is used as-is."""
     model = read_settings()["voice_model"] or os.environ.get("NOTES_VOICE_MODEL") or (VOICE_MODEL if gpu else CPU_VOICE_MODEL)
-    return os.path.expanduser(model)
+    model = os.path.expanduser(model)
+    return MLX_MODELS.get(model, model) if gpu else model
 
 
 def whisper(audio, lang):

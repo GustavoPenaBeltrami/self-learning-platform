@@ -102,7 +102,7 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 | macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `./notes` (Windows: `notes`) |
 | Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html` |
 
-`./notes` is `uv run app/server.py app/notes.html`. Without uv: `python3 app/server.py app/notes.html` starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model, or a local model folder you already have, in `/settings`.
+`./notes` is `uv run app/server.py app/notes.html`. Without uv: `python3 app/server.py app/notes.html` starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`; for a local model folder you already have, see the [manual](docs/manual.md).
 
 Without a dictation engine or model, the microphone points you to the OS dictation instead: `Fn` twice on macOS, `Win+H` on Windows, and on Linux [Speech Note](https://github.com/mkiol/dsnote) (`flatpak install flathub net.mkiol.SpeechNote`, or `yay -S dsnote` on Arch) with `ydotool` on Wayland. See the [manual](docs/manual.md).
 

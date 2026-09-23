@@ -30,6 +30,7 @@ def test_resolution_order():
     assert server.voice_model(False) == "small"
     os.environ["NOTES_VOICE_MODEL"] = "turbo"
     assert server.voice_model(False) == "turbo"
+    assert server.voice_model(True) == server.VOICE_MODEL, "a size must map to the mlx repo on GPU"
     server.save_settings({"voice_model": "~/models/whisper"})
     assert server.voice_model(True) == os.path.expanduser("~/models/whisper"), "settings must win over the env var"
 

@@ -232,9 +232,10 @@ renames the file. The file order (`01-`, `02-`…) is the document order.
     on Apple Silicon (~1.6 GB, the largest; right for the Online profile) and
     `small` on CPU. The Offline profile picks what the hardware handles (`small`
     or `base` on a modest CPU, `turbo` on a fast one) or a model you already
-    have: a local folder is used as-is, with no download. The value depends on
-    the engine: a Hugging Face repo or MLX model folder for mlx-whisper, a size
-    (`small`, `turbo`…), repo or CTranslate2 folder for faster-whisper.
+    have. The `/settings` dropdown offers the sizes (`tiny` to `large-v3`), which
+    work on both engines. For a local folder (MLX for mlx-whisper, CTranslate2
+    for faster-whisper), write its path as `voice_model` in `settings.json`: it
+    is used as-is, with no download, and shows up in the dropdown.
   - **Fallback**: with no engine (started without `uv`) or no model (a skipped
     Setup, offline before the first download, a wrong path) the microphone
     doesn't break: the status tells you to use the OS dictation instead, which
