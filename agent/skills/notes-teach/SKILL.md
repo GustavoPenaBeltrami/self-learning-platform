@@ -351,10 +351,14 @@ It is the highest-leverage step; don't rush it. With their level and their goal
 in hand, stop and genuinely reason out the best way to teach *this* to *this
 person*. Reread the philosophy above and plan against it.
 
-- **Look at the topic's resources first.** `topic.json` has `links` (external
-  sources) and the `resources/` folder has local files. They are the most
-  trustworthy source there is: use them before going out to search, and before
-  going from memory. If `topic.json` has `area`, use it as tone/domain context
+- **Look at the topic's resources first.** `topic.json` has `links` (sources:
+  a `url`, or a `path` to a local file) and the `resources/` folder has local
+  files. They are the most trustworthy source there is: use them before going
+  out to search, and before going from memory. A `path` that doesn't exist:
+  warn the learner in one line and continue with the rest. `sources_mode`
+  (`web`, `local`, `both`; missing = `both`) says where to look things up; with
+  `local` or no connection, verify only against local sources and say plainly
+  when a claim was **not verified on the web**. If `topic.json` has `area`, use it as tone/domain context
   (e.g. a topic with `area: "software-architecture"` is taught with the
   vocabulary already established in sibling topics of the same area).
 - **Survey the field first with the `researcher` subagent.** Before building the
