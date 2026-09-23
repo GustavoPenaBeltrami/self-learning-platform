@@ -193,7 +193,7 @@ async function menu() {
     topics = await loadTopics();
   } catch {
     app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
-      <p>Open a terminal in the folder and run <code>npm run app</code>.</p></div>`;
+      <p>Open a terminal in the folder and run <code>./notes</code>.</p></div>`;
     return;
   }
   buildTree(topics, null);

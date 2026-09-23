@@ -93,17 +93,16 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 - **A coding agent**, whichever you use.
 - **A browser** with a microphone for dictation and oral exams.
 - **Internet only the first time**, to download the packages and the voice model. After that it works offline: Mermaid, KaTeX and the reading fonts ship in the repo (`app/vendor/`).
-- npm is optional: `npm run app` is just a shortcut, there's no `npm install`.
 
 ### Platforms
 
 | System | Dictation | Disk (packages + model) | How to start it |
 |---|---|---|---|
-| macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `npm run app` |
-| macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `npm run app` |
+| macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `./notes` |
+| macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `./notes` (Windows: `notes`) |
 | Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html` |
 
-Without npm: `uv run app/server.py app/notes.html`. Without uv: `python3 app/server.py app/notes.html` starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model, or a local model folder you already have, in `/settings`.
+`./notes` is `uv run app/server.py app/notes.html`. Without uv: `python3 app/server.py app/notes.html` starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model, or a local model folder you already have, in `/settings`.
 
 Without a dictation engine or model, the microphone points you to the OS dictation instead: `Fn` twice on macOS, `Win+H` on Windows, and on Linux [Speech Note](https://github.com/mkiol/dsnote) (`flatpak install flathub net.mkiol.SpeechNote`, or `yay -S dsnote` on Arch) with `ydotool` on Wayland. See the [manual](docs/manual.md).
 
@@ -123,7 +122,7 @@ Read AGENTS.md and run notes-setup-agent.
 It detects which agent it is and exposes the skills in that agent's format — symlinks if it supports them, conversion if not. Whatever it creates goes to `.git/info/exclude`, so it doesn't clutter the repo. Then start the app:
 
 ```sh
-npm run app
+./notes          # Windows: notes
 ```
 
 **Going to keep your topics in your own repo?** Change the remote:
@@ -143,3 +142,7 @@ The details of each skill, the notebook and the exam format are in the **[manual
 ## Contributing
 
 Contributions are welcome! Fork the repo, create your branch, and open a Pull Request. Skills are edited in `agent/skills/`, never inside an agent's own folder. For bugs or ideas, [open an issue](https://github.com/GustavoPenaBeltrami/Notas/issues/new).
+
+## License
+
+[MIT](LICENSE).

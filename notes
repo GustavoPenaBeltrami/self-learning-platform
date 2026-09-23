@@ -1,0 +1,6 @@
+#!/bin/sh
+cd "$(dirname "$0")" || exit 1
+case "${1:-app}" in
+  app) exec uv run app/server.py app/notes.html ;;
+  *) echo "usage: ./notes [app]" >&2; exit 1 ;;
+esac

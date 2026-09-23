@@ -1,7 +1,7 @@
 # Notes — instructions for the agent
 
 This repo is a study system: skills and agents (`agent/`), a filesystem of
-topics (`topics/<slug>/`) and a local app (`npm run app`). You are the third
+topics (`topics/<slug>/`) and a local app (`./notes`). You are the third
 window: the user studies in one, takes exams and notes in the app, and talks
 to you in this one.
 
