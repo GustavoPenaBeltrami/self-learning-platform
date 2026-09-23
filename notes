@@ -3,7 +3,7 @@ cd "$(dirname "$0")" || exit 1
 case "${1:-app}" in
   setup) exec uv run app/server.py --setup ;;
   app)
-    # ponytail: offline, cached deps only; no deps yet (setup skipped) = stdlib python3, the app without dictation
+    # ponytail: cached deps only, a skipped setup falls to stdlib python3 without dictation; run ./notes setup to get it
     uv sync -q --offline --script app/server.py 2>/dev/null && exec uv run -q --offline app/server.py app/notes.html
     exec python3 app/server.py app/notes.html ;;
   *) echo "usage: ./notes [app|setup]" >&2; exit 1 ;;

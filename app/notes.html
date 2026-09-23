@@ -165,8 +165,11 @@ const svg = (n, t = 16) => `<svg viewBox="0 0 20 20" width="${t}" height="${t}" 
   stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
 
 const { app, tree, tools, path, mode } = mountShell('notes');
+addEventListener('settings-applied', e => {
+  const fontSel = document.getElementById('font');
+  if (fontSel) fontSel.value = e.detail.font || 'mono';
+});
 const zoom = () => parseFloat(app.style.zoom) || 1;
-const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
 
@@ -210,7 +213,7 @@ async function menu() {
           <td class="type">${esc(l.type)}</td>
           <td class="num${l.sections ? '' : ' zero'}">${l.sections}</td>
           <td class="num${l.resources ? '' : ' zero'}">${l.resources}</td>
-        </tr>`).join('')}${topics.length ? '' : '<tr><td></td><td class="wide" colspan="4"><span class="sub">no topics yet: ask your agent to "create a new topic" (notes-init)</span></td></tr>'}</tbody>
+        </tr>`).join('')}${topics.length ? '' : noTopicsRow(4)}</tbody>
     </table>
     <div class="tildes"></div></div>`;
 }
@@ -233,11 +236,7 @@ async function openTopic(name) {
         <option value="list">list</option>
         <option value="ol">numbered list</option>
       </select>
-      <select id="font" data-tip="Reading font">
-        <option value="mono">mono</option>
-        <option value="serif">serif</option>
-        <option value="inter">inter</option>
-      </select>
+      <select id="font" data-tip="Reading font"></select>
     </div>
     <div class="wb-mod pill">
       <button data-cmd="bold" data-tip="Bold · ⌘B" style="font-weight:700">B</button>
@@ -285,10 +284,7 @@ async function openTopic(name) {
   doc.addEventListener('focusin', () => mode('INSERT', 'insert'));
   doc.addEventListener('focusout', () => mode('NORMAL'));
   const fontSel = document.getElementById('font');
-  userFonts.then(fonts => {
-    fontSel.insertAdjacentHTML('beforeend', fonts.map(f => `<option value="${esc(f)}">${esc(f.replace(/\.\w+$/, ''))}</option>`).join(''));
-    fontSel.value = document.documentElement.dataset.font;
-  });
+  fontChoices.then(choices => fontSel.innerHTML = optionTags(choices, document.documentElement.dataset.font));
   fontSel.onchange = () => saveSettings({ font: fontSel.value }).catch(() => {});
   doc.addEventListener('input', () => {
     if (!shortcuts()) autoRef();

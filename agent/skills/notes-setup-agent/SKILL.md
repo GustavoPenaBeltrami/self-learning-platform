@@ -12,8 +12,10 @@ to the user.
 
 ## 0. Read the Profile
 
-Read `profile` from `settings.json` at the repo root (or `GET /api/settings`
-if the app is running). Missing file or key = `online`.
+Read `profile` from `settings.json` at the repo root (or `active_profile`
+from `GET /api/settings` if the app is running). Missing file or key = `auto`.
+`auto` is Online when there is a connection, Offline otherwise; recommend as
+Online and mention the Reference stack in one line.
 
 - **Online** (recommended): the supported paid agents are Claude Code, OpenAI
   Codex, Google Antigravity and Cursor. If the learner is already in one of

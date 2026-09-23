@@ -12,23 +12,24 @@ Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
 faster-whisper everywhere else. `./notes` (uv run) brings the right one;
 without it everything works except the microphone.
 """
-import base64, datetime, hashlib, http.server, json, os, pathlib, platform, re, shutil, sys, threading, urllib.parse, webbrowser
+import base64, datetime, hashlib, http.server, json, os, pathlib, platform, re, shutil, socket, sys, threading, urllib.parse, webbrowser
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import text
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-TOPICS = (ROOT / "topics").resolve()   # ponytail: symlink topics/ to keep content outside the repo
+TOPICS = (ROOT / "topics").resolve()   # ponytail: a symlinked topics/ is resolved once at start, relinking it needs a restart, resolve per request if that matters
 PORT = 8321
-VOICE_MODEL = "mlx-community/whisper-large-v3-turbo"   # ~1.6 GB, downloaded the first time
-CPU_VOICE_MODEL = "small"   # ponytail: CPU int8 only, set voice_model=turbo on a fast box; CUDA needs device="auto" + cuDNN
-MLX_MODELS = {"tiny": "mlx-community/whisper-tiny-mlx", "base": "mlx-community/whisper-base-mlx",
-              "small": "mlx-community/whisper-small-mlx", "medium": "mlx-community/whisper-medium-mlx",
-              "turbo": VOICE_MODEL, "large-v3": "mlx-community/whisper-large-v3-mlx"}
-CPU_MODELS = {"tiny": "Systran/faster-whisper-tiny", "base": "Systran/faster-whisper-base",
-              "small": "Systran/faster-whisper-small", "medium": "Systran/faster-whisper-medium",
-              "turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo", "large-v3": "Systran/faster-whisper-large-v3"}
-SIZES = {"tiny": ("~75 MB", "~1 GB"), "base": ("~145 MB", "~1 GB"), "small": ("~480 MB", "~2 GB"), "turbo": ("~1.6 GB", "~6 GB")}
+MODELS = {
+    "tiny": {"mlx": "mlx-community/whisper-tiny-mlx", "cpu": "Systran/faster-whisper-tiny", "disk": "~75 MB", "ram": "~1 GB"},
+    "base": {"mlx": "mlx-community/whisper-base-mlx", "cpu": "Systran/faster-whisper-base", "disk": "~145 MB", "ram": "~1 GB"},
+    "small": {"mlx": "mlx-community/whisper-small-mlx", "cpu": "Systran/faster-whisper-small", "disk": "~480 MB", "ram": "~2 GB"},
+    "medium": {"mlx": "mlx-community/whisper-medium-mlx", "cpu": "Systran/faster-whisper-medium", "disk": "~1.5 GB", "ram": "~5 GB"},
+    "turbo": {"mlx": "mlx-community/whisper-large-v3-turbo", "cpu": "mobiuslabsgmbh/faster-whisper-large-v3-turbo", "disk": "~1.6 GB", "ram": "~6 GB"},
+    "large-v3": {"mlx": "mlx-community/whisper-large-v3-mlx", "cpu": "Systran/faster-whisper-large-v3", "disk": "~3 GB", "ram": "~10 GB"},
+}
+DEFAULT_SIZE = {"mlx": "turbo", "cpu": "small"}   # ponytail: CPU int8 only, a GPU box still runs small on CPU; device="auto" + cuDNN if CUDA users show up
+ENGINE = "mlx" if platform.system() == "Darwin" and platform.machine() == "arm64" else "cpu"
 voice_lock = threading.Lock()
 cpu_model = None
 BODY_LIMIT = 20 * 1024 * 1024   # ponytail: one flat cap for every POST, single local user
@@ -45,32 +46,37 @@ def audio_ext(mime):
 
 
 class NoDictation(ValueError):
-    """No engine or no model: the mic falls back to the OS dictation."""
+    pass
 
 
-def voice_model(gpu):
-    """settings.json voice_model, then NOTES_VOICE_MODEL, then the profile default, then the engine default. A size maps to the mlx repo on GPU; a local path is used as-is."""
-    settings = read_settings()
-    model = (settings["voice_model"] or os.environ.get("NOTES_VOICE_MODEL")
-             or profile_defaults(settings["profile"])["voice_model"] or (VOICE_MODEL if gpu else CPU_VOICE_MODEL))
-    model = os.path.expanduser(model)
-    return MLX_MODELS.get(model, model) if gpu else model
+def model_dir(size, engine=None):
+    return ROOT / "models" / MODELS[size][engine or ENGINE].split("/")[-1]
 
 
-def download_voice_model(size, gpu=None):
-    """Downloads a size into models/<repo name> for the engine this machine runs. Returns the local path."""
-    if gpu is None:
-        gpu = platform.system() == "Darwin" and platform.machine() == "arm64"
-    repo = (MLX_MODELS if gpu else CPU_MODELS).get(size)
-    if not repo:
+def voice_model(engine):
+    choice = read_settings()["voice_model"] or os.environ.get("NOTES_VOICE_MODEL") or DEFAULT_SIZE[engine]
+    if choice not in MODELS:
+        return os.path.expanduser(choice)
+    if model_dir(choice, engine).is_dir():
+        return str(model_dir(choice, engine))
+    if active_profile() == "online":
+        return MODELS[choice][engine]
+    try:
+        from huggingface_hub import snapshot_download
+        return snapshot_download(repo_id=MODELS[choice][engine], local_files_only=True)
+    except Exception:
+        raise NoDictation(f"dictation model {choice} is not on disk and the profile is offline")
+
+
+def download_voice_model(size):
+    if size not in MODELS:
         raise ValueError("unknown model size: " + str(size))
     try:
         from huggingface_hub import snapshot_download
     except ImportError:
         raise NoDictation("dictation engine missing, start with ./notes")
-    dest = ROOT / "models" / repo.split("/")[-1]
-    snapshot_download(repo_id=repo, local_dir=str(dest))
-    return str(dest)
+    snapshot_download(repo_id=MODELS[size][ENGINE], local_dir=str(model_dir(size)))
+    return str(model_dir(size))
 
 
 def whisper(audio, lang):
@@ -85,14 +91,15 @@ def whisper(audio, lang):
         import mlx_whisper
     except ImportError:
         mlx_whisper = None
-    model = voice_model(bool(mlx_whisper))
+    model = voice_model("mlx" if mlx_whisper else "cpu")
     try:
         if mlx_whisper:
-            # ponytail: mlx loads and transcribes in one call, so a transcription error also reads as a missing model
+            # ponytail: mlx loads and transcribes in one call, so a transcription error also reads as a missing model; split load_model out if the hint misleads
             r = mlx_whisper.transcribe(audio, path_or_hf_repo=model, language=lang)
             return [[s["start"], s["text"].strip()] for s in r["segments"]]
         if not cpu_model or cpu_model[0] != model:
-            cpu_model = (model, faster_whisper.WhisperModel(model, device="cpu", compute_type="int8"))
+            cpu_model = (model, faster_whisper.WhisperModel(model, device="cpu", compute_type="int8",
+                                                            local_files_only=active_profile() == "offline"))
     except Exception as e:
         raise NoDictation(f"dictation model {model} not available: {e}")
     segments, _ = cpu_model[1].transcribe(audio, language=lang)
@@ -111,49 +118,70 @@ def transcribe(raw, lang=None):
     return {"text": " ".join(t for _, t in segments).strip(), "segments": segments}
 
 
-SETTINGS = {"profile": "online", "theme": "", "font": "mono", "voice_model": ""}
-PROFILES = ("online", "offline")
+AUTO, ONLINE, OFFLINE = PROFILES = ("auto", "online", "offline")
+SETTINGS = {"profile": AUTO, "theme": "", "font": "mono", "voice_model": ""}
+network = None
 
 
-def profile_defaults(profile):
-    """What a Profile decides: the dictation model when none is set, and sources_mode for new topics."""
-    online = profile != "offline"
-    return {"voice_model": "turbo" if online else "", "sources_mode": "both" if online else "local"}
+def reachable():
+    try:
+        socket.create_connection(("huggingface.co", 443), timeout=1.5).close()
+        return True
+    except OSError:
+        return False
+
+
+def active_profile():
+    global network
+    profile = read_settings()["profile"]
+    if profile != AUTO:
+        return profile
+    if network is None:
+        network = reachable()   # ponytail: probed once per server run, reconnecting needs a restart; re-probe on a timer if that matters
+    return ONLINE if network else OFFLINE
+
+
+def check_voice_model(value):
+    if value and value not in MODELS and not os.path.isdir(os.path.expanduser(value)):
+        raise ValueError("voice_model must be a size or an existing model folder: " + value)
+    return value
 
 
 def ram_gb():
     try:
         return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
     except (AttributeError, ValueError, OSError):
-        return 0   # ponytail: Windows has no sysconf, the suggestion falls to base
+        return 0   # ponytail: Windows has no sysconf so the suggestion falls to base, read GlobalMemoryStatusEx via ctypes if Windows users need it
 
 
 def setup(ask=input):
-    """./notes setup: asks the Profile and the dictation model, downloads it, writes settings.json. Safe to re-run."""
     current = read_settings()
     if (ROOT / "settings.json").exists():
         keep = ask(f"Current: profile {current['profile']}, voice_model {current['voice_model'] or 'default'}. Keep? [Y/n] ")
         if keep.strip().lower() in ("", "y", "yes"):
             return current
-    profile = "offline" if ask("Profile: 1) online (recommended)  2) offline [1] ").strip().lower() in ("2", "offline") else "online"
+    reply = ask("Profile: 1) auto (recommended: online when connected)  2) online  3) offline [1] ").strip().lower()
+    profile = {"2": ONLINE, "3": OFFLINE}.get(reply, reply if reply in PROFILES else AUTO)
     choice = "turbo"
-    if profile == "offline":
+    if profile == OFFLINE:
         ram, free = ram_gb(), shutil.disk_usage(ROOT).free / 2**30
         print(f"This machine: {ram:.0f} GB RAM, {free:.0f} GB free disk.")
-        for size, (disk, mem) in SIZES.items():
-            print(f"  {size:6} disk {disk:8} RAM {mem}")
+        for size, m in MODELS.items():
+            print(f"  {size:8} disk {m['disk']:8} RAM {m['ram']}")
         suggested = "turbo" if ram >= 16 else "small" if ram >= 8 else "base"
-    while profile == "offline":
+    while profile == OFFLINE:
         choice = ask(f"Dictation model: a size, the path to a model you have, or none [{suggested}] ").strip() or suggested
-        if choice in SIZES or choice == "none" or os.path.isdir(os.path.expanduser(choice)):
+        try:
+            check_voice_model("" if choice == "none" else choice)
             break
-        print("Not a size and no such folder: " + choice)
+        except ValueError:
+            print("Not a size and no such folder: " + choice)
     if choice == "none":
         model = ""
-    elif choice not in SIZES:
+    elif choice not in MODELS:
         model = os.path.abspath(os.path.expanduser(choice))
     else:
-        print(f"Downloading {choice} ({SIZES[choice][0]})...")
+        print(f"Downloading {choice} ({MODELS[choice]['disk']})...")
         try:
             model = download_voice_model(choice)
         except Exception as e:
@@ -163,43 +191,53 @@ def setup(ask=input):
 
 
 def read_settings():
-    """settings.json at the repo root. Missing file or missing keys = defaults."""
     file = ROOT / "settings.json"
     saved = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}
     return {k: saved.get(k, v) for k, v in SETTINGS.items()}
 
 
 def save_settings(data):
-    """Merges the known keys into settings.json. Returns the full settings."""
     settings = read_settings()
     settings.update({k: data[k] for k in SETTINGS if k in data})
     if settings["profile"] not in PROFILES:
         raise ValueError("unknown profile: " + str(settings["profile"]))
     if not all(isinstance(v, str) for v in settings.values()):
         raise ValueError("settings values must be strings")
+    check_voice_model(settings["voice_model"])
     (ROOT / "settings.json").write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return settings
 
 
-FONT_NAME = re.compile(r"[A-Za-z0-9][\w .-]*\.(woff2|ttf|otf)")
+FONT_NAME = re.compile(r"[a-z0-9][a-z0-9._-]*\.(woff2|ttf|otf)")
 FONT_MAGIC = (b"wOF2", b"OTTO", b"\0\1\0\0", b"true")
 
 
+def font_name(upload):
+    stem, dot, ext = upload.rpartition(".")
+    return re.sub(r"\s+", "-", stem.strip().lower()) + dot + ext
+
+
 def list_fonts():
-    """User fonts in fonts/ at the repo root, served as /fonts/<name>."""
     d = ROOT / "fonts"
     return sorted(f.name for f in d.iterdir() if f.is_file() and FONT_NAME.fullmatch(f.name)) if d.is_dir() else []
 
 
-def save_font(name, raw):
-    """Stores an uploaded font in fonts/. Rejects bad names, non-fonts and oversized files."""
+def fonts_css():
+    return "\n".join(f'@font-face {{ font-family: "{f}"; src: url("/fonts/{f}"); }}\n'
+                     f':root[data-font="{f}"] {{ --reading-font: "{f}", var(--mono); }}' for f in list_fonts())
+
+
+def save_font(upload, raw):
+    name = font_name(upload)
     if not FONT_NAME.fullmatch(name):
-        raise ValueError("font name not allowed (a .woff2, .ttf or .otf file name, no folders): " + name)
+        raise ValueError("font name not allowed (a .woff2, .ttf or .otf file name, no folders): " + upload)
     if len(raw) > BODY_LIMIT:
         raise ValueError("font too large")
     if not raw.startswith(FONT_MAGIC):
-        raise ValueError("not a font file: " + name)
+        raise ValueError("not a font file: " + upload)
     d = ROOT / "fonts"
+    if (d / name).exists():
+        raise ValueError(f"a font named {name} already exists: rename the file or delete fonts/{name}")
     d.mkdir(exist_ok=True)
     (d / name).write_bytes(raw)
     return {"fonts": list_fonts()}
@@ -390,9 +428,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Location", "/app/settings.html")
                 return self.end_headers()
             if path == "/api/settings":
-                return self.respond(200, read_settings())
+                return self.respond(200, {**read_settings(), "active_profile": active_profile()})
+            if path == "/api/voice-models":
+                return self.respond(200, {k: {"disk": m["disk"], "ram": m["ram"]} for k, m in MODELS.items()})
             if path == "/api/fonts":
                 return self.respond(200, {"fonts": list_fonts()})
+            if path == "/api/fonts.css":
+                body = fonts_css().encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/css; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return self.wfile.write(body)
             if path == "/api/index":
                 return self.respond(200, exam_index())
             if path == "/api/topics":
@@ -448,6 +496,7 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["--transcribe"]:
         print(" ".join(t for _, t in whisper(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)).strip())
         sys.exit(0)
+    print(f"Profile: {active_profile()}")
     page = sys.argv[1] if len(sys.argv) > 1 else ""
     url = f"http://localhost:{PORT}/{page}"
     try:

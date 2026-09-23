@@ -4,7 +4,6 @@ topics/*
 __pycache__/
 node_modules/
 .claude/settings.local.json
-referencias/
 plan.md
 agent/agents/teacher-*
 local/

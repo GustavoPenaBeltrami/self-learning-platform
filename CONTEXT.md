@@ -13,19 +13,23 @@ Usable with no network connection once installed; nothing in daily use calls out
 _Avoid_: Local-only, air-gapped
 
 **Setup**:
-The one moment allowed to use the network: fetching dependencies, models and fonts, or pointing at ones the learner already has.
+The moment meant to use the network: fetching dependencies and models, or pointing at ones the learner already has. After it, daily use aims to need no network; that is a goal, not a rule, and the Online profile may still fetch what is missing.
 _Avoid_: Bootstrap, first run
 
 **Profile**:
-The learner's choice, made at Setup, of how the agent layer and dictation run: Online or Offline. The core is the same in both.
+The learner's choice, made at Setup and changeable in the settings page, of how the agent layer and dictation run: Auto, Online or Offline. The core is the same in all of them.
 _Avoid_: Mode, edition
 
+**Auto profile**:
+The default: Online when the server finds a connection at start, Offline otherwise.
+_Avoid_: Smart mode
+
 **Online profile**:
-The recommended profile: a paid agent and model, web lookups, and the largest dictation model, picked for comfort over independence.
+A paid agent and model, web lookups, and the largest dictation model, fetched when missing; comfort over independence.
 _Avoid_: Cloud mode, default mode
 
 **Offline profile**:
-The profile where everything runs on the learner's machine: the reference stack, local sources, and a dictation model sized to the hardware.
+The profile where everything runs on the learner's machine: the reference stack, local sources, and a dictation model sized to the hardware. Nothing is fetched; what is missing falls back.
 _Avoid_: Air-gapped mode, local mode
 
 ## Layers

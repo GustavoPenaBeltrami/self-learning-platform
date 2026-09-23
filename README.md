@@ -92,7 +92,7 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 - **git**, to clone the repo.
 - **A coding agent**, whichever you use.
 - **A browser** with a microphone for dictation and oral exams.
-- **Internet only for `./notes setup`**, which downloads the packages and the voice model. After that it works offline: Mermaid, KaTeX and the reading fonts ship in the repo (`app/vendor/`).
+- **Internet mainly for `./notes setup`**, which downloads the packages and the voice model. After that it aims to work offline: Mermaid, KaTeX and the reading fonts ship in the repo (`app/vendor/`).
 
 ### Platforms
 
@@ -104,7 +104,7 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 
 `./notes` runs `uv run --offline app/server.py app/notes.html`: it never touches the network, and if setup never ran it falls back to `python3`, which starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`; for a local model folder you already have, see the [manual](docs/manual.md).
 
-Without a dictation engine or model, the microphone points you to the OS dictation instead: `Fn` twice on macOS, `Win+H` on Windows, and on Linux [Speech Note](https://github.com/mkiol/dsnote) (`flatpak install flathub net.mkiol.SpeechNote`, or `yay -S dsnote` on Arch) with `ydotool` on Wayland. See the [manual](docs/manual.md).
+Without a dictation engine or model, the microphone points you to your OS dictation instead; the per-OS steps are in the [manual](docs/manual.md#notebook).
 
 ### Steps
 
@@ -114,7 +114,7 @@ cd Notas
 ./notes setup    # Windows: notes setup
 ```
 
-Setup is the only step that uses the network. It fetches the Python packages, asks for your **profile** — Online (recommended: downloads the largest dictation model, turbo, ~1.6 GB) or Offline (pick a size that fits your RAM and disk, the path to a model you already have, or none) — and writes the choices to `settings.json`. Running it again offers to keep them. Skipping it only costs dictation.
+Setup is the step meant for the network. It fetches the Python packages, asks for your **profile** — Auto (recommended: Online when there is a connection, Offline when not), Online (downloads the largest dictation model, turbo, ~1.6 GB) or Offline (pick a size that fits your RAM and disk, the path to a model you already have, or none) — and writes the choices to `settings.json`. Running it again offers to keep them. Skipping it only costs dictation.
 
 Open your agent in the folder and ask it:
 

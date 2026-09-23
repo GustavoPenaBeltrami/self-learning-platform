@@ -54,9 +54,7 @@
 const { app, tree, tools, path, mode } = mountShell('exams');
 const statusEl = document.getElementById('status');
 const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
-const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 const file = new URLSearchParams(location.search).get('f');
-const key = (k, text, extra = '') => `<button class="key ${extra}"><kbd>${k}</kbd><span>${text}</span></button>`;
 
 function buildTree(topics) {
   tree.innerHTML = topics.map(t => {
@@ -100,7 +98,7 @@ async function index() {
         </tr>${l.exams.map(e => `
         <tr onclick="location.search='?f=${encodeURIComponent(e.path)}'">
           <td></td><td class="wide" colspan="3"><span class="sub">└─ </span><a href="?f=${encodeURIComponent(e.path)}">${esc(e.title)}</a></td>
-        </tr>`).join('')}`).join('')}${topics.length ? '' : '<tr><td></td><td class="wide" colspan="3"><span class="sub">no topics yet: ask your agent to "create a new topic" (notes-init)</span></td></tr>'}</tbody>
+        </tr>`).join('')}`).join('')}${topics.length ? '' : noTopicsRow(3)}</tbody>
     </table>
     <div class="tildes"></div></div>`;
 }

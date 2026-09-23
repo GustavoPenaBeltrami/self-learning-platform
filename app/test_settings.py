@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Self-check of the settings store (GET/POST /api/settings): python3 app/test_settings.py"""
 import json, pathlib, shutil, sys, tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -22,7 +21,7 @@ def with_temp_root(f):
 @with_temp_root
 def test_defaults_without_file():
     assert not (server.ROOT / "settings.json").exists()
-    assert server.read_settings() == {"profile": "online", "theme": "", "font": "mono", "voice_model": ""}
+    assert server.read_settings() == {"profile": "auto", "theme": "", "font": "mono", "voice_model": ""}
 
 
 @with_temp_root
@@ -44,8 +43,18 @@ def test_rejects_unknown_profile():
     raise AssertionError("should have rejected an unknown profile")
 
 
+@with_temp_root
+def test_rejects_missing_model_folder():
+    try:
+        server.save_settings({"voice_model": "/no/such/model"})
+    except ValueError:
+        return
+    raise AssertionError("a voice_model path must exist")
+
+
 if __name__ == "__main__":
     test_defaults_without_file()
     test_round_trip()
     test_rejects_unknown_profile()
+    test_rejects_missing_model_folder()
     print("ok")
