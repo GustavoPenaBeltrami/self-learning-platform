@@ -135,6 +135,8 @@ git remote set-url origin <your-repo>
 
 The details of each skill, the notebook and the exam format are in the **[manual](docs/manual.md)**.
 
+**Online or offline?** The Online profile (a paid agent) is recommended. To run everything on your machine with open-source tools, see [Profiles, offline and ownership](docs/manual.md#profiles-offline-and-ownership) and its Reference stack.
+
 **Roadmap:** test `notes-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/Notas/issues).
 
 **Thanks to** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `notes-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory and spaced review.

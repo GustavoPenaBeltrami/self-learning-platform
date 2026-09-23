@@ -17,6 +17,81 @@ on Linux, Windows and Intel Macs. The model is set in `/settings` (see Dictation
 (emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html`.
 Without `uv`, `python3 app/server.py app/notes.html` starts everything except dictation.
 
+## Profiles, offline and ownership
+
+Everything is yours: topics and notes are plain files, the code is MIT, and
+any agent or model can be swapped without losing anything. The **Profile**
+(`profile` in `settings.json`: `online` or `offline`) is picked at Setup,
+changed any time in `/settings`, and only sets three defaults: the dictation
+model, the `sources_mode` of new topics, and which agents `notes-setup-agent`
+recommends. The core never reads it.
+
+| | Online (recommended) | Offline |
+|---|---|---|
+| Agent | A paid one: Claude Code, OpenAI Codex, Google Antigravity, Cursor… | The Reference stack below, or any agent on a local model |
+| Dictation | The largest model (`turbo`, ~1.6 GB), no questions | A size your RAM and disk handle, or a model you already have |
+| New topics look things up in | Web and local sources (`both`) | Local sources (`local`) |
+
+**What the Setup fetches.** The Setup is the only moment that uses the network:
+Python dependencies (dictation engine) and the dictation model, or a path to
+ones you already have. Fonts, Mermaid and KaTeX already ship in `app/vendor/`.
+
+**What works with no network.** The whole core: the app, notebooks, exams,
+review, settings and fonts. Dictation works once its model is on disk; without
+it, the microphone points to the OS dictation (see Dictation under Notebook).
+The agent layer works if its model is local; with no connection, the agents
+use local sources and say they didn't verify on the web.
+
+**Settings and fonts.** `settings.json` (profile, theme, reading font,
+dictation model) and `fonts/` (your uploaded fonts) live at the repo root,
+git-ignored like `topics/`. The server reads and writes them; the browser
+doesn't keep its own copy, so they survive a new browser or cleared data.
+
+### Reference stack
+
+One fully open-source way to run the agent layer offline. **It is a suggestion,
+not tested by the project**: skills and agents are Markdown and topics are
+Markdown and JSON, so any terminal agent with local file access works.
+
+- **Agent**: [opencode](https://opencode.ai) (MIT). Reads `AGENTS.md` and
+  `SKILL.md`, has subagents.
+- **Runtime**: [Ollama](https://ollama.com).
+- **Model**: `qwen3-coder:30b` (~19 GB disk, 32 GB RAM recommended), or
+  `gpt-oss:20b` (~14 GB disk, 16 GB RAM floor) on smaller machines. Below
+  16 GB of RAM the agent layer isn't viable locally.
+
+```sh
+curl -fsSL https://opencode.ai/install | bash      # opencode
+curl -fsSL https://ollama.com/install.sh | sh      # Ollama on Linux; macOS/Windows: installer at ollama.com
+ollama pull qwen3-coder:30b                        # or: ollama pull gpt-oss:20b
+OLLAMA_CONTEXT_LENGTH=32768 ollama serve           # tool calls need a 16k-32k context
+```
+
+Point opencode at Ollama in `opencode.json` (Ollama can also write this for
+you, see its opencode integration docs), then open opencode in the repo and
+run `notes-setup-agent`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "http://localhost:11434/v1" },
+      "models": { "qwen3-coder:30b": {} }
+    }
+  }
+}
+```
+
+**Known limits.** Grading and nuanced feedback (`notes-grade`) and
+teacher-style judgment are clearly weaker than on a frontier model: take their
+output as a draft. Long multi-step skills (`notes-teach`) and large contexts
+degrade earlier. When that matters, a paid model is worth it.
+
+**Plan B**: [Goose](https://github.com/block/goose) (Apache-2.0), if opencode
+stops fitting.
+
 ## Files
 
 ```

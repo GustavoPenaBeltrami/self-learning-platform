@@ -1,6 +1,6 @@
 ---
 name: notes-setup-agent
-description: Sets up this project for the agent that is using it (Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, or any other, with a cloud model or a local one via Ollama) — exposes the skills and agents in agent/ in the agent's native format, without touching anything versioned. Use the first time the repo is opened with a new agent, or when the user says "set up the project", "install the skills", "/notes-setup-agent" (or in Spanish: "configurá el proyecto", "instalá las skills").
+description: Sets up this project for the agent that is using it (Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, or any other, with a cloud model or a local one via Ollama) — exposes the skills and agents in agent/ in the agent's native format, without touching anything versioned; reads the Profile in settings.json to recommend the paid agents (Online) or the Reference stack (Offline). Use the first time the repo is opened with a new agent, or when the user says "set up the project", "install the skills", "/notes-setup-agent" (or in Spanish: "configurá el proyecto", "instalá las skills").
 ---
 
 # Agent setup
@@ -9,6 +9,24 @@ The single source is `agent/`: `agent/skills/<name>/SKILL.md` and
 `agent/agents/<name>.md`. This skill doesn't copy or rewrite it: it
 **exposes** it where your tool looks for it. Everything you create is local
 to the user.
+
+## 0. Read the Profile
+
+Read `profile` from `settings.json` at the repo root (or `GET /api/settings`
+if the app is running). Missing file or key = `online`.
+
+- **Online** (recommended): the supported paid agents are Claude Code, OpenAI
+  Codex, Google Antigravity and Cursor. If the learner is already in one of
+  them, configure that one. If they're in another agent, say it works too
+  (the agent layer is plain Markdown and JSON) and continue.
+- **Offline**: point them to the Reference stack in the manual (`docs/manual.md`,
+  "Profiles, offline and ownership"): opencode + Ollama + `qwen3-coder:30b`, or
+  `gpt-oss:20b` on 16 GB of RAM. It's a suggestion, not tested. If they're
+  already in opencode, configure it; installing Ollama or pulling a model is
+  the learner's call, don't do it for them. Remind them that grading and
+  teacher judgment are weaker on local models: treat that output as a draft.
+
+Either way, the rest of this skill configures whichever agent is running it.
 
 ## 1. Identify yourself
 
@@ -33,7 +51,8 @@ Starting point, to be verified:
 | Others (Antigravity, Cline, Cursor, opencode) | Usually read `AGENTS.md` or a rules folder | See their docs | See their docs |
 
 Ollama isn't an agent: it runs the model behind one of these. Configure the
-agent, not Ollama. Warn the user that a small local model may not be able to
+agent, not Ollama (for opencode, the manual's Reference stack has the provider
+block). Warn the user that a small local model may not be able to
 sustain long skills like `notes-teach`.
 
 ## 2. Expose, in this order of preference
