@@ -862,8 +862,9 @@ function buildResources() {
   const rows = [
     ...(topic.resources || []).map(r =>
       `<li><a href="${r.path}" target="_blank" title="${esc(r.name)}"><span>${esc(r.name)}</span><span class="size">${r.kb} KB</span></a></li>`),
-    ...(topic.links || []).map(e =>
-      `<li><a href="${esc(e.url)}" target="_blank" title="${esc(e.url)}"><span>${esc(e.title)}</span><span class="size">↗</span></a></li>`),
+    ...(topic.links || []).map(e => e.url
+      ? `<li><a href="${esc(e.url)}" target="_blank" title="${esc(e.url)}"><span>${esc(e.title)}</span><span class="size">↗</span></a></li>`
+      : `<li><a title="${esc(e.path)}"><span>${esc(e.title)}</span><span class="size">local</span></a></li>`),
   ];
   box.innerHTML = rows.length ? `<div class="folder">resources/</div><ul>${rows.join('')}</ul>` : '';
 }

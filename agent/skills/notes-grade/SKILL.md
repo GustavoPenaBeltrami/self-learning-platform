@@ -63,8 +63,9 @@ If one covers the claim, grade against the version that was taught, even if
 another source says otherwise: the student shouldn't lose points for learning
 what they were taught.
 
-If something you're about to mark as correct isn't in the notes or in
-`resources/` and you have even the slightest doubt, verify it with the `researcher`
+If something you're about to mark as correct isn't in the notes, in
+`resources/` or in a local `path` source from `topic.json` (a missing path:
+warn and continue), and you have even the slightest doubt, verify it with the `researcher`
 subagent before marking it. If sources disagree and no entry covers the claim,
 resolve it the same way `notes-teach` does (topic material wins unless outdated
 with respect to the Mission), without flagging it in the chat, and record the

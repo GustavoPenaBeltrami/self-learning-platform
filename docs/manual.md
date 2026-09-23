@@ -45,7 +45,7 @@ app/
                      JetBrains Mono 2.304 (OFL), to work offline.
     Design.md        The visual system: tokens, components, do's and don'ts.
 topics/<slug>/
-    topic.json         Title, subtitle, type, area, goals, reason, language, routine, links.
+    topic.json         Title, subtitle, type, area, goals, reason, language, routine, sources_mode, links.
     learning.md        Mission, Glossary and Record. The memory of /notes-teach.
     notes/NN-*.md      One section per file. Real Markdown.
     notes/img/         Pasted images, as separate files.
@@ -149,8 +149,10 @@ exam format, a documentation one asks when to use what).
   "language": { "source": "en", "notes": "es", "exams": "es" },
   "routine": { "cadence": "1 domain per week", "session": "~30 min" },
   "end_date": "YYYY-MM-DD",
+  "sources_mode": "both",
   "links": [
-    { "title": "Exam guide", "url": "https://docs.aws.amazon.com/..." }
+    { "title": "Exam guide", "url": "https://docs.aws.amazon.com/..." },
+    { "title": "My study guide", "path": "~/Books/clf-c02-guide.pdf" }
   ]
 }
 ```
@@ -161,8 +163,14 @@ books) as context and tone. The teacher agent is per **topic**, not per area:
 a new topic, with a persona designed for that specific topic (a literature
 book calls for a literature teacher, a cert calls for an instructor for that
 cert); `notes-session` offers to generate it for topics that don't have one yet.
-`links` are external sources (official docs, a course); `resources/` are local
-files (the book's PDF, a handout). Both show up together above the notebook's index.
+`links` are the declared sources: a `url` (official docs, a course) or a `path`
+to a file anywhere on disk; `resources/` are local files inside the topic (the
+book's PDF, a handout) and always count as sources. All show up together above
+the notebook's index. `notes-init` offers to copy an external `path` into
+`resources/`; a missing path only produces a warning. `sources_mode` (`web`,
+`local` or `both`) is where the agent looks things up; `notes-init` defaults it
+from the Profile (`both` for Online, `local` for Offline), and with no
+connection it's local regardless, with a note on what wasn't verified on the web.
 
 ### Language
 
