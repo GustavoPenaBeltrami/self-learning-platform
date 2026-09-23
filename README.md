@@ -6,6 +6,7 @@
 
 **an agent-powered hub for self-learners**
 
+[![Website](https://img.shields.io/badge/website-selflearningplatform.github.io-262626?style=flat-square&labelColor=0c0c0c)](https://selflearningplatform.github.io)
 [![Stars](https://img.shields.io/github/stars/GustavoPenaBeltrami/self-learning-platform.svg?style=flat-square&color=262626&labelColor=0c0c0c)](https://github.com/GustavoPenaBeltrami/self-learning-platform/stargazers)
 [![Issues](https://img.shields.io/github/issues/GustavoPenaBeltrami/self-learning-platform.svg?style=flat-square&color=262626&labelColor=0c0c0c)](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues)
 [![Python](https://img.shields.io/badge/python-server-262626?style=flat-square&logo=python&logoColor=e6e6e6&labelColor=0c0c0c)](https://www.python.org/)
