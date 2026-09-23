@@ -132,7 +132,7 @@ app/
     tools/migrate_names.py Renames old Spanish class names in topics/*/notes/*.md. Idempotent.
     vendor/          Mermaid 11.17.2 and KaTeX 0.16.11 with their fonts, Inter 4.1 and
                      JetBrains Mono 2.304 (OFL), to work offline.
-    Design.md        The visual system: tokens, components, do's and don'ts.
+    styles/Design.md The visual system: tokens, components, do's and don'ts.
 topics/<slug>/
     topic.json         Title, subtitle, type, area, goals, reason, language, routine, sources_mode, links.
     learning.md        Mission, Glossary and Record. The memory of /notes-teach.
@@ -157,7 +157,7 @@ the `.md` files. There's no index to maintain by hand.
 
 ## The visual system
 
-`app/Design.md` is the source. The app imitates a tiling desktop in a tab:
+`app/styles/Design.md` is the source. The app imitates a tiling desktop in a tab:
 a waybar on top (navigation and tools), an explorer on the left with every
 topic and its index, the content as a vim buffer in the middle (line numbers,
 `~` at the end) and a statusline at the bottom (mode, path, saved, zoom, width).
