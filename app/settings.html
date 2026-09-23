@@ -14,6 +14,7 @@
     justify-self: start; border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
     background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
   }
+  .field input { justify-self: stretch; }
   .field :is(select, input):focus { outline: 1px solid var(--accent); }
   .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
   .field .hint::before { content: '// '; color: var(--color-steel); }
@@ -49,13 +50,18 @@ Promise.all([settings, userFonts]).then(([s, fonts]) => {
         <select id="set-${key}" data-key="${key}">${opts(choices, s[key] ?? '')}</select>
         <p class="hint">${hint}</p>
       </div>`).join('')}
+      <div class="field">
+        <label for="set-voice_model">voice_model</label>
+        <input id="set-voice_model" data-key="voice_model" spellcheck="false" placeholder="default" value="${(s.voice_model ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">
+        <p class="hint">Dictation model: a local model folder (used as-is, no download) or a model name. Empty: NOTES_VOICE_MODEL, else whisper-large-v3-turbo on Apple Silicon, small on CPU.</p>
+      </div>
     <div class="field">
       <label for="font-file">upload font</label>
       <input type="file" id="font-file" accept=".woff2,.ttf,.otf">
       <p class="hint">A .woff2, .ttf or .otf file. Saved to fonts/ at the repo root and added to the font list.</p>
     </div>
     <div class="tildes"></div></div>`;
-  app.querySelectorAll('select[data-key]').forEach(sel => sel.onchange = async () => {
+  app.querySelectorAll('[data-key]').forEach(sel => sel.onchange = async () => {
     statusEl.textContent = 'saving…';
     try {
       await saveSettings({ [sel.dataset.key]: sel.value });

@@ -21,7 +21,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 TOPICS = ROOT / "topics"
 PORT = 8321
 VOICE_MODEL = "mlx-community/whisper-large-v3-turbo"   # ~1.6 GB, downloaded the first time
-CPU_VOICE_MODEL = os.environ.get("NOTES_VOICE_MODEL", "small")   # ponytail: CPU int8 only, set NOTES_VOICE_MODEL=turbo on a fast box; CUDA needs device="auto" + cuDNN
+CPU_VOICE_MODEL = "small"   # ponytail: CPU int8 only, set voice_model=turbo on a fast box; CUDA needs device="auto" + cuDNN
 voice_lock = threading.Lock()
 cpu_model = None
 BODY_LIMIT = 20 * 1024 * 1024   # ponytail: one flat cap for every POST, single local user
@@ -37,24 +37,39 @@ def audio_ext(mime):
     return ext
 
 
+class NoDictation(ValueError):
+    """No engine or no model: the mic falls back to the OS dictation."""
+
+
+def voice_model(gpu):
+    """settings.json voice_model, then NOTES_VOICE_MODEL, then the engine default. A local path is used as-is."""
+    model = read_settings()["voice_model"] or os.environ.get("NOTES_VOICE_MODEL") or (VOICE_MODEL if gpu else CPU_VOICE_MODEL)
+    return os.path.expanduser(model)
+
+
 def whisper(audio, lang):
     global cpu_model
     try:
         import faster_whisper
     except ImportError:
-        raise ValueError("dictation engine missing, start with npm run app")
+        raise NoDictation("dictation engine missing, start with npm run app")
     if isinstance(audio, str):
         audio = faster_whisper.decode_audio(audio)
     try:
         import mlx_whisper
     except ImportError:
         mlx_whisper = None
-    if mlx_whisper:
-        r = mlx_whisper.transcribe(audio, path_or_hf_repo=VOICE_MODEL, language=lang)
-        return [[s["start"], s["text"].strip()] for s in r["segments"]]
-    if cpu_model is None:
-        cpu_model = faster_whisper.WhisperModel(CPU_VOICE_MODEL, device="cpu", compute_type="int8")
-    segments, _ = cpu_model.transcribe(audio, language=lang)
+    model = voice_model(bool(mlx_whisper))
+    try:
+        if mlx_whisper:
+            # ponytail: mlx loads and transcribes in one call, so a transcription error also reads as a missing model
+            r = mlx_whisper.transcribe(audio, path_or_hf_repo=model, language=lang)
+            return [[s["start"], s["text"].strip()] for s in r["segments"]]
+        if not cpu_model or cpu_model[0] != model:
+            cpu_model = (model, faster_whisper.WhisperModel(model, device="cpu", compute_type="int8"))
+    except Exception as e:
+        raise NoDictation(f"dictation model {model} not available: {e}")
+    segments, _ = cpu_model[1].transcribe(audio, language=lang)
     return [[s.start, s.text.strip()] for s in segments]
 
 
@@ -63,14 +78,14 @@ def transcribe(raw, lang=None):
     try:
         import numpy   # in here: the rest of the server doesn't need it
     except ImportError:
-        raise ValueError("dictation engine missing, start with npm run app")
+        raise NoDictation("dictation engine missing, start with npm run app")
     with voice_lock:   # ponytail: one transcription at a time, there is a single user
         segments = whisper(numpy.frombuffer(raw, dtype="<f4"), lang)
     # segments [start_s, text]: live dictation pins the old ones and trims the audio there
     return {"text": " ".join(t for _, t in segments).strip(), "segments": segments}
 
 
-SETTINGS = {"profile": "online", "theme": "", "font": "mono"}
+SETTINGS = {"profile": "online", "theme": "", "font": "mono", "voice_model": ""}
 PROFILES = ("online", "offline")
 
 
@@ -325,7 +340,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             raw = self.rfile.read(length)
             if path == "/api/voice":
                 lang = urllib.parse.parse_qs(query).get("lang", [None])[0]
-                return self.respond(200, transcribe(raw, lang))
+                try:
+                    return self.respond(200, transcribe(raw, lang))
+                except NoDictation as e:
+                    return self.respond(503, {"error": str(e), "fallback": True})
             if path == "/api/settings":
                 return self.respond(200, save_settings(json.loads(raw)))
             if path == "/api/font":

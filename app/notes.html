@@ -385,6 +385,9 @@ function insertImage(file) {
    the microphone: the server doesn't need ffmpeg. */
 const RATE = 16000, COMMIT_S = 15;
 let dictation;
+const osDictation = () => /Mac/.test(navigator.platform) ? 'use macOS dictation: press Fn twice'
+  : /Win/.test(navigator.platform) ? 'use Windows voice typing: Win+H'
+  : 'use Speech Note (flatpak install flathub net.mkiol.SpeechNote), with ydotool on Wayland';
 
 async function dictate(button) {
   if (dictation) return dictation.done = true;
@@ -433,6 +436,7 @@ async function dictate(button) {
       d.chunks.reduce((o, t) => (audio.set(t, o), o + t.length), 0);
       sent = audio.length;
       const r = await (await fetch(voiceUrl, { method: 'POST', body: audio })).json();
+      if (r.fallback) throw new Error('no local dictation model, ' + osDictation());
       if (r.error) throw new Error(r.error);
 
       if (done) { if (r.text) span.before(r.text + ' '); break; }
