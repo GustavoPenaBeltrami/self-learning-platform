@@ -164,8 +164,6 @@ const ICON = {
 const svg = (n, t = 16) => `<svg viewBox="0 0 20 20" width="${t}" height="${t}" fill="none"
   stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
 
-document.documentElement.dataset.font = localStorage.getItem('font') || 'mono';
-
 const { app, tree, tools, path, mode } = mountShell('notes');
 const zoom = () => parseFloat(app.style.zoom) || 1;
 const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
@@ -287,11 +285,8 @@ async function openTopic(name) {
   doc.addEventListener('focusin', () => mode('INSERT', 'insert'));
   doc.addEventListener('focusout', () => mode('NORMAL'));
   const fontSel = document.getElementById('font');
-  fontSel.value = localStorage.getItem('font') || 'mono';
-  fontSel.onchange = () => {
-    document.documentElement.dataset.font = fontSel.value;
-    localStorage.setItem('font', fontSel.value);
-  };
+  fontSel.value = document.documentElement.dataset.font;
+  fontSel.onchange = () => saveSettings({ font: fontSel.value }).catch(() => {});
   doc.addEventListener('input', () => {
     if (!shortcuts()) autoRef();
     buildIndex();

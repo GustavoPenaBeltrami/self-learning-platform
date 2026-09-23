@@ -70,6 +70,29 @@ def transcribe(raw, lang=None):
     return {"text": " ".join(t for _, t in segments).strip(), "segments": segments}
 
 
+SETTINGS = {"profile": "online", "theme": "", "font": "mono"}
+PROFILES = ("online", "offline")
+
+
+def read_settings():
+    """settings.json at the repo root. Missing file or missing keys = defaults."""
+    file = ROOT / "settings.json"
+    saved = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}
+    return {k: saved.get(k, v) for k, v in SETTINGS.items()}
+
+
+def save_settings(data):
+    """Merges the known keys into settings.json. Returns the full settings."""
+    settings = read_settings()
+    settings.update({k: data[k] for k in SETTINGS if k in data})
+    if settings["profile"] not in PROFILES:
+        raise ValueError("unknown profile: " + str(settings["profile"]))
+    if not all(isinstance(v, str) for v in settings.values()):
+        raise ValueError("settings values must be strings")
+    (ROOT / "settings.json").write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return settings
+
+
 def folder(slug):
     """Topic folder. Rejects anything that escapes topics/."""
     d = (TOPICS / slug).resolve()
@@ -250,6 +273,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.unquote(self.path.split("?")[0])
         try:
+            if path == "/settings":
+                self.send_response(302)
+                self.send_header("Location", "/app/settings.html")
+                return self.end_headers()
+            if path == "/api/settings":
+                return self.respond(200, read_settings())
             if path == "/api/index":
                 return self.respond(200, exam_index())
             if path == "/api/topics":
@@ -271,6 +300,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if path == "/api/voice":
                 lang = urllib.parse.parse_qs(query).get("lang", [None])[0]
                 return self.respond(200, transcribe(raw, lang))
+            if path == "/api/settings":
+                return self.respond(200, save_settings(json.loads(raw)))
             if path == "/api/attempt":
                 data = json.loads(raw)
                 return self.respond(200, {"path": save_attempt(data["slug"], data["exam"], data["answers"])})

@@ -68,7 +68,7 @@ The short names (`--bg`, `--card`, `--ink`, `--muted`, `--line`, `--accent`, `--
 | `forest` | forest | Deep green-grey with sage and moss | `#141b17` | `#e1eadf` | `#8cc68a` |
 | `amber` | amber crt | Amber phosphor monitor. Everything is a shade of amber | `#130e06` | `#ffbf57` | `#ffb347` |
 
-Theme selection lives in `theme.js`. `data-theme` on `<html>` picks the block; with no value, the page follows `prefers-color-scheme` (`hypr` or `light`). The choice persists in `localStorage.theme`. Light themes set `color-scheme: light`; everything else inherits `dark`.
+Theme selection lives in `theme.js`. `data-theme` on `<html>` picks the block; with no value, the page follows `prefers-color-scheme` (`hypr` or `light`). The choice persists in `settings.json` at the repo root through `/api/settings`; `localStorage.settings` only caches it so the first paint has the right theme. Light themes set `color-scheme: light`; everything else inherits `dark`.
 
 To add a theme: copy one `:root[data-theme="…"]` block in `style.css`, change the 20 values, and add the key to `THEMES` in `theme.js`. Check two contrasts: `--on-accent` on `--color-accent` and on `--ansi-cyan` (htop header, keys), and `--color-fog` on `--color-carbon`.
 
@@ -77,7 +77,7 @@ Highlight colors for marks (`COLORS` in `notes.html`) are fixed hexes stored in 
 ## Tokens — Typography
 
 **JetBrains Mono** for everything: chrome, body, headings, tables, buttons. Weights 400 and 700.
-The note body has a reader-font switch (`mono` default, `serif`, `inter`) that only affects `.doc` text. Headings stay mono.
+The note body has a reader-font switch (`mono` default, `serif`, `inter`) that only affects `.doc` text. Headings stay mono. It is saved in `settings.json` like the theme.
 
 | Role | Size | Notes |
 |---|---|---|
@@ -93,7 +93,7 @@ Headings are numbered by CSS counters (`1.`, `1.1`, `1.1.1`) and the numbers are
 
 ### Waybar
 `--color-void` bar, 44px tall, three columns (`1fr auto 1fr`).
-- **Left:** book icon in accent, then the workspace module: pill links `1 notes` / `2 exams`. The active one is filled with accent and `--on-accent` text.
+- **Left:** book icon in accent, then the workspace module: pill links `1 notes` / `2 exams` / `3 settings`. The active one is filled with accent and `--on-accent` text.
 - **Center:** clock, bold `--color-chalk`, `Mon Sep 21   14:32`, 24h, updated every 15s. No decoration.
 - **Right:** tool modules, then the theme `<select>`. Each module is a `--color-graphite` rounded rect (radius 8px, 30px tall) holding 24px-tall borderless buttons that hover to `--color-iron`. Pressed buttons fill with accent. Color swatches are 12px circles; the pressed one gets a 1.5px outline ring.
 - Tools overflow by horizontal scroll with no scrollbar. They never wrap.
@@ -165,8 +165,9 @@ Buttons are `<kbd>` + label pairs: the key on `--color-void`, the label filled w
 | File | Owns |
 |---|---|
 | `style.css` | Tokens, the six theme blocks, and shared components (waybar, explorer, tables, statusline, keys, viz) |
-| `theme.js` | Theme list, persistence, `themeSelector()` markup, `pickTheme()` |
+| `theme.js` | Theme list, settings load/save (`settings`, `saveSettings()`), applies theme and reading font, `themeSelector()` markup, `pickTheme()` |
 | `shell.js` | `mountShell(page)` injects waybar, explorer, panel and statusline; runs the clock, scroll position, zoom and width. Returns `{ app, tree, tools, path, mode }` |
 | `notes.html` | Editor-specific styles and logic: tools, tree index, document |
 | `exam.html` | Exam styles and logic: tree of exams, questions, meter |
+| `settings.html` | The `/settings` page: profile, theme and reading font |
 | `viz.js` | Mermaid and KaTeX; the Mermaid theme is built from the ramp tokens |

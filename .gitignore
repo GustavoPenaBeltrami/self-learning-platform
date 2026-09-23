@@ -7,3 +7,5 @@ node_modules/
 referencias/
 plan.md
 agent/agents/teacher-*
+/settings.json
+/fonts/
