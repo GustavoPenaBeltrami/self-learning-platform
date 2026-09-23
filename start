@@ -1,10 +1,10 @@
 #!/bin/sh
 cd "$(dirname "$0")" || exit 1
-case "${1:-app}" in
+case "${1:-learning}" in
   setup) exec uv run app/server/server.py --setup ;;
-  app)
-    # ponytail: cached deps only, a skipped setup falls to stdlib python3 without dictation; run ./notes setup to get it
+  learning)
+    # ponytail: cached deps only, a skipped setup falls to stdlib python3 without dictation; run ./start setup to get it
     uv sync -q --offline --script app/server/server.py 2>/dev/null && exec uv run -q --offline app/server/server.py app/views/notes.html
     exec python3 app/server/server.py app/views/notes.html ;;
-  *) echo "usage: ./notes [app|setup]" >&2; exit 1 ;;
+  *) echo "usage: ./start [learning|setup]" >&2; exit 1 ;;
 esac

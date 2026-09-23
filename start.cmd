@@ -2,8 +2,8 @@
 cd /d "%~dp0"
 if "%~1"=="setup" goto setup
 if "%~1"=="" goto app
-if "%~1"=="app" goto app
-echo usage: notes [app^|setup] 1>&2
+if "%~1"=="learning" goto app
+echo usage: .\start [learning^|setup] 1>&2
 exit /b 1
 :setup
 uv run app/server/server.py --setup

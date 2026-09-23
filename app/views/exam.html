@@ -80,7 +80,7 @@ async function index() {
     topics = await load();
   } catch {
     app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
-      <p>Open a terminal here and run <code>./notes</code>.</p></div>`;
+      <p>Open a terminal here and run <code>./start learning</code>.</p></div>`;
     return;
   }
   path('~/notes/topics/*/exams');

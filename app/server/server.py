@@ -9,7 +9,7 @@
 """Local server for the study system. Stdlib only: python3 app/server/server.py
 
 Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
-faster-whisper everywhere else. `./notes` (uv run) brings the right one;
+faster-whisper everywhere else. `./start learning` (uv run) brings the right one;
 without it everything works except the microphone.
 """
 import base64, datetime, hashlib, http.server, json, os, pathlib, platform, re, shutil, socket, sys, threading, urllib.parse, webbrowser
@@ -74,7 +74,7 @@ def download_voice_model(size):
     try:
         from huggingface_hub import snapshot_download
     except ImportError:
-        raise NoDictation("dictation engine missing, start with ./notes")
+        raise NoDictation("dictation engine missing, run ./start learning")
     snapshot_download(repo_id=MODELS[size][ENGINE], local_dir=str(model_dir(size)))
     return str(model_dir(size))
 
@@ -84,7 +84,7 @@ def whisper(audio, lang):
     try:
         import faster_whisper
     except ImportError:
-        raise NoDictation("dictation engine missing, start with ./notes")
+        raise NoDictation("dictation engine missing, run ./start learning")
     if isinstance(audio, str):
         audio = faster_whisper.decode_audio(audio)
     try:
@@ -111,7 +111,7 @@ def transcribe(raw, lang=None):
     try:
         import numpy   # in here: the rest of the server doesn't need it
     except ImportError:
-        raise NoDictation("dictation engine missing, start with ./notes")
+        raise NoDictation("dictation engine missing, run ./start learning")
     with voice_lock:   # ponytail: one transcription at a time, there is a single user
         segments = whisper(numpy.frombuffer(raw, dtype="<f4"), lang)
     # segments [start_s, text]: live dictation pins the old ones and trims the audio there
@@ -186,7 +186,7 @@ def setup(ask=input):
             model = download_voice_model(choice)
         except Exception as e:
             model = ""
-            print(f"Download failed ({e}). The mic falls back to the OS dictation; run ./notes setup again to retry.")
+            print(f"Download failed ({e}). The mic falls back to the OS dictation; run ./start setup again to retry.")
     return save_settings({"profile": profile, "voice_model": model})
 
 
@@ -491,7 +491,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--setup"]:
-        print("Setup done:", json.dumps(setup()), "\nStart the app with ./notes")
+        print("Setup done:", json.dumps(setup()), "\nStart the app with ./start learning")
         sys.exit(0)
     if sys.argv[1:2] == ["--transcribe"]:
         print(" ".join(t for _, t in whisper(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)).strip())
