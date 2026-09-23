@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+<script src="shell.js"></script>
+<style>
+  .field { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: .3rem 1rem; padding: var(--spacing-16) 0; }
+  .field + .field { border-top: 1px dashed var(--line); }
+  .field label { color: var(--ansi-cyan); }
+  .field select {
+    justify-self: start; border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
+    background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
+  }
+  .field select:focus { outline: 1px solid var(--accent); }
+  .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
+  .field .hint::before { content: '// '; color: var(--color-steel); }
+</style>
+
+<body>
+<script>
+const { app, tree, path } = mountShell('settings');
+const statusEl = document.getElementById('status');
+const opts = (pairs, value) => pairs.map(([k, name]) =>
+  `<option value="${k}"${k === value ? ' selected' : ''}>${name}</option>`).join('');
+const FIELDS = [
+  ['profile', [['online', 'online (recommended)'], ['offline', 'offline']],
+    'Online: paid agent, web lookups, largest dictation model. Offline: everything on this machine.'],
+  ['theme', [['', 'auto (follows the OS)'], ...Object.entries(THEMES)], 'Colors of the whole app.'],
+  ['font', [['mono', 'mono'], ['serif', 'serif'], ['inter', 'inter']], 'Reading font for the note body. Headings stay mono.'],
+];
+
+tree.innerHTML = `<details open class="current"><summary><span class="name">notes/</span><span class="count">1</span></summary>
+  <ul><li><a href="settings.html" aria-current="page"><span class="n">›</span><span>settings.json</span></a></li></ul></details>`;
+path('~/notes/settings.json');
+
+settings.then(s => {
+  app.innerHTML = `
+    <div class="sheet">
+    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/notes</span> <span class="p-sig">❯</span> nvim settings.json</p>
+    <h1>Settings</h1>
+    <p class="minor"># saved to settings.json at the repo root, on every change</p>
+    ${FIELDS.map(([key, choices, hint]) => `
+      <div class="field">
+        <label for="set-${key}">${key}</label>
+        <select id="set-${key}" data-key="${key}">${opts(choices, s[key] ?? '')}</select>
+        <p class="hint">${hint}</p>
+      </div>`).join('')}
+    <div class="tildes"></div></div>`;
+  app.querySelectorAll('select[data-key]').forEach(sel => sel.onchange = async () => {
+    statusEl.textContent = 'saving…';
+    try {
+      await saveSettings({ [sel.dataset.key]: sel.value });
+      statusEl.textContent = 'saved';
+    } catch (e) {
+      statusEl.textContent = '✕ ' + e.message;
+    }
+  });
+});
+</script>
