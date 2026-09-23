@@ -6,8 +6,8 @@
 
 **an agent-powered hub for self-learners**
 
-[![Stars](https://img.shields.io/github/stars/GustavoPenaBeltrami/Notas.svg?style=flat-square&color=262626&labelColor=0c0c0c)](https://github.com/GustavoPenaBeltrami/Notas/stargazers)
-[![Issues](https://img.shields.io/github/issues/GustavoPenaBeltrami/Notas.svg?style=flat-square&color=262626&labelColor=0c0c0c)](https://github.com/GustavoPenaBeltrami/Notas/issues)
+[![Stars](https://img.shields.io/github/stars/GustavoPenaBeltrami/self-learning-platform.svg?style=flat-square&color=262626&labelColor=0c0c0c)](https://github.com/GustavoPenaBeltrami/self-learning-platform/stargazers)
+[![Issues](https://img.shields.io/github/issues/GustavoPenaBeltrami/self-learning-platform.svg?style=flat-square&color=262626&labelColor=0c0c0c)](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues)
 [![Python](https://img.shields.io/badge/python-server-262626?style=flat-square&logo=python&logoColor=e6e6e6&labelColor=0c0c0c)](https://www.python.org/)
 [![Local](https://img.shields.io/badge/local-first-262626?style=flat-square&labelColor=0c0c0c)](#installation)
 
@@ -48,8 +48,8 @@ The **filesystem** reads fine on GitHub, in Obsidian or in any editor. `topics/e
 #### Steps
 
 ```sh
-git clone https://github.com/GustavoPenaBeltrami/Notas.git
-cd Notas
+git clone https://github.com/GustavoPenaBeltrami/self-learning-platform.git
+cd self-learning-platform
 ```
 
 Add `uv run slp setup` here if you want [dictation](#notes-dictator-support-optional) ready offline.
@@ -128,7 +128,7 @@ topics/<slug>/
 
 `topic.json` → `language` sets the defaults: `source` is the material's language, `notes` for notes, summaries and lessons, `exams` for exams, exercises and feedback. Ask for another language in any single request ("give me the exam in English") without touching the file. The agent chats in whatever language you write in.
 
-### The loop
+### Studying loop
 
 | Command | Step | What it does |
 |---|---|---|
@@ -142,9 +142,7 @@ topics/<slug>/
 
 Everything they produce lands in the topic folder and shows up in the app on its own.
 
-### Recommendations
-
-#### Recommended setup
+### Recommended setup
 
 Three windows side by side. Two monitors help.
 
@@ -192,13 +190,13 @@ Two themes, ink and paper: `sumi` 墨 and `kami` 紙. The full design reference 
 
 **Online or offline?** The online profile (a paid agent) is recommended. To run everything on your machine, use opencode + Ollama + `qwen3-coder:30b` (or `gpt-oss:20b` on 16 GB of RAM).
 
-**Roadmap:** test `slp-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/Notas/issues).
+**Roadmap:** test `slp-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues).
 
 **Thanks to** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `slp-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory and spaced review.
 
 ## contributing
 
-Contributions are welcome. Fork the repo, create your branch, and open a pull request. Skills are edited in `agent/skills/`, never inside an agent's own folder. For bugs or ideas, [open an issue](https://github.com/GustavoPenaBeltrami/Notas/issues/new).
+Contributions are welcome. Fork the repo, create your branch, and open a pull request. Skills are edited in `agent/skills/`, never inside an agent's own folder. For bugs or ideas, [open an issue](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues/new).
 
 ## license
 
