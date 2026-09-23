@@ -1,6 +1,6 @@
-# Notes
+# Self Learning Platform
 
-A self-hosted study environment the learner fully owns: it runs on their machine, needs no subscription or network to use, and works with any agent and any model, local or paid. The name is provisional.
+A self-hosted study environment the learner fully owns: it runs on their machine, needs no subscription or network to use, and works with any agent and any model, local or paid.
 
 ## Principles
 
