@@ -10,11 +10,11 @@
   .field { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: .3rem 1rem; padding: var(--spacing-16) 0; }
   .field + .field { border-top: 1px dashed var(--line); }
   .field label { color: var(--ansi-cyan); }
-  .field select {
+  .field select, .field input {
     justify-self: start; border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
     background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
   }
-  .field select:focus { outline: 1px solid var(--accent); }
+  .field :is(select, input):focus { outline: 1px solid var(--accent); }
   .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
   .field .hint::before { content: '// '; color: var(--color-steel); }
 </style>
@@ -36,7 +36,8 @@ tree.innerHTML = `<details open class="current"><summary><span class="name">note
   <ul><li><a href="settings.html" aria-current="page"><span class="n">›</span><span>settings.json</span></a></li></ul></details>`;
 path('~/notes/settings.json');
 
-settings.then(s => {
+Promise.all([settings, userFonts]).then(([s, fonts]) => {
+  FIELDS[2][1].push(...fonts.map(f => [f, f]));
   app.innerHTML = `
     <div class="sheet">
     <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/notes</span> <span class="p-sig">❯</span> nvim settings.json</p>
@@ -48,6 +49,11 @@ settings.then(s => {
         <select id="set-${key}" data-key="${key}">${opts(choices, s[key] ?? '')}</select>
         <p class="hint">${hint}</p>
       </div>`).join('')}
+    <div class="field">
+      <label for="font-file">upload font</label>
+      <input type="file" id="font-file" accept=".woff2,.ttf,.otf">
+      <p class="hint">A .woff2, .ttf or .otf file. Saved to fonts/ at the repo root and added to the font list.</p>
+    </div>
     <div class="tildes"></div></div>`;
   app.querySelectorAll('select[data-key]').forEach(sel => sel.onchange = async () => {
     statusEl.textContent = 'saving…';
@@ -58,5 +64,13 @@ settings.then(s => {
       statusEl.textContent = '✕ ' + e.message;
     }
   });
+  document.getElementById('font-file').onchange = async e => {
+    const file = e.target.files[0];
+    statusEl.textContent = 'uploading…';
+    const r = await fetch('/api/font?name=' + encodeURIComponent(file.name), { method: 'POST', body: file })
+      .then(r => r.json()).catch(e => ({ error: e.message }));
+    if (r.error) return statusEl.textContent = '✕ ' + r.error;
+    location.reload();
+  };
 });
 </script>

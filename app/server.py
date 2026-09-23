@@ -93,6 +93,30 @@ def save_settings(data):
     return settings
 
 
+FONT_NAME = re.compile(r"[A-Za-z0-9][\w .-]*\.(woff2|ttf|otf)")
+FONT_MAGIC = (b"wOF2", b"OTTO", b"\0\1\0\0", b"true")
+
+
+def list_fonts():
+    """User fonts in fonts/ at the repo root, served as /fonts/<name>."""
+    d = ROOT / "fonts"
+    return sorted(f.name for f in d.iterdir() if f.is_file() and FONT_NAME.fullmatch(f.name)) if d.is_dir() else []
+
+
+def save_font(name, raw):
+    """Stores an uploaded font in fonts/. Rejects bad names, non-fonts and oversized files."""
+    if not FONT_NAME.fullmatch(name):
+        raise ValueError("font name not allowed (a .woff2, .ttf or .otf file name, no folders): " + name)
+    if len(raw) > BODY_LIMIT:
+        raise ValueError("font too large")
+    if not raw.startswith(FONT_MAGIC):
+        raise ValueError("not a font file: " + name)
+    d = ROOT / "fonts"
+    d.mkdir(exist_ok=True)
+    (d / name).write_bytes(raw)
+    return {"fonts": list_fonts()}
+
+
 def folder(slug):
     """Topic folder. Rejects anything that escapes topics/."""
     d = (TOPICS / slug).resolve()
@@ -279,6 +303,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self.end_headers()
             if path == "/api/settings":
                 return self.respond(200, read_settings())
+            if path == "/api/fonts":
+                return self.respond(200, {"fonts": list_fonts()})
             if path == "/api/index":
                 return self.respond(200, exam_index())
             if path == "/api/topics":
@@ -302,6 +328,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self.respond(200, transcribe(raw, lang))
             if path == "/api/settings":
                 return self.respond(200, save_settings(json.loads(raw)))
+            if path == "/api/font":
+                return self.respond(200, save_font(urllib.parse.parse_qs(query).get("name", [""])[0], raw))
             if path == "/api/attempt":
                 data = json.loads(raw)
                 return self.respond(200, {"path": save_attempt(data["slug"], data["exam"], data["answers"])})

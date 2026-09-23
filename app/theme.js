@@ -22,6 +22,14 @@
   window.THEMES = THEMES;
   window.settings = fetch('/api/settings').then(r => r.json()).then(keep).catch(cached);
 
+  window.userFonts = fetch('/api/fonts').then(r => r.json()).then(({ fonts }) => {
+    const style = document.createElement('style');
+    style.textContent = fonts.map(f => `@font-face { font-family: "${f}"; src: url("/fonts/${encodeURIComponent(f)}"); }
+      :root[data-font="${f}"] { --reading-font: "${f}", var(--mono); }`).join('\n');
+    document.head.append(style);
+    return fonts;
+  }).catch(() => []);
+
   window.saveSettings = patch => {
     apply({ ...cached(), ...patch });
     return fetch('/api/settings', { method: 'POST', body: JSON.stringify(patch) }).then(r => r.json()).then(keep)

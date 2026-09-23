@@ -285,7 +285,10 @@ async function openTopic(name) {
   doc.addEventListener('focusin', () => mode('INSERT', 'insert'));
   doc.addEventListener('focusout', () => mode('NORMAL'));
   const fontSel = document.getElementById('font');
-  fontSel.value = document.documentElement.dataset.font;
+  userFonts.then(fonts => {
+    fontSel.insertAdjacentHTML('beforeend', fonts.map(f => `<option value="${esc(f)}">${esc(f.replace(/\.\w+$/, ''))}</option>`).join(''));
+    fontSel.value = document.documentElement.dataset.font;
+  });
   fontSel.onchange = () => saveSettings({ font: fontSel.value }).catch(() => {});
   doc.addEventListener('input', () => {
     if (!shortcuts()) autoRef();

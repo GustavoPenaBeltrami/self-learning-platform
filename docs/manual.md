@@ -33,6 +33,7 @@ app/
     text.py          HTML <-> Markdown conversion. `python3 app/text.py` self-tests.
     test_attempt.py  Tests for saving exam attempts.
     test_offline.py  Fails if the app loads anything from an external host.
+    test_fonts.py    Tests for uploading user fonts.
     style.css        Shared visual system. Tokens and color themes.
     theme.js         Color theme list and picker, shared.
     shell.js         Waybar, explorer and statusline, shared.
@@ -80,7 +81,10 @@ to `THEMES` in `theme.js`. Components only read tokens: change them there, not
 in individual rules.
 
 The notebook's reading font picker (mono / serif / inter) applies only to the
-body of the note.
+body of the note. To read in your own typeface, upload a `.woff2`, `.ttf` or
+`.otf` file from `/settings`: it is stored in `fonts/` at the repo root
+(git-ignored, like `topics/`) and appears in both font pickers, offline.
+Anything that isn't a font, or bigger than 20 MB, is rejected.
 
 ## Diagrams and formulas
 
