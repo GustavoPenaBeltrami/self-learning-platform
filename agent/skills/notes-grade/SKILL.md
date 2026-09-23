@@ -57,9 +57,18 @@ the concept, not whether it "touches on the topic". An ADR that doesn't weigh tr
 each other doesn't pass even if it mentions the right words. Format *teach*: it's
 graded the same as an `oral` answer.
 
+Before judging a factual answer, read the `Source choice` entries in the
+Record of the topic's `learning.md` (format in `notes-teach`, Record rule 5).
+If one covers the claim, grade against the version that was taught, even if
+another source says otherwise: the student shouldn't lose points for learning
+what they were taught.
+
 If something you're about to mark as correct isn't in the notes or in
 `resources/` and you have even the slightest doubt, verify it with the `researcher`
-subagent before marking it.
+subagent before marking it. If sources disagree and no entry covers the claim,
+resolve it the same way `notes-teach` does (topic material wins unless outdated
+with respect to the Mission), without flagging it in the chat, and record the
+choice in the Record.
 
 ## What you write
 
@@ -83,6 +92,8 @@ Feedback: on the right track, but the complete answer needs the security side to
 - ✓/✗ per point, each ✗ with what's missing and the note section that covers it.
 - For exercises, the score line is `**Prompt criteria:** N of M`.
 - If no note covers it, say so: it's a gap in the notes, not in the student.
+- A ✗ on a factual point cites the source of the correct version, the same one
+  the `Source choice` entry names when there is one.
 
 **2. The topic's `learning.md`** — same Record rules as
 `notes-teach`: what goes in is whatever reveals a **misconception** (what they
