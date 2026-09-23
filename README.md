@@ -8,7 +8,6 @@
 
 *Made by [Gustavo Peña Beltrami](https://github.com/GustavoPenaBeltrami)*
 
-[![Manual](https://img.shields.io/badge/docs-manual-blue)](docs/manual.md)
 [![Stars](https://img.shields.io/github/stars/GustavoPenaBeltrami/Notas.svg)](https://github.com/GustavoPenaBeltrami/Notas/stargazers)
 [![Issues](https://img.shields.io/github/issues/GustavoPenaBeltrami/Notas.svg)](https://github.com/GustavoPenaBeltrami/Notas/issues)
 [![Python](https://img.shields.io/badge/python-server-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -60,7 +59,7 @@ Notes has four pieces that talk to each other through the filesystem:
 
 The **skills** are the method: teach from unconditional truths, practice and review. The **agents** give each topic the right persona. The **filesystem** reads fine on GitHub, in Obsidian or in any editor. And the **app** is where you take notes and sit exams, with voice dictation via Whisper.
 
-Ready to start? Follow the [installation](#installation) or jump straight to the [manual](docs/manual.md).
+Ready to start? Follow the [installation](#installation).
 
 ## Three windows
 
@@ -102,9 +101,9 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 | macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `./notes` (Windows: `notes`) |
 | Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server/server.py app/views/notes.html` |
 
-`./notes` runs `uv run --offline app/server/server.py app/views/notes.html`: it never touches the network, and if setup never ran it falls back to `python3`, which starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`; for a local model folder you already have, see the [manual](docs/manual.md).
+`./notes` runs `uv run --offline app/server/server.py app/views/notes.html`: it never touches the network, and if setup never ran it falls back to `python3`, which starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`.
 
-Without a dictation engine or model, the microphone points you to your OS dictation instead; the per-OS steps are in the [manual](docs/manual.md#notebook).
+Without a dictation engine or model, the microphone points you to your OS dictation instead.
 
 ### Steps
 
@@ -136,9 +135,7 @@ git remote set-url origin <your-repo>
 
 ## 📚 Documentation
 
-The details of each skill, the notebook and the exam format are in the **[manual](docs/manual.md)**.
-
-**Online or offline?** The Online profile (a paid agent) is recommended. To run everything on your machine with open-source tools, see [Profiles, offline and ownership](docs/manual.md#profiles-offline-and-ownership) and its Reference stack.
+**Online or offline?** The Online profile (a paid agent) is recommended. To run everything on your machine, use opencode + Ollama + `qwen3-coder:30b` (or `gpt-oss:20b` on 16 GB of RAM).
 
 **Roadmap:** test `notes-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/Notas/issues).
 

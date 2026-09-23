@@ -21,8 +21,7 @@ Online and mention the Reference stack in one line.
   Codex, Google Antigravity and Cursor. If the learner is already in one of
   them, configure that one. If they're in another agent, say it works too
   (the agent layer is plain Markdown and JSON) and continue.
-- **Offline**: point them to the Reference stack in the manual (`docs/manual.md`,
-  "Profiles, offline and ownership"): opencode + Ollama + `qwen3-coder:30b`, or
+- **Offline**: point them to this reference stack: opencode + Ollama + `qwen3-coder:30b`, or
   `gpt-oss:20b` on 16 GB of RAM. It's a suggestion, not tested. If they're
   already in opencode, configure it; installing Ollama or pulling a model is
   the learner's call, don't do it for them. Remind them that grading and
@@ -53,8 +52,24 @@ Starting point, to be verified:
 | Others (Antigravity, Cline, Cursor, opencode) | Usually read `AGENTS.md` or a rules folder | See their docs | See their docs |
 
 Ollama isn't an agent: it runs the model behind one of these. Configure the
-agent, not Ollama (for opencode, the manual's Reference stack has the provider
-block). Warn the user that a small local model may not be able to
+agent, not Ollama. For opencode, start Ollama with
+`OLLAMA_CONTEXT_LENGTH=32768 ollama serve` (tool calls need a 16k-32k context)
+and put this in `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "http://localhost:11434/v1" },
+      "models": { "qwen3-coder:30b": {} }
+    }
+  }
+}
+```
+
+Warn the user that a small local model may not be able to
 sustain long skills like `notes-teach`.
 
 ## 2. Expose, in this order of preference
