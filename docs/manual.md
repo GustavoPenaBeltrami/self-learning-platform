@@ -32,13 +32,15 @@ app/
     server.py        Local server. Lists files, builds and saves the notebooks.
     text.py          HTML <-> Markdown conversion. `python3 app/text.py` self-tests.
     test_attempt.py  Tests for saving exam attempts.
+    test_offline.py  Fails if the app loads anything from an external host.
     style.css        Shared visual system. Tokens and color themes.
     theme.js         Color theme list and picker, shared.
     shell.js         Waybar, explorer and statusline, shared.
     exam.html        Exam simulator. Handles every question type.
     notes.html       Notebook.
     viz.js           Diagrams (Mermaid) and formulas (KaTeX). Shared.
-    vendor/          Mermaid 11.17.2 and KaTeX 0.16.11 with their fonts, to work offline.
+    vendor/          Mermaid 11.17.2 and KaTeX 0.16.11 with their fonts, Inter 4.1 and
+                     JetBrains Mono 2.304 (OFL), to work offline.
     Design.md        The visual system: tokens, components, do's and don'ts.
 topics/<slug>/
     topic.json         Title, subtitle, type, area, goals, reason, language, routine, links.
@@ -213,8 +215,8 @@ renames the file. The file order (`01-`, `02-`…) is the document order.
   50% opacity until you hover over it. Drag it by the `⠿`. If you paste an
   image inside, you get a floating image.
 - **Reading font**: Serif (Charter), Inter or JetBrains Mono, in the toolbar.
-  It's remembered. The last two load from Google Fonts; without internet they
-  fall back to the equivalent system font.
+  It's remembered. All three work offline: Inter and JetBrains Mono ship in
+  `app/vendor/`.
 - **Light / dark mode** in the toolbar, for the whole interface.
 - **Dictation**: click the microphone or `⌃M` (Control, not Command: macOS uses
   `⌘M` to minimize), speak, and do the same to finish. The text goes where the

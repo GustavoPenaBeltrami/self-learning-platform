@@ -92,7 +92,7 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 - **git**, to clone the repo.
 - **A coding agent**, whichever you use.
 - **A browser** with a microphone for dictation and oral exams.
-- **Internet only the first time**, to download the packages and the voice model. After that it works offline: Mermaid and KaTeX ship in the repo (`app/vendor/`).
+- **Internet only the first time**, to download the packages and the voice model. After that it works offline: Mermaid, KaTeX and the reading fonts ship in the repo (`app/vendor/`).
 - npm is optional: `npm run app` is just a shortcut, there's no `npm install`.
 
 ### Platforms
