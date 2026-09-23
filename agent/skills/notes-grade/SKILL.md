@@ -1,6 +1,6 @@
 ---
 name: notes-grade
-description: Grades an exam or exercise attempt — checks each rubric or prompt point, writes the feedback next to the attempt, updates learning.md and the topic's progress. Use when the user says "grade this attempt", "how did I do", "grade my exercise", "/notes-grade" (or in Spanish: "corregime este intento", "cómo me fue", "corregí mi ejercicio"), or after taking an exam with non-MC questions in exam.html or submitting an exercise from notes-exercises.
+description: Grades an exam or exercise attempt — checks each rubric or prompt point, writes the feedback next to the attempt, updates learning.md and the topic's progress. Use when the user says "grade this attempt", "how did I do", "grade my exercise", "/notes-grade", or after taking an exam with non-MC questions in exam.html or submitting an exercise from notes-exercises.
 ---
 
 # Grade

@@ -1,6 +1,6 @@
 ---
 name: notes-setup-agent
-description: Sets up this project for the agent that is using it (Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, or any other, with a cloud model or a local one via Ollama) — exposes the skills and agents in agent/ in the agent's native format, without touching anything versioned. Use the first time the repo is opened with a new agent, or when the user says "set up the project", "install the skills", "/notes-setup-agent" (or in Spanish: "configurá el proyecto", "instalá las skills").
+description: Sets up this project for the agent that is using it (Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, or any other, with a cloud model or a local one via Ollama) — exposes the skills and agents in agent/ in the agent's native format, without touching anything versioned. Use the first time the repo is opened with a new agent, or when the user says "set up the project", "install the skills", "/notes-setup-agent".
 ---
 
 # Agent setup

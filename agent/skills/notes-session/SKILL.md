@@ -1,6 +1,6 @@
 ---
 name: notes-session
-description: Entry point of a study session — surveys the state of every topic (overdue reviews, ungraded attempts, topics without exercises, incomplete topic.json files), asks what the user wants to do today and hands off to the right skill. Use when the user says "let's start", "what do I study today", "what's pending", "/notes-session", "I want to log that…" (or in Spanish: "arranquemos", "qué estudio hoy", "qué tengo pendiente", "quiero registrar que…"), or opens a session with no concrete request.
+description: Entry point of a study session — surveys the state of every topic (overdue reviews, ungraded attempts, topics without exercises, incomplete topic.json files), asks what the user wants to do today and hands off to the right skill. Use when the user says "let's start", "what do I study today", "what's pending", "/notes-session", "I want to log that…", or opens a session with no concrete request.
 ---
 
 # Session
@@ -24,7 +24,7 @@ Read from the filesystem, not from memory:
 - **Overdue reviews**: apply the Leitner-box criterion from `notes-review`
   (read that skill, don't reimplement it differently) over
   `topics/*/progress/log.md` and the attempts. Also count topics with
-  everything retired whose weekly ambulatory review is overdue.
+  everything retired whose weekly maintenance review is overdue.
 - **Topics with notes but zero exercises** (`notes/*.md` exists and
   `exercises/` is empty or missing). It's a signal to show: reading without
   producing doesn't close the loop.

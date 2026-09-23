@@ -54,10 +54,10 @@
   .doc em, .doc i { color: var(--ansi-yellow); }
 
   mark { --c: #d8c06a; background: none; color: inherit; cursor: pointer; }
-  mark.mk-fondo { background: color-mix(in srgb, var(--c) 35%, transparent); padding: 0 .1em; }
-  mark.mk-sub { border-bottom: 2px solid var(--c); }
-  mark.mk-tacha { text-decoration: line-through; text-decoration-color: var(--c); text-decoration-thickness: 2px; }
-  mark[data-nota]::after { content: '\00b0'; color: var(--accent); font-size: .9em; vertical-align: super; }
+  mark.mk-highlight { background: color-mix(in srgb, var(--c) 35%, transparent); padding: 0 .1em; }
+  mark.mk-underline { border-bottom: 2px solid var(--c); }
+  mark.mk-strike { text-decoration: line-through; text-decoration-color: var(--c); text-decoration-thickness: 2px; }
+  mark[data-comment]::after { content: '\00b0'; color: var(--accent); font-size: .9em; vertical-align: super; }
   mark.active { outline: 1px solid var(--accent); outline-offset: 2px; }
 
   .ref { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
@@ -90,30 +90,30 @@
   }
   .mark-menu input::placeholder { color: var(--muted); }
 
-  .tarjeta {
+  .card {
     position: absolute; z-index: 10; width: 14rem; margin: 0; overflow: hidden;
     background: var(--color-graphite); border: 1px solid var(--line);
     border-left: 2px solid var(--c, var(--accent)); border-radius: 0;
     font: 400 13px/1.6 var(--mono);
     opacity: .55; transition: opacity .15s ease;
   }
-  .tarjeta:hover, .tarjeta:focus-within { opacity: 1; }
-  .tarjeta .cuerpo { padding: .6rem .8rem; outline: 0; min-height: 2.4rem; }
-  .tarjeta .cuerpo:empty::before { content: 'margin note'; color: var(--muted); }
-  .tarjeta .handle {
+  .card:hover, .card:focus-within { opacity: 1; }
+  .card .card-body { padding: .6rem .8rem; outline: 0; min-height: 2.4rem; }
+  .card .card-body:empty::before { content: 'margin note'; color: var(--muted); }
+  .card .handle {
     position: absolute; top: .25rem; right: .25rem; display: flex; gap: .1rem;
     opacity: 0; background: var(--color-void); border: 1px solid var(--line);
   }
-  .tarjeta:hover .handle, .tarjeta:focus-within .handle { opacity: 1; }
-  .tarjeta .handle span, .tarjeta .handle button {
+  .card:hover .handle, .card:focus-within .handle { opacity: 1; }
+  .card .handle span, .card .handle button {
     border: 0; background: none; padding: .15rem .35rem;
     font: 400 12px/1.4 var(--mono); color: var(--muted);
   }
-  .tarjeta .handle span { cursor: grab; }
-  .tarjeta.dragging { outline: 1px solid var(--accent); }
-  .tarjeta img { display: block; width: 100%; height: auto; }
-  .tarjeta figcaption { padding: .5rem .8rem; color: var(--muted); outline: 0; font-size: 12px; }
-  .tarjeta figcaption:empty::before { content: 'caption'; color: var(--color-slate); }
+  .card .handle span { cursor: grab; }
+  .card.dragging { outline: 1px solid var(--accent); }
+  .card img { display: block; width: 100%; height: auto; }
+  .card figcaption { padding: .5rem .8rem; color: var(--muted); outline: 0; font-size: 12px; }
+  .card figcaption:empty::before { content: 'caption'; color: var(--color-slate); }
 
   .doc img.inline { display: block; max-width: 100%; height: auto; margin: var(--spacing-24) auto; cursor: pointer; }
   .doc img.inline.active { outline: 1px solid var(--accent); outline-offset: 3px; }
@@ -137,7 +137,7 @@
   .tree .nothing { color: var(--color-steel); padding: 0 .3rem; margin: 0; }
 
   @media (max-width: 1280px) {
-    .tarjeta { position: static !important; width: auto; margin: 1rem 0; }
+    .card { position: static !important; width: auto; margin: 1rem 0; }
   }
 </style>
 
@@ -215,7 +215,7 @@ async function menu() {
           <td class="type">${esc(l.type)}</td>
           <td class="num${l.sections ? '' : ' zero'}">${l.sections}</td>
           <td class="num${l.resources ? '' : ' zero'}">${l.resources}</td>
-        </tr>`).join('')}</tbody>
+        </tr>`).join('')}${topics.length ? '' : '<tr><td></td><td class="wide" colspan="4"><span class="sub">no topics yet: ask your agent to "create a new topic" (notes-init)</span></td></tr>'}</tbody>
     </table>
     <div class="tildes"></div></div>`;
 }
@@ -251,9 +251,9 @@ async function openTopic(name) {
     <div class="wb-mod pill">
       ${COLORS.map((c, i) => `<button class="swatch" style="--c:${c};background:${c}"
         data-color="${c}" aria-pressed="${i === 0}" data-tip="Color ${c}"></button>`).join('')}
-      <button data-mark="mk-fondo" data-tip="Highlight">${svg('highlight')}</button>
-      <button data-mark="mk-sub" data-tip="Underline">${svg('underline')}</button>
-      <button data-mark="mk-tacha" data-tip="Strikethrough">${svg('strike')}</button>
+      <button data-mark="mk-highlight" data-tip="Highlight">${svg('highlight')}</button>
+      <button data-mark="mk-underline" data-tip="Underline">${svg('underline')}</button>
+      <button data-mark="mk-strike" data-tip="Strikethrough">${svg('strike')}</button>
     </div>
     <div class="wb-mod pill">
       <button id="reference" data-tip="Reference to a section · or type [[name]]">${svg('reference')}</button>
@@ -315,7 +315,7 @@ async function openTopic(name) {
   doc.addEventListener('mouseover', e => {
     const a = e.target.closest?.('.ref');
     if (a) return refBubble(a);
-    const m = e.target.closest?.('mark[data-nota]');
+    const m = e.target.closest?.('mark[data-comment]');
     if (m) commentBubble(m);
   });
   addEventListener('keydown', e => {
@@ -674,7 +674,7 @@ function showBubble(anchor, html, broken) {
 }
 
 function commentBubble(m) {
-  showBubble(m, `<h4>Comment</h4>${esc(m.dataset.nota)}`);
+  showBubble(m, `<h4>Comment</h4>${esc(m.dataset.comment)}`);
 }
 
 function refBubble(a) {
@@ -685,7 +685,7 @@ function refBubble(a) {
   const parts = [];
   for (let n = target.nextElementSibling; n; n = n.nextElementSibling) {
     if (/^H[1-6]$/.test(n.tagName) && +n.tagName[1] <= level) break;
-    if (!n.classList.contains('tarjeta')) parts.push(n.textContent);
+    if (!n.classList.contains('card')) parts.push(n.textContent);
   }
   const body = parts.join(' ').replace(/\s+/g, ' ').trim();
   showBubble(a, `<h4>${esc(target.textContent)}</h4>` +
@@ -726,7 +726,7 @@ function markMenu(markEl) {
     COLORS.map(c => `<button class="swatch" data-color="${c}" style="background:${c}"
         aria-pressed="${c === current}" data-tip="${c}"></button>`).join('')
     + '<span class="sep"></span>'
-    + `<input type="text" id="mark-comment" placeholder="Comment…" value="${esc(markEl.dataset.nota || '')}">`
+    + `<input type="text" id="mark-comment" placeholder="Comment…" value="${esc(markEl.dataset.comment || '')}">`
     + `<button data-action="remove" data-tip="Remove the mark">${svg('remove', 14)}</button>`);
 
   m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => {
@@ -736,7 +736,7 @@ function markMenu(markEl) {
   });
   const field = m.querySelector('#mark-comment');
   field.oninput = () => {
-    field.value.trim() ? markEl.dataset.nota = field.value.trim() : delete markEl.dataset.nota;
+    field.value.trim() ? markEl.dataset.comment = field.value.trim() : delete markEl.dataset.comment;
     save();
   };
   field.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); closeMenu(); } };
@@ -917,14 +917,14 @@ function buildIndex() {
 /* ---------- cards ---------- */
 function createCard({ x, y, c, body = '', img = null, caption = '' }) {
   const el = document.createElement('aside');
-  el.className = 'tarjeta';
+  el.className = 'card';
   el.contentEditable = 'false';
   el.style.setProperty('--c', c || color);
   el.dataset.x = x ?? doc.offsetWidth + 32;
   el.dataset.y = y ?? Math.max(0, Math.round(scrollY / zoom() + 100 - doc.offsetTop));
   el.innerHTML = handle()
     + (img ? `<img src="${img}" alt=""><figcaption contenteditable>${esc(caption)}</figcaption>`
-           : `<div class="cuerpo" contenteditable>${body}</div>`);
+           : `<div class="card-body" contenteditable>${body}</div>`);
   doc.appendChild(el);
   activateCard(el);
   place(el);
@@ -940,7 +940,7 @@ function place(el) {
 }
 
 function placeCards() {
-  doc.querySelectorAll('.tarjeta').forEach(el => {
+  doc.querySelectorAll('.card').forEach(el => {
     el.contentEditable = 'false';
     if (!el.querySelector('.handle')) el.insertAdjacentHTML('afterbegin', handle());
     place(el);
@@ -981,7 +981,7 @@ function snapshot() {
     f.removeAttribute('data-error');
     f.querySelector('.view')?.replaceChildren();
   });
-  copy.querySelectorAll('.tarjeta').forEach(t => {
+  copy.querySelectorAll('.card').forEach(t => {
     t.removeAttribute('style');            // the position lives in data-x / data-y
     t.removeAttribute('contenteditable');
     t.querySelector('.handle')?.remove();  // the handle is injected again on open

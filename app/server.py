@@ -18,7 +18,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import text
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-TOPICS = ROOT / "topics"
+TOPICS = (ROOT / "topics").resolve()   # ponytail: symlink topics/ to keep content outside the repo
 PORT = 8321
 VOICE_MODEL = "mlx-community/whisper-large-v3-turbo"   # ~1.6 GB, downloaded the first time
 CPU_VOICE_MODEL = os.environ.get("NOTES_VOICE_MODEL", "small")   # ponytail: CPU int8 only, set NOTES_VOICE_MODEL=turbo on a fast box; CUDA needs device="auto" + cuDNN
@@ -231,7 +231,7 @@ def save_attempt(slug, exam, answers):
             a["audio"] = name
     path = attempts / (date + ".json")
     path.write_text(json.dumps({"exam": exam, "answers": answers}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return path.relative_to(ROOT).as_posix()
+    return "topics/" + path.relative_to(TOPICS).as_posix()
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

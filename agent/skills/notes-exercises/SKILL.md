@@ -1,6 +1,6 @@
 ---
 name: notes-exercises
-description: Builds an applied exercise on a topic — forces producing an artifact (code, ADR, critique, explanation) instead of answering questions. Use when the user says "I want an exercise", "do something practical with this", "apply what I learned", "/notes-exercises" (or in Spanish: "quiero un ejercicio", "hacer algo práctico de esto", "aplicar lo que aprendí"), or when notes-session detects a topic with notes but no exercises.
+description: Builds an applied exercise on a topic — forces producing an artifact (code, ADR, critique, explanation) instead of answering questions. Use when the user says "I want an exercise", "do something practical with this", "apply what I learned", "/notes-exercises", or when notes-session detects a topic with notes but no exercises.
 ---
 
 # Exercises

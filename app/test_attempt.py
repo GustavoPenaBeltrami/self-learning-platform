@@ -51,6 +51,15 @@ def test_saves_oral_audio():
     assert "mime" not in data["answers"][0], "the mime must not stay in the json"
 
 
+def test_empty_topics():
+    real = server.TOPICS
+    server.TOPICS = pathlib.Path(tempfile.mkdtemp()).resolve() / "missing"
+    try:
+        assert server.topics() == [] and server.exam_index() == {"topics": []}
+    finally:
+        server.TOPICS = real
+
+
 @with_test_topic
 def test_rejects_missing_slug():
     expect_rejection(lambda: server.save_attempt("../outside", "ch-01", []))
@@ -72,4 +81,5 @@ if __name__ == "__main__":
     test_rejects_missing_slug()
     test_rejects_escaping_exam()
     test_rejects_missing_exam()
+    test_empty_topics()
     print("ok")

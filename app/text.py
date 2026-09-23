@@ -236,14 +236,14 @@ if __name__ == "__main__":
     h = ('<h1>Fundamentals</h1><p>Text with <b>bold</b> and <i>italic</i> and <s>struck</s>.</p>'
          '<h2>Coupling</h2><ul><li>One</li><li>Two</li></ul>'
          '<p>See <a class="ref" href="#styles">Styles</a> too.</p>'
-         '<p>A <mark class="mk mk-bg" style="--c: #D9C46A" title="careful">highlight</mark> here.</p>')
+         '<p>A <mark class="mk mk-highlight" style="--c: #D9C46A" title="careful">highlight</mark> here.</p>')
     md = html_to_md(h)
     assert "# Fundamentals" in md, md
     assert "## Coupling" in md, md
     assert "**bold**" in md and "*italic*" in md and "~~struck~~" in md, md
     assert "- One\n- Two" in md, md
     assert "[[Styles]]" in md, md
-    assert '<mark class="mk mk-bg" style="--c: #D9C46A" title="careful">highlight</mark>' in md, md
+    assert '<mark class="mk mk-highlight" style="--c: #D9C46A" title="careful">highlight</mark>' in md, md
 
     back = md_to_html(md)
     assert "<h1>Fundamentals</h1>" in back, back

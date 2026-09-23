@@ -1,6 +1,6 @@
 ---
 name: notes-teach
-description: Teaches a topic so it ends up understood, not memorized — probes the real level with graded questions, builds a plan as a dependency graph, and constructs it node by node from unconditional truths. Use ALWAYS when something needs explaining, from a one-line clarification to a long session. Triggers on "/notes-teach", "teach me", "explain", "I don't get it", "quiz me on the topic", "enseñame", "explicame", "no entiendo", "tomame el tema", or when the user pastes study material and asks to understand it.
+description: Teaches a topic so it ends up understood, not memorized — probes the real level with graded questions, builds a plan as a dependency graph, and constructs it node by node from unconditional truths. Use ALWAYS when something needs explaining, from a one-line clarification to a long session. Triggers on "/notes-teach", "teach me", "explain", "I don't get it", "quiz me on the topic", or when the user pastes study material and asks to understand it.
 ---
 
 # Teach

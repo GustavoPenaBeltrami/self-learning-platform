@@ -1,6 +1,6 @@
 ---
 name: notes-exam
-description: Builds a JSON exam from raw content the user pastes (a book chapter, documentation, a certification guide), auditing it first against the topic's progress. Use when the user pastes pages, a chapter, an extracted PDF or their own summary and asks for an exam, a quiz, questions, or says "quiz me on this", "give me an exam on this" (or in Spanish: "tomame examen de esto", "armame un examen", "haceme preguntas").
+description: Builds a JSON exam from raw content the user pastes (a book chapter, documentation, a certification guide), auditing it first against the topic's progress. Use when the user pastes pages, a chapter, an extracted PDF or their own summary and asks for an exam, a quiz, questions, or says "quiz me on this", "give me an exam on this".
 ---
 
 # Notes exam

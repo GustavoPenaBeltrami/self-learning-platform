@@ -1,6 +1,6 @@
 ---
 name: notes-review
-description: Builds a spaced, interleaved review with Leitner cards — mixes topics, prioritizes what failed or sits in the fast box, and rewrites the questions so they require recall rather than recognition. Use when the user says "review", "/notes-review", "how long since I last saw this", "I'm forgetting this", "quiz me" (or in Spanish: "repasar", "hace cuánto que no veo esto", "se me está olvidando", "tomame repaso"), or when they finished a block and it's worth consolidating before moving on.
+description: Builds a spaced, interleaved review with Leitner cards — mixes topics, prioritizes what failed or sits in the fast box, and rewrites the questions so they require recall rather than recognition. Use when the user says "review", "/notes-review", "how long since I last saw this", "I'm forgetting this", "quiz me", or when they finished a block and it's worth consolidating before moving on.
 ---
 
 # Notes review
@@ -71,14 +71,14 @@ back, a miss is a strong signal.
 
 **Retirement**: after **3 consecutive correct answers in the slow box**, the
 card is retired from active rotation. It isn't lost: it moves to the weekly
-ambulatory review.
+maintenance review.
 
 **What goes into a normal review**: aim for 12-15 questions, prioritizing the
 fast box > medium > slow, and within each box the ones seen longest ago in
 `progress/log.md`. If there's no evidence of anything (a topic just started or
 without attempts), treat everything as the fast box and spread evenly.
 
-**Weekly ambulatory review**: when a topic runs out of active cards
+**Weekly maintenance review**: when a topic runs out of active cards
 (everything retired from slow), it isn't abandoned — once a week give it a
 short oral/chat review of the whole retired set, without saving it as an exam
 (it's not reproducible or bankable). If they pass, the set stays confirmed for

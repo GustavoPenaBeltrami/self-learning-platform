@@ -1,6 +1,6 @@
 ---
 name: notes-init
-description: Registers a new study topic — interviews the user to fill in topic.json, creates the folder structure and progress files, writes learning.md with the Mission, runs a level diagnosis in the terminal and offers to generate the topic's dedicated teacher agent. Use when the user says "I want to start studying X", "create a new topic", "add a topic", "/notes-init" (or in Spanish: "quiero empezar a estudiar X", "creá un tema nuevo", "agregá un tema").
+description: Registers a new study topic — interviews the user to fill in topic.json, creates the folder structure and progress files, writes learning.md with the Mission, runs a level diagnosis in the terminal and offers to generate the topic's dedicated teacher agent. Use when the user says "I want to start studying X", "create a new topic", "add a topic", "/notes-init".
 ---
 
 # New topic
@@ -33,8 +33,8 @@ ask about** (even if the answer can be "none"):
   to finish).
 - `links` and initial local resources.
 
-Folder `slug`: snake_case of the title, like the existing ones
-(`fundamentals_software_architecture`). If it already exists, stop and ask.
+Folder `slug`: snake_case of the title
+(e.g. `the_pragmatic_programmer`). If it already exists, stop and ask.
 `order`: the next free one.
 
 ## 2. Generate the filesystem
@@ -89,7 +89,7 @@ of step 3. That way the first `notes-teach` session doesn't ask for it again.
 Dates always `YYYY-MM-DD`. Don't invent data the user didn't give: an empty
 field beats an invented one.
 
-## 3. Ambulatory diagnosis
+## 3. Informal diagnosis
 
 In the terminal, without saving an `exam.json`: it's for locating the level,
 it's not reproducible or bankable.
@@ -113,8 +113,8 @@ literature book calls for a literature/Spanish-language teacher,
 teaches, an AWS certification calls for an instructor for that cert. It's
 optional: a way to run `notes-teach` with more domain character. The memory
 stays in the topic's `learning.md`; the agent keeps no memory of its own.
-`area` still exists in `topic.json` as context/tone data (§2.1 of
-`plan.md`); it no longer bounds the agent's scope.
+`area` still exists in `topic.json` as context/tone data; it no longer
+bounds the agent's scope.
 
 1. If `agent/agents/teacher-<topic-slug>.md` already exists, there's nothing
    to do.
