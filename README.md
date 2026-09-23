@@ -185,7 +185,7 @@ Four Japanese design ideas describe what SLP does. They settle decisions; they a
 | 渋い | **shibui** | quiet beauty | hierarchy by lightness, not size |
 | 静寂 | **seijaku** | calm | chrome lives in two bars; content stays quiet |
 
-Two themes, ink and paper: `sumi` 墨 and `kami` 紙. The full design reference is [`app/styles/Design-2.md`](app/styles/Design-2.md).
+Two themes, ink and paper: `sumi` 墨 and `kami` 紙. The full design reference is [`app/styles/DESIGN.md`](app/styles/DESIGN.md).
 
 ## documentation
 
