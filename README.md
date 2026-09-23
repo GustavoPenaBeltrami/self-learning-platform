@@ -92,25 +92,29 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 - **git**, to clone the repo.
 - **A coding agent**, whichever you use.
 - **A browser** with a microphone for dictation and oral exams.
-- **Internet only the first time**, to download the packages and the voice model. After that it works offline: Mermaid and KaTeX ship in the repo (`app/vendor/`).
-- npm is optional: `npm run app` is just a shortcut, there's no `npm install`.
+- **Internet only for `./notes setup`**, which downloads the packages and the voice model. After that it works offline: Mermaid, KaTeX and the reading fonts ship in the repo (`app/vendor/`).
 
 ### Platforms
 
 | System | Dictation | Disk (packages + model) | How to start it |
 |---|---|---|---|
-| macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `npm run app` |
-| macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `npm run app` |
+| macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `./notes` |
+| macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `./notes` (Windows: `notes`) |
 | Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html` |
 
-Without npm: `uv run app/server.py app/notes.html`. Without uv: `python3 app/server.py app/notes.html` starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `NOTES_VOICE_MODEL=turbo` makes it more accurate.
+`./notes` runs `uv run --offline app/server.py app/notes.html`: it never touches the network, and if setup never ran it falls back to `python3`, which starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`; for a local model folder you already have, see the [manual](docs/manual.md).
+
+Without a dictation engine or model, the microphone points you to the OS dictation instead: `Fn` twice on macOS, `Win+H` on Windows, and on Linux [Speech Note](https://github.com/mkiol/dsnote) (`flatpak install flathub net.mkiol.SpeechNote`, or `yay -S dsnote` on Arch) with `ydotool` on Wayland. See the [manual](docs/manual.md).
 
 ### Steps
 
 ```sh
 git clone https://github.com/GustavoPenaBeltrami/Notas.git
 cd Notas
+./notes setup    # Windows: notes setup
 ```
+
+Setup is the only step that uses the network. It fetches the Python packages, asks for your **profile** — Online (recommended: downloads the largest dictation model, turbo, ~1.6 GB) or Offline (pick a size that fits your RAM and disk, the path to a model you already have, or none) — and writes the choices to `settings.json`. Running it again offers to keep them. Skipping it only costs dictation.
 
 Open your agent in the folder and ask it:
 
@@ -121,7 +125,7 @@ Read AGENTS.md and run notes-setup-agent.
 It detects which agent it is and exposes the skills in that agent's format — symlinks if it supports them, conversion if not. Whatever it creates goes to `.git/info/exclude`, so it doesn't clutter the repo. Then start the app:
 
 ```sh
-npm run app
+./notes          # Windows: notes
 ```
 
 **Going to keep your topics in your own repo?** Change the remote:
@@ -134,6 +138,8 @@ git remote set-url origin <your-repo>
 
 The details of each skill, the notebook and the exam format are in the **[manual](docs/manual.md)**.
 
+**Online or offline?** The Online profile (a paid agent) is recommended. To run everything on your machine with open-source tools, see [Profiles, offline and ownership](docs/manual.md#profiles-offline-and-ownership) and its Reference stack.
+
 **Roadmap:** test `notes-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/Notas/issues).
 
 **Thanks to** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `notes-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory and spaced review.
@@ -141,3 +147,7 @@ The details of each skill, the notebook and the exam format are in the **[manual
 ## Contributing
 
 Contributions are welcome! Fork the repo, create your branch, and open a Pull Request. Skills are edited in `agent/skills/`, never inside an agent's own folder. For bugs or ideas, [open an issue](https://github.com/GustavoPenaBeltrami/Notas/issues/new).
+
+## License
+
+[MIT](LICENSE).

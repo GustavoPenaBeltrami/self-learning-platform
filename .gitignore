@@ -8,3 +8,6 @@ referencias/
 plan.md
 agent/agents/teacher-*
 local/
+/settings.json
+/fonts/
+/models/

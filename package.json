@@ -1,8 +1,0 @@
-{
-  "name": "notes",
-  "private": true,
-  "description": "Study system: exams and notes. Runs on python3; dictation adds mlx-whisper or faster-whisper via uv.",
-  "scripts": {
-    "app": "uv run app/server.py app/notes.html"
-  }
-}

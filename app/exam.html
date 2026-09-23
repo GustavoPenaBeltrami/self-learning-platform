@@ -3,9 +3,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Exams</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="style.css">
 <script src="theme.js"></script>
 <script src="viz.js"></script>
@@ -85,7 +82,7 @@ async function index() {
     topics = await load();
   } catch {
     app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
-      <p>Open a terminal here and run <code>npm run app</code>.</p></div>`;
+      <p>Open a terminal here and run <code>./notes</code>.</p></div>`;
     return;
   }
   path('~/notes/topics/*/exams');

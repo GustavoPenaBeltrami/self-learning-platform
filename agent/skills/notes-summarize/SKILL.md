@@ -13,6 +13,7 @@ Summarizes technical text and appends it to an existing notes file (`topics/<top
    - **pasted**: it comes in the message.
    - **attached**: a PDF/image the user attached — read it with `Read`.
    - **`resources/`**: a file already saved in `topics/<topic>/resources/` — ask which one if they don't say.
+   - **local path**: a `path` source from the topic's `topic.json` `links`. If the file doesn't exist, say so in one line and ask for another source.
 2. **Destination**: which topic and which file in `notes/` (e.g. `topics/example/notes/01-methods-and-codes.md`). If the user is already working on a note in the conversation, use that one without asking again.
 3. **Summary level** (if they don't say, use `medium`):
    - **compact**: very compact, just bullets with the key idea of each concept. No elaboration, no examples unless essential.

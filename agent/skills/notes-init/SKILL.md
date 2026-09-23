@@ -31,7 +31,16 @@ ask about** (even if the answer can be "none"):
   overrides them for that output.
 - `routine` (`cadence`, `session`) and `end_date` (YYYY-MM-DD: when they want
   to finish).
-- `links` and initial local resources.
+- `links` (Sources) and initial local resources. A source is a URL
+  (`{ "title", "url" }`) or a path to a file anywhere on disk
+  (`{ "title", "path" }`). `resources/` is always a source without being
+  declared. For each path outside `topics/<slug>/`, offer with
+  `AskUserQuestion` to copy the file into `resources/` (then it needs no
+  `links` entry); if they decline, keep the `path` entry. A path that doesn't
+  exist: warn in one line and keep it, never stop the interview.
+- `sources_mode` (`web`, `local` or `both`): where the agent looks things up.
+  Offer the default from the Profile in `settings.json` at the repo root:
+  `profile: "offline"` → `local`, `online` or no file → `both`.
 
 Folder `slug`: snake_case of the title
 (e.g. `the_pragmatic_programmer`). If it already exists, stop and ask.
@@ -53,7 +62,8 @@ topics/<slug>/
   "goals": ["…"], "reason": "…",
   "language": { "source": "en", "notes": "es", "exams": "es" },
   "routine": { "cadence": "…", "session": "…" }, "end_date": "YYYY-MM-DD",
-  "links": [{ "title": "…", "url": "…" }]
+  "sources_mode": "both",
+  "links": [{ "title": "…", "url": "…" }, { "title": "…", "path": "~/Books/…pdf" }]
 }
 ```
 
@@ -153,6 +163,13 @@ up. It's not a parallel process: it's the same one with your personality.
   got stuck, and guide them to discover it — never solve it yourself first.
 - **Never from memory.** Every doubtful fact is verified with the
   `researcher` subagent before you say it.
+- **Sources follow `sources_mode`.** Read `topic.json` `sources_mode` and
+  `links` (URLs and local `path`s) plus `resources/`. With `local`, or with no
+  connection, use only local sources and say plainly "not verified on the web"
+  for anything you couldn't check there. A missing path: warn and continue.
+- **When sources disagree, you decide.** Apply the `notes-teach` rule: the
+  topic's material wins unless outdated for the Mission, cite what you used,
+  record it in the Record — don't flag the conflict in the chat.
 - Typical traps in this topic: <1-2 frequent misconceptions, if any>.
 
 ## What you don't do

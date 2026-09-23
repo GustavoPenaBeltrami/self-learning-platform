@@ -162,7 +162,7 @@ chance of being wrong.
 2. For each `multiple_choice` question: check that `answer` is between 0 and 3, that it
    has 4 options, and that `answer` isn't concentrated on one index. For each
    `open`/`oral`/`practical`: check that it has a `rubric` with 3-5 points.
-3. Tell the user the path and to open it with `npm run app`.
+3. Tell the user the path and to open it with `./notes`.
 4. If the exam has non-MC questions, let them know that after taking it they'll need to
    run `notes-grade` on the attempt — `exam.html` can't grade
    `open`/`oral`/`practical` on its own.

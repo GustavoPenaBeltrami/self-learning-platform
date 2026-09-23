@@ -5,24 +5,113 @@ Full reference. The introduction is in the [README](../README.md).
 ## Getting started
 
 ```sh
-npm run app      # opens the notebooks; exams are in the nav
+./notes setup    # once, the only step that uses the network (Windows: notes setup)
+./notes          # opens the notebooks; exams are in the nav (Windows: notes)
 ```
 
-Starts the server at `http://localhost:8321/` and opens `notes.html`. If one is
-already running, it opens the tab and exits. No `npm install` and no build: it runs on the Python stdlib.
-The only exception is dictation: `npm run app` starts with `uv run`, which reads
-the dependencies from the header of `app/server.py` and downloads the right one
-the first time — `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU)
-on Linux, Windows and Intel Macs. On CPU it uses the `small` model; for another one,
-`NOTES_VOICE_MODEL=turbo npm run app`. On Windows ARM, dictation needs x64 Python
+`./notes setup` is interactive and safe to re-run (it offers to keep the
+current choices). It fetches the dependencies in the header of `app/server.py`
+— `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU) on Linux,
+Windows and Intel Macs — asks for the profile and resolves the dictation model:
+
+- **Online** (recommended): downloads `turbo` (~1.6 GB), no more questions.
+- **Offline**: shows the machine's RAM and free disk next to each size (`tiny`,
+  `base`, `small`, `turbo`) and asks for a size, the path to a model folder you
+  already have, or `none`.
+
+The model goes to `models/` at the repo root (git-ignored) and its path, with
+the profile, to `settings.json`. The profile also sets the default
+`sources_mode` for new topics: `both` for Online, `local` for Offline. A failed
+download or `none` leaves dictation on the OS fallback; nothing else changes.
+
+`./notes` starts the server at `http://localhost:8321/` and opens `notes.html`. If one is
+already running, it opens the tab and exits. No build: it runs on the Python stdlib,
+with `uv run --offline` so daily use never touches the network. If setup never
+ran, it falls back to `python3`: everything works except dictation. The model is set in `/settings` (see Dictation below). On Windows ARM, dictation needs x64 Python
 (emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html`.
 Without `uv`, `python3 app/server.py app/notes.html` starts everything except dictation.
+
+## Profiles, offline and ownership
+
+Everything is yours: topics and notes are plain files, the code is MIT, and
+any agent or model can be swapped without losing anything. The **Profile**
+(`profile` in `settings.json`: `online` or `offline`) is picked at Setup,
+changed any time in `/settings`, and only sets three defaults: the dictation
+model, the `sources_mode` of new topics, and which agents `notes-setup-agent`
+recommends. The core never reads it.
+
+| | Online (recommended) | Offline |
+|---|---|---|
+| Agent | A paid one: Claude Code, OpenAI Codex, Google Antigravity, Cursor… | The Reference stack below, or any agent on a local model |
+| Dictation | The largest model (`turbo`, ~1.6 GB), no questions | A size your RAM and disk handle, or a model you already have |
+| New topics look things up in | Web and local sources (`both`) | Local sources (`local`) |
+
+**What the Setup fetches.** The Setup is the only moment that uses the network:
+Python dependencies (dictation engine) and the dictation model, or a path to
+ones you already have. Fonts, Mermaid and KaTeX already ship in `app/vendor/`.
+
+**What works with no network.** The whole core: the app, notebooks, exams,
+review, settings and fonts. Dictation works once its model is on disk; without
+it, the microphone points to the OS dictation (see Dictation under Notebook).
+The agent layer works if its model is local; with no connection, the agents
+use local sources and say they didn't verify on the web.
+
+**Settings and fonts.** `settings.json` (profile, theme, reading font,
+dictation model) and `fonts/` (your uploaded fonts) live at the repo root,
+git-ignored like `topics/`. The server reads and writes them; the browser
+doesn't keep its own copy, so they survive a new browser or cleared data.
+
+### Reference stack
+
+One fully open-source way to run the agent layer offline. **It is a suggestion,
+not tested by the project**: skills and agents are Markdown and topics are
+Markdown and JSON, so any terminal agent with local file access works.
+
+- **Agent**: [opencode](https://opencode.ai) (MIT). Reads `AGENTS.md` and
+  `SKILL.md`, has subagents.
+- **Runtime**: [Ollama](https://ollama.com).
+- **Model**: `qwen3-coder:30b` (~19 GB disk, 32 GB RAM recommended), or
+  `gpt-oss:20b` (~14 GB disk, 16 GB RAM floor) on smaller machines. Below
+  16 GB of RAM the agent layer isn't viable locally.
+
+```sh
+curl -fsSL https://opencode.ai/install | bash      # opencode
+curl -fsSL https://ollama.com/install.sh | sh      # Ollama on Linux; macOS/Windows: installer at ollama.com
+ollama pull qwen3-coder:30b                        # or: ollama pull gpt-oss:20b
+OLLAMA_CONTEXT_LENGTH=32768 ollama serve           # tool calls need a 16k-32k context
+```
+
+Point opencode at Ollama in `opencode.json` (Ollama can also write this for
+you, see its opencode integration docs), then open opencode in the repo and
+run `notes-setup-agent`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "http://localhost:11434/v1" },
+      "models": { "qwen3-coder:30b": {} }
+    }
+  }
+}
+```
+
+**Known limits.** Grading and nuanced feedback (`notes-grade`) and
+teacher-style judgment are clearly weaker than on a frontier model: take their
+output as a draft. Long multi-step skills (`notes-teach`) and large contexts
+degrade earlier. When that matters, a paid model is worth it.
+
+**Plan B**: [Goose](https://github.com/block/goose) (Apache-2.0), if opencode
+stops fitting.
 
 ## Files
 
 ```
 README.md            The introduction.
-package.json         `npm run app`. No dependencies.
+notes, notes.cmd     Launcher: `./notes` (or `./notes app`) starts the app, `./notes setup` sets it up; `notes` on Windows.
+LICENSE              MIT.
 AGENTS.md            Entry point for any agent: where the skills are and how to map tools.
 agent/
     skills/          The skills below. Single source, for any agent.
@@ -32,16 +121,21 @@ app/
     server.py        Local server. Lists files, builds and saves the notebooks.
     text.py          HTML <-> Markdown conversion. `python3 app/text.py` self-tests.
     test_attempt.py  Tests for saving exam attempts.
+    test_offline.py  Fails if the app loads anything from an external host.
+    test_dictation.py Tests for the dictation model choice and the OS-dictation fallback.
+    test_fonts.py    Tests for uploading user fonts.
+    test_setup.py    Tests for ./notes setup, profile defaults and the model download.
     style.css        Shared visual system. Tokens and color themes.
     theme.js         Color theme list and picker, shared.
     shell.js         Waybar, explorer and statusline, shared.
     exam.html        Exam simulator. Handles every question type.
     notes.html       Notebook.
     viz.js           Diagrams (Mermaid) and formulas (KaTeX). Shared.
-    vendor/          Mermaid 11.17.2 and KaTeX 0.16.11 with their fonts, to work offline.
+    vendor/          Mermaid 11.17.2 and KaTeX 0.16.11 with their fonts, Inter 4.1 and
+                     JetBrains Mono 2.304 (OFL), to work offline.
     Design.md        The visual system: tokens, components, do's and don'ts.
 topics/<slug>/
-    topic.json         Title, subtitle, type, area, goals, reason, language, routine, links.
+    topic.json         Title, subtitle, type, area, goals, reason, language, routine, sources_mode, links.
     learning.md        Mission, Glossary and Record. The memory of /notes-teach.
     notes/NN-*.md      One section per file. Real Markdown.
     notes/img/         Pasted images, as separate files.
@@ -78,7 +172,10 @@ to `THEMES` in `theme.js`. Components only read tokens: change them there, not
 in individual rules.
 
 The notebook's reading font picker (mono / serif / inter) applies only to the
-body of the note.
+body of the note. To read in your own typeface, upload a `.woff2`, `.ttf` or
+`.otf` file from `/settings`: it is stored in `fonts/` at the repo root
+(git-ignored, like `topics/`) and appears in both font pickers, offline.
+Anything that isn't a font, or bigger than 20 MB, is rejected.
 
 ## Diagrams and formulas
 
@@ -142,8 +239,10 @@ exam format, a documentation one asks when to use what).
   "language": { "source": "en", "notes": "es", "exams": "es" },
   "routine": { "cadence": "1 domain per week", "session": "~30 min" },
   "end_date": "YYYY-MM-DD",
+  "sources_mode": "both",
   "links": [
-    { "title": "Exam guide", "url": "https://docs.aws.amazon.com/..." }
+    { "title": "Exam guide", "url": "https://docs.aws.amazon.com/..." },
+    { "title": "My study guide", "path": "~/Books/clf-c02-guide.pdf" }
   ]
 }
 ```
@@ -154,8 +253,14 @@ books) as context and tone. The teacher agent is per **topic**, not per area:
 a new topic, with a persona designed for that specific topic (a literature
 book calls for a literature teacher, a cert calls for an instructor for that
 cert); `notes-session` offers to generate it for topics that don't have one yet.
-`links` are external sources (official docs, a course); `resources/` are local
-files (the book's PDF, a handout). Both show up together above the notebook's index.
+`links` are the declared sources: a `url` (official docs, a course) or a `path`
+to a file anywhere on disk; `resources/` are local files inside the topic (the
+book's PDF, a handout) and always count as sources. All show up together above
+the notebook's index. `notes-init` offers to copy an external `path` into
+`resources/`; a missing path only produces a warning. `sources_mode` (`web`,
+`local` or `both`) is where the agent looks things up; `notes-init` defaults it
+from the Profile (`both` for Online, `local` for Offline), and with no
+connection it's local regardless, with a note on what wasn't verified on the web.
 
 ### Language
 
@@ -213,16 +318,34 @@ renames the file. The file order (`01-`, `02-`…) is the document order.
   50% opacity until you hover over it. Drag it by the `⠿`. If you paste an
   image inside, you get a floating image.
 - **Reading font**: Serif (Charter), Inter or JetBrains Mono, in the toolbar.
-  It's remembered. The last two load from Google Fonts; without internet they
-  fall back to the equivalent system font.
+  It's remembered. All three work offline: Inter and JetBrains Mono ship in
+  `app/vendor/`.
 - **Light / dark mode** in the toolbar, for the whole interface.
 - **Dictation**: click the microphone or `⌃M` (Control, not Command: macOS uses
   `⌘M` to minimize), speak, and do the same to finish. The text goes where the
-  cursor is. Whisper transcribes locally (`large-v3-turbo` on the GPU on Apple
-  Silicon, `NOTES_VOICE_MODEL` on CPU), detecting the language when none is
-  given, with no internet except the first time it downloads the model
-  (~1.6 GB on Apple Silicon). The GPU model is set in `VOICE_MODEL` in
-  `app/server.py`.
+  cursor is. Whisper transcribes locally, detecting the language when none is
+  given, with no internet once `./notes setup` downloaded the model.
+  - **Model**: `voice_model` in `/settings` wins, then the `NOTES_VOICE_MODEL`
+    environment variable, then the profile default: `turbo` (~1.6 GB, the
+    largest) for Online; for Offline, `turbo` on the GPU on Apple Silicon and
+    `small` on CPU. The Offline profile picks what the hardware handles (`small`
+    or `base` on a modest CPU, `turbo` on a fast one) or a model you already
+    have. The `/settings` dropdown offers the sizes (`tiny` to `large-v3`), which
+    work on both engines; its **download** button saves the selected size to
+    `models/` and sets `voice_model` to that folder, so it works offline (a bare
+    size is fetched on first use instead). For a local folder (MLX for mlx-whisper, CTranslate2
+    for faster-whisper), write its path as `voice_model` in `settings.json`: it
+    is used as-is, with no download, and shows up in the dropdown.
+  - **Fallback**: with no engine (started without `uv`) or no model (a skipped
+    Setup, offline before the first download, a wrong path) the microphone
+    doesn't break: the status tells you to use the OS dictation instead, which
+    types into the notebook like a keyboard.
+    - macOS: system dictation, press `Fn` twice (System Settings → Keyboard →
+      Dictation).
+    - Windows: voice typing, `Win+H`.
+    - Linux: [Speech Note](https://github.com/mkiol/dsnote), offline:
+      `flatpak install flathub net.mkiol.SpeechNote` (Arch: `yay -S dsnote`).
+      On Wayland it needs `ydotool` to type into other windows.
 - Saves on its own, 0.9 s after each change. The status shows in the toolbar.
 
 ### What's inside a `.md`

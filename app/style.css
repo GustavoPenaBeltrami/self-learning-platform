@@ -1,3 +1,7 @@
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url(vendor/jetbrains-mono/JetBrainsMono-Regular.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url(vendor/jetbrains-mono/JetBrainsMono-Bold.woff2) format("woff2"); }
+@font-face { font-family: Inter; font-weight: 400; font-display: swap; src: url(vendor/inter/Inter-Regular.woff2) format("woff2"); }
+
 :root {
   --color-void:      #111419;
   --color-carbon:    #181c23;

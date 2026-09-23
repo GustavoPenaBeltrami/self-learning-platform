@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Settings</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+<script src="shell.js"></script>
+<style>
+  .field { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: .3rem 1rem; padding: var(--spacing-16) 0; }
+  .field + .field { border-top: 1px dashed var(--line); }
+  .field label { color: var(--ansi-cyan); }
+  .field select, .field input {
+    justify-self: start; border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
+    background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
+  }
+  .field :is(select, input):focus { outline: 1px solid var(--accent); }
+  .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
+  .field .hint::before { content: '// '; color: var(--color-steel); }
+</style>
+
+<body>
+<script>
+const { app, tree, path } = mountShell('settings');
+const statusEl = document.getElementById('status');
+const opts = (pairs, value) => pairs.map(([k, name]) =>
+  `<option value="${k}"${k === value ? ' selected' : ''}>${name}</option>`).join('');
+const FIELDS = [
+  ['profile', [['online', 'online (recommended)'], ['offline', 'offline']],
+    'Online: paid agent, web lookups, largest dictation model. Offline: everything on this machine.'],
+  ['theme', [['', 'auto (follows the OS)'], ...Object.entries(THEMES)], 'Colors of the whole app.'],
+  ['font', [['mono', 'mono'], ['serif', 'serif'], ['inter', 'inter']], 'Reading font for the note body. Headings stay mono.'],
+  ['voice_model', [['', 'default (online: turbo; offline: turbo on Apple Silicon, small on CPU)'], ['tiny', 'tiny · ~75 MB'], ['base', 'base · ~145 MB'],
+    ['small', 'small · ~480 MB'], ['medium', 'medium · ~1.5 GB'], ['turbo', 'turbo · ~1.6 GB (online)'], ['large-v3', 'large-v3 · ~3 GB']],
+    'Dictation model. Bigger is more accurate and slower. download saves the selected size to models/ so it works offline; otherwise it is fetched on first use. A local model folder: set its path as voice_model in settings.json.'],
+];
+
+tree.innerHTML = `<details open class="current"><summary><span class="name">notes/</span><span class="count">1</span></summary>
+  <ul><li><a href="settings.html" aria-current="page"><span class="n">›</span><span>settings.json</span></a></li></ul></details>`;
+path('~/notes/settings.json');
+
+Promise.all([settings, userFonts]).then(([s, fonts]) => {
+  FIELDS[2][1].push(...fonts.map(f => [f, f]));
+  if (s.voice_model && !FIELDS[3][1].some(([k]) => k === s.voice_model)) FIELDS[3][1].push([s.voice_model, s.voice_model]);
+  app.innerHTML = `
+    <div class="sheet">
+    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/notes</span> <span class="p-sig">❯</span> nvim settings.json</p>
+    <h1>Settings</h1>
+    <p class="minor"># saved to settings.json at the repo root, on every change</p>
+    ${FIELDS.map(([key, choices, hint]) => `
+      <div class="field">
+        <label for="set-${key}">${key}</label>
+        <span><select id="set-${key}" data-key="${key}">${opts(choices, s[key] ?? '')}</select>${key === 'voice_model' ? ' <button id="voice-dl">download</button>' : ''}</span>
+        <p class="hint">${hint}</p>
+      </div>`).join('')}
+    <div class="field">
+      <label for="font-file">upload font</label>
+      <input type="file" id="font-file" accept=".woff2,.ttf,.otf">
+      <p class="hint">A .woff2, .ttf or .otf file. Saved to fonts/ at the repo root and added to the font list.</p>
+    </div>
+    <div class="tildes"></div></div>`;
+  app.querySelectorAll('[data-key]').forEach(sel => sel.onchange = async () => {
+    statusEl.textContent = 'saving…';
+    try {
+      await saveSettings({ [sel.dataset.key]: sel.value });
+      statusEl.textContent = 'saved';
+    } catch (e) {
+      statusEl.textContent = '✕ ' + e.message;
+    }
+  });
+  document.getElementById('voice-dl').onclick = async () => {
+    statusEl.textContent = 'downloading…';
+    const r = await fetch('/api/voice-model/download', { method: 'POST', body: JSON.stringify({ size: document.getElementById('set-voice_model').value }) })
+      .then(r => r.json()).catch(e => ({ error: e.message }));
+    if (r.error) return statusEl.textContent = '✕ ' + r.error;
+    statusEl.textContent = 'saved';
+    location.reload();
+  };
+  document.getElementById('font-file').onchange = async e => {
+    const file = e.target.files[0];
+    statusEl.textContent = 'uploading…';
+    const r = await fetch('/api/font?name=' + encodeURIComponent(file.name), { method: 'POST', body: file })
+      .then(r => r.json()).catch(e => ({ error: e.message }));
+    if (r.error) return statusEl.textContent = '✕ ' + r.error;
+    location.reload();
+  };
+});
+</script>

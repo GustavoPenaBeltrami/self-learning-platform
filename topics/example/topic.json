@@ -16,10 +16,15 @@
     "session": ""
   },
   "end_date": "",
+  "sources_mode": "both",
   "links": [
     {
       "title": "MDN: Overview of HTTP",
       "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview"
+    },
+    {
+      "title": "HTTP: The Definitive Guide (my copy)",
+      "path": "~/Books/http-the-definitive-guide.pdf"
     }
   ]
 }

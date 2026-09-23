@@ -9,10 +9,10 @@
 """Local server for the study system. Stdlib only: python3 app/server.py
 
 Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
-faster-whisper everywhere else. `npm run app` (uv run) brings the right one;
+faster-whisper everywhere else. `./notes` (uv run) brings the right one;
 without it everything works except the microphone.
 """
-import base64, datetime, hashlib, http.server, json, os, pathlib, re, sys, threading, urllib.parse, webbrowser
+import base64, datetime, hashlib, http.server, json, os, pathlib, platform, re, shutil, sys, threading, urllib.parse, webbrowser
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import text
@@ -21,7 +21,14 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 TOPICS = (ROOT / "topics").resolve()   # ponytail: symlink topics/ to keep content outside the repo
 PORT = 8321
 VOICE_MODEL = "mlx-community/whisper-large-v3-turbo"   # ~1.6 GB, downloaded the first time
-CPU_VOICE_MODEL = os.environ.get("NOTES_VOICE_MODEL", "small")   # ponytail: CPU int8 only, set NOTES_VOICE_MODEL=turbo on a fast box; CUDA needs device="auto" + cuDNN
+CPU_VOICE_MODEL = "small"   # ponytail: CPU int8 only, set voice_model=turbo on a fast box; CUDA needs device="auto" + cuDNN
+MLX_MODELS = {"tiny": "mlx-community/whisper-tiny-mlx", "base": "mlx-community/whisper-base-mlx",
+              "small": "mlx-community/whisper-small-mlx", "medium": "mlx-community/whisper-medium-mlx",
+              "turbo": VOICE_MODEL, "large-v3": "mlx-community/whisper-large-v3-mlx"}
+CPU_MODELS = {"tiny": "Systran/faster-whisper-tiny", "base": "Systran/faster-whisper-base",
+              "small": "Systran/faster-whisper-small", "medium": "Systran/faster-whisper-medium",
+              "turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo", "large-v3": "Systran/faster-whisper-large-v3"}
+SIZES = {"tiny": ("~75 MB", "~1 GB"), "base": ("~145 MB", "~1 GB"), "small": ("~480 MB", "~2 GB"), "turbo": ("~1.6 GB", "~6 GB")}
 voice_lock = threading.Lock()
 cpu_model = None
 BODY_LIMIT = 20 * 1024 * 1024   # ponytail: one flat cap for every POST, single local user
@@ -37,24 +44,58 @@ def audio_ext(mime):
     return ext
 
 
+class NoDictation(ValueError):
+    """No engine or no model: the mic falls back to the OS dictation."""
+
+
+def voice_model(gpu):
+    """settings.json voice_model, then NOTES_VOICE_MODEL, then the profile default, then the engine default. A size maps to the mlx repo on GPU; a local path is used as-is."""
+    settings = read_settings()
+    model = (settings["voice_model"] or os.environ.get("NOTES_VOICE_MODEL")
+             or profile_defaults(settings["profile"])["voice_model"] or (VOICE_MODEL if gpu else CPU_VOICE_MODEL))
+    model = os.path.expanduser(model)
+    return MLX_MODELS.get(model, model) if gpu else model
+
+
+def download_voice_model(size, gpu=None):
+    """Downloads a size into models/<repo name> for the engine this machine runs. Returns the local path."""
+    if gpu is None:
+        gpu = platform.system() == "Darwin" and platform.machine() == "arm64"
+    repo = (MLX_MODELS if gpu else CPU_MODELS).get(size)
+    if not repo:
+        raise ValueError("unknown model size: " + str(size))
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError:
+        raise NoDictation("dictation engine missing, start with ./notes")
+    dest = ROOT / "models" / repo.split("/")[-1]
+    snapshot_download(repo_id=repo, local_dir=str(dest))
+    return str(dest)
+
+
 def whisper(audio, lang):
     global cpu_model
     try:
         import faster_whisper
     except ImportError:
-        raise ValueError("dictation engine missing, start with npm run app")
+        raise NoDictation("dictation engine missing, start with ./notes")
     if isinstance(audio, str):
         audio = faster_whisper.decode_audio(audio)
     try:
         import mlx_whisper
     except ImportError:
         mlx_whisper = None
-    if mlx_whisper:
-        r = mlx_whisper.transcribe(audio, path_or_hf_repo=VOICE_MODEL, language=lang)
-        return [[s["start"], s["text"].strip()] for s in r["segments"]]
-    if cpu_model is None:
-        cpu_model = faster_whisper.WhisperModel(CPU_VOICE_MODEL, device="cpu", compute_type="int8")
-    segments, _ = cpu_model.transcribe(audio, language=lang)
+    model = voice_model(bool(mlx_whisper))
+    try:
+        if mlx_whisper:
+            # ponytail: mlx loads and transcribes in one call, so a transcription error also reads as a missing model
+            r = mlx_whisper.transcribe(audio, path_or_hf_repo=model, language=lang)
+            return [[s["start"], s["text"].strip()] for s in r["segments"]]
+        if not cpu_model or cpu_model[0] != model:
+            cpu_model = (model, faster_whisper.WhisperModel(model, device="cpu", compute_type="int8"))
+    except Exception as e:
+        raise NoDictation(f"dictation model {model} not available: {e}")
+    segments, _ = cpu_model[1].transcribe(audio, language=lang)
     return [[s.start, s.text.strip()] for s in segments]
 
 
@@ -63,11 +104,105 @@ def transcribe(raw, lang=None):
     try:
         import numpy   # in here: the rest of the server doesn't need it
     except ImportError:
-        raise ValueError("dictation engine missing, start with npm run app")
+        raise NoDictation("dictation engine missing, start with ./notes")
     with voice_lock:   # ponytail: one transcription at a time, there is a single user
         segments = whisper(numpy.frombuffer(raw, dtype="<f4"), lang)
     # segments [start_s, text]: live dictation pins the old ones and trims the audio there
     return {"text": " ".join(t for _, t in segments).strip(), "segments": segments}
+
+
+SETTINGS = {"profile": "online", "theme": "", "font": "mono", "voice_model": ""}
+PROFILES = ("online", "offline")
+
+
+def profile_defaults(profile):
+    """What a Profile decides: the dictation model when none is set, and sources_mode for new topics."""
+    online = profile != "offline"
+    return {"voice_model": "turbo" if online else "", "sources_mode": "both" if online else "local"}
+
+
+def ram_gb():
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
+    except (AttributeError, ValueError, OSError):
+        return 0   # ponytail: Windows has no sysconf, the suggestion falls to base
+
+
+def setup(ask=input):
+    """./notes setup: asks the Profile and the dictation model, downloads it, writes settings.json. Safe to re-run."""
+    current = read_settings()
+    if (ROOT / "settings.json").exists():
+        keep = ask(f"Current: profile {current['profile']}, voice_model {current['voice_model'] or 'default'}. Keep? [Y/n] ")
+        if keep.strip().lower() in ("", "y", "yes"):
+            return current
+    profile = "offline" if ask("Profile: 1) online (recommended)  2) offline [1] ").strip().lower() in ("2", "offline") else "online"
+    choice = "turbo"
+    if profile == "offline":
+        ram, free = ram_gb(), shutil.disk_usage(ROOT).free / 2**30
+        print(f"This machine: {ram:.0f} GB RAM, {free:.0f} GB free disk.")
+        for size, (disk, mem) in SIZES.items():
+            print(f"  {size:6} disk {disk:8} RAM {mem}")
+        suggested = "turbo" if ram >= 16 else "small" if ram >= 8 else "base"
+    while profile == "offline":
+        choice = ask(f"Dictation model: a size, the path to a model you have, or none [{suggested}] ").strip() or suggested
+        if choice in SIZES or choice == "none" or os.path.isdir(os.path.expanduser(choice)):
+            break
+        print("Not a size and no such folder: " + choice)
+    if choice == "none":
+        model = ""
+    elif choice not in SIZES:
+        model = os.path.abspath(os.path.expanduser(choice))
+    else:
+        print(f"Downloading {choice} ({SIZES[choice][0]})...")
+        try:
+            model = download_voice_model(choice)
+        except Exception as e:
+            model = ""
+            print(f"Download failed ({e}). The mic falls back to the OS dictation; run ./notes setup again to retry.")
+    return save_settings({"profile": profile, "voice_model": model})
+
+
+def read_settings():
+    """settings.json at the repo root. Missing file or missing keys = defaults."""
+    file = ROOT / "settings.json"
+    saved = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}
+    return {k: saved.get(k, v) for k, v in SETTINGS.items()}
+
+
+def save_settings(data):
+    """Merges the known keys into settings.json. Returns the full settings."""
+    settings = read_settings()
+    settings.update({k: data[k] for k in SETTINGS if k in data})
+    if settings["profile"] not in PROFILES:
+        raise ValueError("unknown profile: " + str(settings["profile"]))
+    if not all(isinstance(v, str) for v in settings.values()):
+        raise ValueError("settings values must be strings")
+    (ROOT / "settings.json").write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return settings
+
+
+FONT_NAME = re.compile(r"[A-Za-z0-9][\w .-]*\.(woff2|ttf|otf)")
+FONT_MAGIC = (b"wOF2", b"OTTO", b"\0\1\0\0", b"true")
+
+
+def list_fonts():
+    """User fonts in fonts/ at the repo root, served as /fonts/<name>."""
+    d = ROOT / "fonts"
+    return sorted(f.name for f in d.iterdir() if f.is_file() and FONT_NAME.fullmatch(f.name)) if d.is_dir() else []
+
+
+def save_font(name, raw):
+    """Stores an uploaded font in fonts/. Rejects bad names, non-fonts and oversized files."""
+    if not FONT_NAME.fullmatch(name):
+        raise ValueError("font name not allowed (a .woff2, .ttf or .otf file name, no folders): " + name)
+    if len(raw) > BODY_LIMIT:
+        raise ValueError("font too large")
+    if not raw.startswith(FONT_MAGIC):
+        raise ValueError("not a font file: " + name)
+    d = ROOT / "fonts"
+    d.mkdir(exist_ok=True)
+    (d / name).write_bytes(raw)
+    return {"fonts": list_fonts()}
 
 
 def folder(slug):
@@ -250,6 +385,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.unquote(self.path.split("?")[0])
         try:
+            if path == "/settings":
+                self.send_response(302)
+                self.send_header("Location", "/app/settings.html")
+                return self.end_headers()
+            if path == "/api/settings":
+                return self.respond(200, read_settings())
+            if path == "/api/fonts":
+                return self.respond(200, {"fonts": list_fonts()})
             if path == "/api/index":
                 return self.respond(200, exam_index())
             if path == "/api/topics":
@@ -270,7 +413,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             raw = self.rfile.read(length)
             if path == "/api/voice":
                 lang = urllib.parse.parse_qs(query).get("lang", [None])[0]
-                return self.respond(200, transcribe(raw, lang))
+                try:
+                    return self.respond(200, transcribe(raw, lang))
+                except NoDictation as e:
+                    return self.respond(503, {"error": str(e), "fallback": True})
+            if path == "/api/settings":
+                return self.respond(200, save_settings(json.loads(raw)))
+            if path == "/api/voice-model/download":
+                return self.respond(200, save_settings({"voice_model": download_voice_model(json.loads(raw).get("size"))}))
+            if path == "/api/font":
+                return self.respond(200, save_font(urllib.parse.parse_qs(query).get("name", [""])[0], raw))
             if path == "/api/attempt":
                 data = json.loads(raw)
                 return self.respond(200, {"path": save_attempt(data["slug"], data["exam"], data["answers"])})
@@ -290,6 +442,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--setup"]:
+        print("Setup done:", json.dumps(setup()), "\nStart the app with ./notes")
+        sys.exit(0)
     if sys.argv[1:2] == ["--transcribe"]:
         print(" ".join(t for _, t in whisper(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)).strip())
         sys.exit(0)

@@ -1,5 +1,5 @@
 (() => {
-  const PAGES = [['notes', 'notes.html'], ['exams', 'exam.html']];
+  const PAGES = [['notes', 'notes.html'], ['exams', 'exam.html'], ['settings', 'settings.html']];
 
   window.mountShell = current => {
     document.body.insertAdjacentHTML('afterbegin', `

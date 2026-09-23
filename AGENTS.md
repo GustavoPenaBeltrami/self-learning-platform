@@ -1,7 +1,7 @@
 # Notes — instructions for the agent
 
 This repo is a study system: skills and agents (`agent/`), a filesystem of
-topics (`topics/<slug>/`) and a local app (`npm run app`). You are the third
+topics (`topics/<slug>/`) and a local app (`./notes`). You are the third
 window: the user studies in one, takes exams and notes in the app, and talks
 to you in this one.
 
@@ -30,7 +30,7 @@ The skills name Claude Code tools. Map them to yours:
 |---|---|
 | `AskUserQuestion` | Ask with options. Without that tool: ask a numbered question in the chat and wait for the answer. |
 | `Agent` / `subagent_type: X` | Delegate to the subagent `agent/agents/X.md`. Without subagents: follow that file yourself. |
-| `WebSearch` / `WebFetch` | Search and read the web. Without web access: say so and don't state things from memory. |
+| `WebSearch` / `WebFetch` | Search and read the web, as the topic's `sources_mode` allows (`web`, `local`, `both`). With `local` or without web access: use the local sources (`resources/` and `path` entries in `links`), say plainly what was not verified on the web, and don't state things from memory. |
 | `Read` / `Write` / `Edit` / `Grep` / `Glob` | Read, write and search files. |
 
 ## Language
