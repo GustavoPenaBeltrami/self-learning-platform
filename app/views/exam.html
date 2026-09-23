@@ -283,7 +283,7 @@ async function grade(exam, questions) {
   }
   const footer = saved.error
     ? `could not save the attempt: ${esc(saved.error)}`
-    : `run <code>notes-grade</code> on this attempt — saved to <code>${esc(saved.path)}</code>`;
+    : `run <code>slp-grade</code> on this attempt — saved to <code>${esc(saved.path)}</code>`;
 
   app.innerHTML = header(exam, questions.length, 'exam --check') + `
     ${pct !== null ? meter(pct) : ''}

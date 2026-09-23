@@ -1,6 +1,6 @@
 ---
-name: notes-init
-description: Registers a new study topic — interviews the user to fill in topic.json, creates the folder structure and progress files, writes learning.md with the Mission, runs a level diagnosis in the terminal and offers to generate the topic's dedicated teacher agent. Use when the user says "I want to start studying X", "create a new topic", "add a topic", "/notes-init".
+name: slp-init
+description: Registers a new study topic — interviews the user to fill in topic.json, creates the folder structure and progress files, writes learning.md with the Mission, runs a level diagnosis in the terminal and offers to generate the topic's dedicated teacher agent. Use when the user says "I want to start studying X", "create a new topic", "add a topic", "/slp-init".
 ---
 
 # New topic
@@ -92,10 +92,10 @@ topics/<slug>/
 |------|-----------------|--------|
 ```
 
-`learning.md`: the `notes-teach` format (Mission / Glossary / Record), with
+`learning.md`: the `slp-teach` format (Mission / Glossary / Record), with
 the **Mission already written** from `reason` + `goals` (and what's out of
 scope if they said so), an empty Glossary, and the Record with what came out
-of step 3. That way the first `notes-teach` session doesn't ask for it again.
+of step 3. That way the first `slp-teach` session doesn't ask for it again.
 
 Dates always `YYYY-MM-DD`. Don't invent data the user didn't give: an empty
 field beats an invented one.
@@ -105,7 +105,7 @@ field beats an invented one.
 In the terminal, without saving an `exam.json`: it's for locating the level,
 it's not reproducible or bankable.
 
-- Use the probing mechanics of `notes-teach` phase 1a — graded questions
+- Use the probing mechanics of `slp-teach` phase 1a — graded questions
   with `AskUserQuestion`, grading in the following message, binary search
   for the edge bounded from both sides, the same option-construction rules —
   but on the **overall level of the topic**, not a specific lesson. About
@@ -122,7 +122,7 @@ designed to fit its actual content, not a generic area template — a
 literature book calls for a literature/Spanish-language teacher,
 *Fundamentals of Software Architecture* calls for a senior architect who
 teaches, an AWS certification calls for an instructor for that cert. It's
-optional: a way to run `notes-teach` with more domain character. The memory
+optional: a way to run `slp-teach` with more domain character. The memory
 stays in the topic's `learning.md`; the agent keeps no memory of its own.
 `area` still exists in `topic.json` as context/tone data; it no longer
 bounds the agent's scope.
@@ -141,7 +141,7 @@ bounds the agent's scope.
 ```md
 ---
 name: teacher-<topic-slug>
-description: <concrete persona> specialized in <topic title>. Teaches this topic following notes-teach, with the tone and judgment of <who>. Use for lessons, explanations or grading on the "<topic-slug>" topic.
+description: <concrete persona> specialized in <topic title>. Teaches this topic following slp-teach, with the tone and judgment of <who>. Use for lessons, explanations or grading on the "<topic-slug>" topic.
 tools: Read, Grep, Glob, Write, Edit, WebSearch, WebFetch
 model: inherit
 ---
@@ -156,7 +156,7 @@ it before teaching.
 
 ## How you teach
 
-Follow `agent/skills/notes-teach/SKILL.md` in full: the two principles,
+Follow `agent/skills/slp-teach/SKILL.md` in full: the two principles,
 probe → plan → teach, the rules for graded questions, where the lesson ends
 up. It's not a parallel process: it's the same one with your personality.
 
@@ -168,7 +168,7 @@ up. It's not a parallel process: it's the same one with your personality.
   `links` (URLs and local `path`s) plus `resources/`. With `local`, or with no
   connection, use only local sources and say plainly "not verified on the web"
   for anything you couldn't check there. A missing path: warn and continue.
-- **When sources disagree, you decide.** Apply the `notes-teach` rule: the
+- **When sources disagree, you decide.** Apply the `slp-teach` rule: the
   topic's material wins unless outdated for the Mission, cite what you used,
   record it in the Record — don't flag the conflict in the chat.
 - Typical traps in this topic: <1-2 frequent misconceptions, if any>.
@@ -187,9 +187,9 @@ don't give the answer before they try.
      own state?
 6. **Existing topics without a teacher**: if `topics/*/topic.json` has other
    topics already registered without `agent/agents/teacher-<slug>.md`, there's
-   no need to solve it here — `/notes-session` detects them when surveying
+   no need to solve it here — `/slp-session` detects them when surveying
    state and offers them with the same criterion, so old topics get one
-   without re-running `notes-init` for each.
+   without re-running `slp-init` for each.
 
 **Pedagogical basis for point 4** (researched before writing the template,
 not blindly): Khanmigo's Socratic tutor never solves — it asks what the
@@ -206,5 +206,5 @@ the attempt.
 ## 5. Wrap up
 
 Show in a few lines where everything ended up, what came out of the
-diagnosis, and **one** suggested first step: read and `notes-summarize`, or
-straight to `notes-teach` if they already have a foundation.
+diagnosis, and **one** suggested first step: read and `slp-summarize`, or
+straight to `slp-teach` if they already have a foundation.

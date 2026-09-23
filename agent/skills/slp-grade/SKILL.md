@@ -1,13 +1,13 @@
 ---
-name: notes-grade
-description: Grades an exam or exercise attempt — checks each rubric or prompt point, writes the feedback next to the attempt, updates learning.md and the topic's progress. Use when the user says "grade this attempt", "how did I do", "grade my exercise", "/notes-grade", or after taking an exam with non-MC questions in exam.html or submitting an exercise from notes-exercises.
+name: slp-grade
+description: Grades an exam or exercise attempt — checks each rubric or prompt point, writes the feedback next to the attempt, updates learning.md and the topic's progress. Use when the user says "grade this attempt", "how did I do", "grade my exercise", "/slp-grade", or after taking an exam with non-MC questions in exam.html or submitting an exercise from slp-exercises.
 ---
 
 # Grade
 
 An attempt without feedback is practice in the dark. This skill closes the loop:
 it compares what was submitted against what was asked, says what's missing (not "it's wrong"), and
-leaves everything recorded so `notes-review` and the next session can use it.
+leaves everything recorded so `slp-review` and the next session can use it.
 
 ## Which attempt to grade
 
@@ -58,7 +58,7 @@ each other doesn't pass even if it mentions the right words. Format *teach*: it'
 graded the same as an `oral` answer.
 
 Before judging a factual answer, read the `Source choice` entries in the
-Record of the topic's `learning.md` (format in `notes-teach`, Record rule 5).
+Record of the topic's `learning.md` (format in `slp-teach`, Record rule 5).
 If one covers the claim, grade against the version that was taught, even if
 another source says otherwise: the student shouldn't lose points for learning
 what they were taught.
@@ -67,7 +67,7 @@ If something you're about to mark as correct isn't in the notes, in
 `resources/` or in a local `path` source from `topic.json` (a missing path:
 warn and continue), and you have even the slightest doubt, verify it with the `researcher`
 subagent before marking it. If sources disagree and no entry covers the claim,
-resolve it the same way `notes-teach` does (topic material wins unless outdated
+resolve it the same way `slp-teach` does (topic material wins unless outdated
 with respect to the Mission), without flagging it in the chat, and record the
 choice in the Record.
 
@@ -97,7 +97,7 @@ Feedback: on the right track, but the complete answer needs the security side to
   the `Source choice` entry names when there is one.
 
 **2. The topic's `learning.md`** — same Record rules as
-`notes-teach`: what goes in is whatever reveals a **misconception** (what they
+`slp-teach`: what goes in is whatever reveals a **misconception** (what they
 believed and what it actually is) or a non-trivial demonstration of understanding. In exercises
 it counts double: a misconception that survives all the way to producing an artifact
 is more serious than one that only shows up in a short answer. Getting the
@@ -132,4 +132,4 @@ but not taken isn't recorded).
 
 Three or four lines: score or criteria met, the weakest point, and **a single**
 concrete recommendation of what to reinforce before the next attempt (the right
-skill: `notes-teach`, `notes-exercises` or `notes-review`).
+skill: `slp-teach`, `slp-exercises` or `slp-review`).

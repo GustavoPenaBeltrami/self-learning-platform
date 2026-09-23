@@ -3,7 +3,7 @@
 
   window.key = (k, text, extra = '') => `<button class="key ${extra}"><kbd>${k}</kbd><span>${text}</span></button>`;
 
-  window.noTopicsRow = cols => `<tr><td></td><td class="wide" colspan="${cols}"><span class="sub">no topics yet: ask your agent to "create a new topic" (notes-init)</span></td></tr>`;
+  window.noTopicsRow = cols => `<tr><td></td><td class="wide" colspan="${cols}"><span class="sub">no topics yet: ask your agent to "create a new topic" (slp-init)</span></td></tr>`;
 
   window.mountShell = current => {
     document.body.insertAdjacentHTML('afterbegin', `

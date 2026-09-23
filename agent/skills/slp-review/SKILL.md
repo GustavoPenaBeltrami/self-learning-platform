@@ -1,6 +1,6 @@
 ---
-name: notes-review
-description: Builds a spaced, interleaved review with Leitner cards — mixes topics, prioritizes what failed or sits in the fast box, and rewrites the questions so they require recall rather than recognition. Use when the user says "review", "/notes-review", "how long since I last saw this", "I'm forgetting this", "quiz me", or when they finished a block and it's worth consolidating before moving on.
+name: slp-review
+description: Builds a spaced, interleaved review with Leitner cards — mixes topics, prioritizes what failed or sits in the fast box, and rewrites the questions so they require recall rather than recognition. Use when the user says "review", "/slp-review", "how long since I last saw this", "I'm forgetting this", "quiz me", or when they finished a block and it's worth consolidating before moving on.
 ---
 
 # Notes review
@@ -21,7 +21,7 @@ This skill produces that difficulty in three ways, and all three are mandatory:
 ## Where it writes
 
 `topics/review/exams/YYYY-MM-DD/exam.json` (same folder structure as any exam —
-see `notes-exam`). Attempts go in `topics/review/exams/YYYY-MM-DD/attempts/`,
+see `slp-exam`). Attempts go in `topics/review/exams/YYYY-MM-DD/attempts/`,
 same as in any other topic.
 
 It's just another topic: if `topics/review/` doesn't exist, create the folder
@@ -32,7 +32,7 @@ lists.
 { "title": "Review", "subtitle": "Spaced and interleaved", "type": "review", "order": 0, "links": [] }
 ```
 
-The exam format is `notes-exam`'s, and **its option-construction rules apply in
+The exam format is `slp-exam`'s, and **its option-construction rules apply in
 full** — above all, write the correct statement first and mutate it into each
 distractor. Don't repeat them here: read that skill.
 

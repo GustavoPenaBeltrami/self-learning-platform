@@ -1,15 +1,15 @@
 ---
-name: notes-session
-description: Entry point of a study session — surveys the state of every topic (overdue reviews, ungraded attempts, topics without exercises, incomplete topic.json files), asks what the user wants to do today and hands off to the right skill. Use when the user says "let's start", "what do I study today", "what's pending", "/notes-session", "I want to log that…", or opens a session with no concrete request.
+name: slp-session
+description: Entry point of a study session — surveys the state of every topic (overdue reviews, ungraded attempts, topics without exercises, incomplete topic.json files), asks what the user wants to do today and hands off to the right skill. Use when the user says "let's start", "what do I study today", "what's pending", "/slp-session", "I want to log that…", or opens a session with no concrete request.
 ---
 
 # Session
 
 It orchestrates; it doesn't write. This skill does not write to `progress/`:
-each skill that produces an event (`notes-teach`, `notes-grade`, `notes-review`)
+each skill that produces an event (`slp-teach`, `slp-grade`, `slp-review`)
 writes its own. If the user comes to "log that they finished chapter X", hand
 them off to the skill that matches that event, or update the topic's `status.md`
-following the rules of `notes-teach` if it was reading only.
+following the rules of `slp-teach` if it was reading only.
 
 ## 1. Survey (don't ask anything yet)
 
@@ -21,7 +21,7 @@ Read from the filesystem, not from memory:
   (`.json` for exams; any extension for exercises) without its companion
   `<date>.md`. Careful: in exercises the artifact itself can be `.md`; it is
   pending if it's the only file with that date.
-- **Overdue reviews**: apply the Leitner-box criterion from `notes-review`
+- **Overdue reviews**: apply the Leitner-box criterion from `slp-review`
   (read that skill, don't reimplement it differently) over
   `topics/*/progress/log.md` and the attempts. Also count topics with
   everything retired whose weekly maintenance review is overdue.
@@ -44,7 +44,7 @@ If any topic has empty `goals` or `reason`, offer to fill them in now
 same. If not, move on: it doesn't block the session.
 
 For each topic without `agent/agents/teacher-<slug>.md` (surveyed in step
-1), offer to generate it with the same criterion as `notes-init` §4 (a persona
+1), offer to generate it with the same criterion as `slp-init` §4 (a persona
 designed for that specific topic, default yes, that section's template and
 check). One at a time if there are several; it doesn't block the session if
 the user says no.
@@ -58,12 +58,12 @@ With `AskUserQuestion`, in a single round:
 
 | Option | Hands off to |
 |---|---|
-| Read / summarize | `notes-summarize` |
-| Get taught something specific | `notes-teach` |
-| Take an exam | `notes-exam` (or `exam.html` if it already exists) |
-| Do an applied exercise | `notes-exercises` |
-| Grade a pending attempt | `notes-grade` |
-| Review | `notes-review` |
+| Read / summarize | `slp-summarize` |
+| Get taught something specific | `slp-teach` |
+| Take an exam | `slp-exam` (or `exam.html` if it already exists) |
+| Do an applied exercise | `slp-exercises` |
+| Grade a pending attempt | `slp-grade` |
+| Review | `slp-review` |
 | Go over existing notes | open `topics/<topic>/notes/` in the app |
 | Leave it, I'll go on alone | nothing |
 
@@ -75,7 +75,7 @@ was already asked here.
 
 If the destination is "Get taught something specific" and the topic has
 `agent/agents/teacher-<slug>.md`, invoke that agent (`Agent`,
-`subagent_type: teacher-<slug>`) instead of running `notes-teach` in the
+`subagent_type: teacher-<slug>`) instead of running `slp-teach` in the
 main session — the agent follows the same process, with more domain
 character.
 

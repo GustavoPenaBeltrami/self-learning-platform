@@ -1,6 +1,6 @@
 ---
-name: notes-teach
-description: Teaches a topic so it ends up understood, not memorized — probes the real level with graded questions, builds a plan as a dependency graph, and constructs it node by node from unconditional truths. Use ALWAYS when something needs explaining, from a one-line clarification to a long session. Triggers on "/notes-teach", "teach me", "explain", "I don't get it", "quiz me on the topic", or when the user pastes study material and asks to understand it.
+name: slp-teach
+description: Teaches a topic so it ends up understood, not memorized — probes the real level with graded questions, builds a plan as a dependency graph, and constructs it node by node from unconditional truths. Use ALWAYS when something needs explaining, from a one-line clarification to a long session. Triggers on "/slp-teach", "teach me", "explain", "I don't get it", "quiz me on the topic", or when the user pastes study material and asks to understand it.
 ---
 
 # Teach
@@ -138,7 +138,7 @@ with the phases below.
 | Question **without a correct answer** (what they want, where we're headed) | `AskUserQuestion` alone, with no grading afterwards |
 | Verify a fact or survey a topic | `researcher` subagent (tool `Agent`, `subagent_type: "researcher"`) |
 | Diagram or formula | a ```mermaid or ```math fence in the note — `notes.html` renders them |
-| Long battery of questions to take later | skill `notes-exam` → `topics/<topic>/exams/<slug>/exam.json` |
+| Long battery of questions to take later | skill `slp-exam` → `topics/<topic>/exams/<slug>/exam.json` |
 | Leave the lesson written down | a new `.md` in `topics/<topic>/notes/` (see *Where the lesson goes*) |
 | Record that the topic moved forward | update `topics/<topic>/progress/status.md` directly (see *Where the lesson goes*, step 6) |
 
@@ -217,7 +217,7 @@ Rules for each part:
      `Source choice: <claim>`, then three lines: `Taught:` the version and its
      source, `Not taught:` the other version and its source, `Why:` the
      tie-break that decided it. This is the canonical format: `researcher`
-     and `notes-grade` point here. Before resolving a conflict, look for an
+     and `slp-grade` point here. Before resolving a conflict, look for an
      existing entry on the same claim and follow it, so the topic stays
      consistent.
 
@@ -235,7 +235,7 @@ Answering well at the end of the lesson measures fluency, and gives an illusory
 sense of mastery. Retention is built with desirable difficulty: retrieving from
 memory instead of recognizing, spacing over time, and interleaving related
 topics. That is why a node check doesn't close the topic — the real closure is
-spaced review, which lives in the `notes-review` skill.
+spaced review, which lives in the `slp-review` skill.
 
 To acquire **knowledge**, difficulty is the enemy: it eats the working memory
 needed to understand. To consolidate a **skill**, difficulty is the tool. Don't
@@ -502,12 +502,12 @@ cuts it off):
 4. Update `topics/<topic>/learning.md`: terms they can already use go to the
    glossary, and whatever qualifies under the five rules goes to the Record. If
    the session produced neither, write nothing: covering is not learning.
-5. If there are questions worth taking again later, switch to the `notes-exam`
+5. If there are questions worth taking again later, switch to the `slp-exam`
    skill instead of putting them in the note.
 6. Update `topics/<topic>/progress/status.md` directly (current unit, whether a
    written summary exists): date always `YYYY-MM-DD`, never relative; if a piece
    of data is missing to complete the row, ask once and all together; don't
-   invent grades or dates. Remind the user that spaced review (`notes-review`) is
+   invent grades or dates. Remind the user that spaced review (`slp-review`) is
    what turns this into retention.
 
 ## If the request is small

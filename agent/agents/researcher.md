@@ -60,7 +60,7 @@ otherwise **the topic's own material wins, unless it is outdated with respect
 to the Mission**. The chosen version carries its source like any finding. Put
 the other version under **Discarded** with its source and the tie-break that
 ruled it out, so the caller can record the choice in `learning.md` in the
-format defined in `agent/skills/notes-teach/SKILL.md` (Record, rule 5).
+format defined in `agent/skills/slp-teach/SKILL.md` (Record, rule 5).
 
 ## Deliverable
 

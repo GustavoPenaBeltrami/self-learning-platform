@@ -2,7 +2,7 @@
 
 <!-- omit in toc -->
 
-# TomaNota 📚
+# SLP: SelfLearningPlatform 📚
 
 <strong>An agent-powered hub for self-learners</strong>
 
@@ -21,8 +21,8 @@ A book, a certification, a tool's documentation, a course: everything you study 
 
 | Command | What it does |
 |---|---|
-| `/notes-init` | Sets up a topic: interview, structure, level check |
-| `/notes-session` | What's pending today across all topics, and what to do |
+| `/slp-init` | Sets up a topic: interview, structure, level check |
+| `/slp-session` | What's pending today across all topics, and what to do |
 
 ## Why Notes
 
@@ -71,7 +71,7 @@ Notes is used with three windows side by side:
 | 2 | **The app** | The notebook at `localhost:8321`. Exams are in the nav bar. |
 | 3 | **The agent** | Open at the repo root. Teaches, builds exams, grades. |
 
-Then the loop: `/notes-teach` or `/notes-summarize` to prepare, `/notes-exam` and `/notes-exercises` to practice (you sit them in window 2), `/notes-grade` for feedback and `/notes-review` so it doesn't fade away. Everything they produce lands in `topics/<slug>/` and shows up in the app on its own.
+Then the loop: `/slp-teach` or `/slp-summarize` to prepare, `/slp-exam` and `/slp-exercises` to practice (you sit them in window 2), `/slp-grade` for feedback and `/slp-review` so it doesn't fade away. Everything they produce lands in `topics/<slug>/` and shows up in the app on its own.
 
 `topics/example/` shows the structure. Your real topics stay out of git.
 
@@ -118,7 +118,7 @@ Setup is the step meant for the network. It fetches the Python packages, asks fo
 Open your agent in the folder and ask it:
 
 ```
-Read AGENTS.md and run notes-setup-agent.
+Read AGENTS.md and run slp-setup-agent.
 ```
 
 It detects which agent it is and exposes the skills in that agent's format — symlinks if it supports them, conversion if not. Whatever it creates goes to `.git/info/exclude`, so it doesn't clutter the repo. Then start the app:
@@ -137,9 +137,9 @@ git remote set-url origin <your-repo>
 
 **Online or offline?** The Online profile (a paid agent) is recommended. To run everything on your machine, use opencode + Ollama + `qwen3-coder:30b` (or `gpt-oss:20b` on 16 GB of RAM).
 
-**Roadmap:** test `notes-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/Notas/issues).
+**Roadmap:** test `slp-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/Notas/issues).
 
-**Thanks to** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `notes-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory and spaced review.
+**Thanks to** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `slp-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory and spaced review.
 
 ## Contributing
 

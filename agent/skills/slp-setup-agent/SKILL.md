@@ -1,6 +1,6 @@
 ---
-name: notes-setup-agent
-description: Sets up this project for the agent that is using it (Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, or any other, with a cloud model or a local one via Ollama) — exposes the skills and agents in agent/ in the agent's native format, without touching anything versioned; reads the Profile in settings.json to recommend the paid agents (Online) or the Reference stack (Offline). Use the first time the repo is opened with a new agent, or when the user says "set up the project", "install the skills", "/notes-setup-agent".
+name: slp-setup-agent
+description: Sets up this project for the agent that is using it (Claude Code, Codex, Gemini CLI, Antigravity, Cline, Cursor, opencode, or any other, with a cloud model or a local one via Ollama) — exposes the skills and agents in agent/ in the agent's native format, without touching anything versioned; reads the Profile in settings.json to recommend the paid agents (Online) or the Reference stack (Offline). Use the first time the repo is opened with a new agent, or when the user says "set up the project", "install the skills", "/slp-setup-agent".
 ---
 
 # Agent setup
@@ -70,7 +70,7 @@ and put this in `opencode.json`:
 ```
 
 Warn the user that a small local model may not be able to
-sustain long skills like `notes-teach`.
+sustain long skills like `slp-teach`.
 
 ## 2. Expose, in this order of preference
 
@@ -107,10 +107,10 @@ git status --short           # nothing new must show up
 
 ## 4. Verify
 
-- Your tool lists `notes-session` (or, at level 1, you can read
-  `agent/skills/notes-session/SKILL.md`).
+- Your tool lists `slp-session` (or, at level 1, you can read
+  `agent/skills/slp-session/SKILL.md`).
 - `git status --short` shows nothing that wasn't there before.
 
 Close with a three-line summary: which level you used, which paths you
-created, and "start with `notes-session`". If the tool needs a restart to see
+created, and "start with `slp-session`". If the tool needs a restart to see
 the skills, say so.

@@ -1,6 +1,6 @@
 ---
-name: notes-summarize
-description: Summarizes a text (pasted, attached, or from the topic's resources/) and appends it to a note in topics/*/notes/*.md, in the topic's configured notes language unless the user asks for another. Use when the user says "summarize this", "/notes-summarize", "add this summary to the note", or pastes/attaches a fragment of a book/article to condense.
+name: slp-summarize
+description: Summarizes a text (pasted, attached, or from the topic's resources/) and appends it to a note in topics/*/notes/*.md, in the topic's configured notes language unless the user asks for another. Use when the user says "summarize this", "/slp-summarize", "add this summary to the note", or pastes/attaches a fragment of a book/article to condense.
 ---
 
 # Summarize

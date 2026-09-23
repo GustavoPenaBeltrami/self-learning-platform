@@ -1,5 +1,5 @@
 ---
-name: notes-exam
+name: slp-exam
 description: Builds a JSON exam from raw content the user pastes (a book chapter, documentation, a certification guide), auditing it first against the topic's progress. Use when the user pastes pages, a chapter, an extracted PDF or their own summary and asks for an exam, a quiz, questions, or says "quiz me on this", "give me an exam on this".
 ---
 
@@ -67,7 +67,7 @@ four: they may not have a microphone or may not want to record oral answers.
 - Distribute only among the types they confirmed. If they chose just one, the
   exam is 100% that type.
 - `oral` is answered by recording audio (same mechanism as the notebook
-  dictation); `notes-grade` grades it on the transcription, just like
+  dictation); `slp-grade` grades it on the transcription, just like
   `open`.
 
 ## How questions are written
@@ -164,10 +164,10 @@ chance of being wrong.
    `open`/`oral`/`practical`: check that it has a `rubric` with 3-5 points.
 3. Tell the user the path and to open it with `./start learning`.
 4. If the exam has non-MC questions, let them know that after taking it they'll need to
-   run `notes-grade` on the attempt — `exam.html` can't grade
+   run `slp-grade` on the attempt — `exam.html` can't grade
    `open`/`oral`/`practical` on its own.
 5. Don't record anything in `progress/log.md` when creating the exam: that's done by
-   `notes-grade` when the user takes the exam and grades the attempt, not before.
+   `slp-grade` when the user takes the exam and grades the attempt, not before.
 
 For a spaced review that mixes topics instead of a single-chapter exam,
-the skill is `notes-review`, which reuses these same construction rules.
+the skill is `slp-review`, which reuses these same construction rules.

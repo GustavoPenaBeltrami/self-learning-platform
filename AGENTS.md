@@ -8,7 +8,7 @@ to you in this one.
 ## First time
 
 If your tool doesn't see the skills in `agent/skills/` as its own yet, read
-`agent/skills/notes-setup-agent/SKILL.md` and follow it. It configures the
+`agent/skills/slp-setup-agent/SKILL.md` and follow it. It configures the
 project for you without touching anything under version control.
 
 ## Skills
@@ -16,7 +16,7 @@ project for you without touching anything under version control.
 Each skill is `agent/skills/<name>/SKILL.md` (Agent Skills format:
 `name` + `description` frontmatter, instructions below). If your tool doesn't
 load skills on its own, whenever a request matches a `description`, read that
-whole `SKILL.md` and follow it. The entry point is `notes-session`.
+whole `SKILL.md` and follow it. The entry point is `slp-session`.
 
 The agents in `agent/agents/*.md` are subagents: `researcher` and one
 `teacher-<slug>` per topic. Without subagents, read the file and do its work

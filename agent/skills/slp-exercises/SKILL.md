@@ -1,13 +1,13 @@
 ---
-name: notes-exercises
-description: Builds an applied exercise on a topic — forces producing an artifact (code, ADR, critique, explanation) instead of answering questions. Use when the user says "I want an exercise", "do something practical with this", "apply what I learned", "/notes-exercises", or when notes-session detects a topic with notes but no exercises.
+name: slp-exercises
+description: Builds an applied exercise on a topic — forces producing an artifact (code, ADR, critique, explanation) instead of answering questions. Use when the user says "I want an exercise", "do something practical with this", "apply what I learned", "/slp-exercises", or when slp-session detects a topic with notes but no exercises.
 ---
 
 # Exercises
 
 An exam tests whether something was understood. An exercise forces you to **use** the
 concept to produce something new. It's the difference between recognizing/recalling and
-reasoning with it. This skill builds the prompt; grading belongs to `notes-grade`.
+reasoning with it. This skill builds the prompt; grading belongs to `slp-grade`.
 
 ## Where it writes
 
@@ -74,6 +74,6 @@ exercise. Chat with the user in the language the user writes in.
    - `topics/<topic>/exercises/<slug>/attempts/<YYYY-MM-DDTHHmm>.<ext>` — `.md`
      for ADR/critique/explanation, the language's extension if it's code, `.md`
      with the transcription if it was oral (via `/api/voice`).
-   - When they submit it, `notes-grade` gives the feedback and records the progress.
+   - When they submit it, `slp-grade` gives the feedback and records the progress.
      This skill doesn't write to `progress/`: an unsubmitted exercise isn't an
      event.
