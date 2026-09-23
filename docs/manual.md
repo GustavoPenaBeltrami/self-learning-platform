@@ -5,16 +5,16 @@ Full reference. The introduction is in the [README](../README.md).
 ## Getting started
 
 ```sh
-npm run app      # opens the notebooks; exams are in the nav
+./notes          # opens the notebooks; exams are in the nav (Windows: notes)
 ```
 
 Starts the server at `http://localhost:8321/` and opens `notes.html`. If one is
-already running, it opens the tab and exits. No `npm install` and no build: it runs on the Python stdlib.
-The only exception is dictation: `npm run app` starts with `uv run`, which reads
+already running, it opens the tab and exits. No install step and no build: it runs on the Python stdlib.
+The only exception is dictation: `./notes` starts with `uv run`, which reads
 the dependencies from the header of `app/server.py` and downloads the right one
 the first time — `mlx-whisper` (GPU) on Apple Silicon Macs, `faster-whisper` (CPU)
 on Linux, Windows and Intel Macs. On CPU it uses the `small` model; for another one,
-`NOTES_VOICE_MODEL=turbo npm run app`. On Windows ARM, dictation needs x64 Python
+`NOTES_VOICE_MODEL=turbo ./notes`. On Windows ARM, dictation needs x64 Python
 (emulated): `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server.py app/notes.html`.
 Without `uv`, `python3 app/server.py app/notes.html` starts everything except dictation.
 
@@ -22,7 +22,8 @@ Without `uv`, `python3 app/server.py app/notes.html` starts everything except di
 
 ```
 README.md            The introduction.
-package.json         `npm run app`. No dependencies.
+notes, notes.cmd     Launcher: `./notes` (or `./notes app`) starts the app; `notes` on Windows.
+LICENSE              MIT.
 AGENTS.md            Entry point for any agent: where the skills are and how to map tools.
 agent/
     skills/          The skills below. Single source, for any agent.

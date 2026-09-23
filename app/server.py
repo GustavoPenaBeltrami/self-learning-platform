@@ -9,7 +9,7 @@
 """Local server for the study system. Stdlib only: python3 app/server.py
 
 Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
-faster-whisper everywhere else. `npm run app` (uv run) brings the right one;
+faster-whisper everywhere else. `./notes` (uv run) brings the right one;
 without it everything works except the microphone.
 """
 import base64, datetime, hashlib, http.server, json, os, pathlib, re, sys, threading, urllib.parse, webbrowser
@@ -42,7 +42,7 @@ def whisper(audio, lang):
     try:
         import faster_whisper
     except ImportError:
-        raise ValueError("dictation engine missing, start with npm run app")
+        raise ValueError("dictation engine missing, start with ./notes")
     if isinstance(audio, str):
         audio = faster_whisper.decode_audio(audio)
     try:
@@ -63,7 +63,7 @@ def transcribe(raw, lang=None):
     try:
         import numpy   # in here: the rest of the server doesn't need it
     except ImportError:
-        raise ValueError("dictation engine missing, start with npm run app")
+        raise ValueError("dictation engine missing, start with ./notes")
     with voice_lock:   # ponytail: one transcription at a time, there is a single user
         segments = whisper(numpy.frombuffer(raw, dtype="<f4"), lang)
     # segments [start_s, text]: live dictation pins the old ones and trims the audio there
