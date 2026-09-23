@@ -71,3 +71,7 @@ _Avoid_: Search mode, research setting
 **Online feature**:
 A capability that uses the network, such as web search; preferred when a connection exists, with local resources as the fallback, and never required by the core.
 _Avoid_: Cloud feature
+
+**Attempt**:
+One sitting of an exam, or one submission of an exercise, saved under its `attempts/` folder and named by the minute it was made; exam answers point at questions by their position in the exam, whatever order they were shown in. An attempt is pending until its feedback is written next to it.
+_Avoid_: Submission, try, result

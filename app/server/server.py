@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.9"
-# dependencies = [
-#   "mlx-whisper; sys_platform == 'darwin' and platform_machine == 'arm64'",
-#   "faster-whisper; sys_platform != 'win32' or platform_machine != 'ARM64'",
-# ]
-# ///
 """Local server for the study system. Stdlib only: python3 app/server/server.py
 
 Dictation is the only thing that needs more: mlx-whisper on Apple Silicon Macs,
-faster-whisper everywhere else. `./start learning` (uv run) brings the right one;
+faster-whisper everywhere else. `uv run slp` brings the right one;
 without it everything works except the microphone.
 """
 import base64, datetime, hashlib, http.server, json, os, pathlib, platform, re, shutil, socket, sys, threading, urllib.parse, webbrowser
@@ -74,7 +67,7 @@ def download_voice_model(size):
     try:
         from huggingface_hub import snapshot_download
     except ImportError:
-        raise NoDictation("dictation engine missing, run ./start learning")
+        raise NoDictation("dictation engine missing, run uv run slp")
     snapshot_download(repo_id=MODELS[size][ENGINE], local_dir=str(model_dir(size)))
     return str(model_dir(size))
 
@@ -84,7 +77,7 @@ def whisper(audio, lang):
     try:
         import faster_whisper
     except ImportError:
-        raise NoDictation("dictation engine missing, run ./start learning")
+        raise NoDictation("dictation engine missing, run uv run slp")
     if isinstance(audio, str):
         audio = faster_whisper.decode_audio(audio)
     try:
@@ -111,7 +104,7 @@ def transcribe(raw, lang=None):
     try:
         import numpy   # in here: the rest of the server doesn't need it
     except ImportError:
-        raise NoDictation("dictation engine missing, run ./start learning")
+        raise NoDictation("dictation engine missing, run uv run slp")
     with voice_lock:   # ponytail: one transcription at a time, there is a single user
         segments = whisper(numpy.frombuffer(raw, dtype="<f4"), lang)
     # segments [start_s, text]: live dictation pins the old ones and trims the audio there
@@ -186,7 +179,7 @@ def setup(ask=input):
             model = download_voice_model(choice)
         except Exception as e:
             model = ""
-            print(f"Download failed ({e}). The mic falls back to the OS dictation; run ./start setup again to retry.")
+            print(f"Download failed ({e}). The mic falls back to the OS dictation; run uv run slp setup again to retry.")
     return save_settings({"profile": profile, "voice_model": model})
 
 
@@ -393,6 +386,15 @@ def save_attempt(slug, exam, answers):
     (attempts/<date>-p<i>.<ext>); the JSON keeps the name, not the base64.
     """
     c = exam_folder(folder(slug), exam)
+    questions = json.loads((c / "exam.json").read_text(encoding="utf-8")).get("questions", [])
+    seen = set()
+    for a in answers:
+        i = a.get("i")
+        if type(i) is not int or not 0 <= i < len(questions) or i in seen:
+            raise ValueError(f"bad question index: {i!r}")
+        seen.add(i)
+        a["type"] = questions[i].get("type", "multiple_choice")
+    answers = sorted(answers, key=lambda a: a["i"])
     attempts = c / "attempts"
     attempts.mkdir(exist_ok=True)
     date = datetime.datetime.now().strftime("%Y-%m-%dT%H%M")
@@ -489,26 +491,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         pass  # ponytail: no console noise; remove the pass to debug
 
 
-if __name__ == "__main__":
-    if sys.argv[1:2] == ["--setup"]:
-        print("Setup done:", json.dumps(setup()), "\nStart the app with ./start learning")
-        sys.exit(0)
-    if sys.argv[1:2] == ["--transcribe"]:
-        print(" ".join(t for _, t in whisper(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)).strip())
-        sys.exit(0)
+def main(args=None):
+    args = sys.argv[1:] if args is None else args
+    if args[:1] == ["setup"]:
+        print("Setup done:", json.dumps(setup()), "\nStart the app with uv run slp")
+        return
+    if args[:1] == ["transcribe"]:
+        print(" ".join(t for _, t in whisper(args[1], args[2] if len(args) > 2 else None)).strip())
+        return
+    if args:
+        sys.exit("usage: slp [setup | transcribe <audio> [lang]]")
     print(f"Profile: {active_profile()}")
-    page = sys.argv[1] if len(sys.argv) > 1 else ""
-    url = f"http://localhost:{PORT}/{page}"
+    url = f"http://localhost:{PORT}/app/views/notes.html"
     try:
         server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     except OSError:
         # ponytail: a server is already up, just open the page
         print(f"A server was already running on {PORT}. Opening {url}")
         webbrowser.open(url)
-        sys.exit(0)
+        return
     print(f"Study app at {url}  (ctrl+c to stop)")
     webbrowser.open(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nServer stopped.")  # ctrl+c without traceback
+
+
+if __name__ == "__main__":
+    main()

@@ -12,7 +12,8 @@ leaves everything recorded so `slp-review` and the next session can use it.
 ## Which attempt to grade
 
 An attempt is **pending** when `attempts/<date>.<ext>` exists without its
-companion `attempts/<date>.md`. If the user doesn't say which one, look in
+companion `attempts/<date>.md`. `<date>` is exactly `YYYY-MM-DDTHHmm`: files
+named `<date>-p<i>.<ext>` are the audio of an exam attempt, not attempts. If the user doesn't say which one, look in
 `topics/*/exams/*/attempts/` and `topics/*/exercises/*/attempts/`; if there's
 only one, grade that one; if there are several, ask with `AskUserQuestion`.
 
@@ -29,6 +30,8 @@ The only thing that changes is what you compare against.
 
 **Exam attempt** — read `exams/<slug>/attempts/<date>.json` (raw),
 `exams/<slug>/exam.json` (questions and rubrics) and the relevant `notes/*.md`.
+Each answer's `i` is the 0-based position of its question in `exam.json`
+(not the shuffled order the student saw), and its `type` is copied from that question.
 - `multiple_choice`: already graded by the client; recompute the score
   comparing `chosen` with `answer` and list the missed ones with their `explanation`.
 - `open`, `practical`: check the answer against **each point**
@@ -41,7 +44,7 @@ The only thing that changes is what you compare against.
   exam was actually written in if the user overrode it):
 
   ```bash
-  uv run app/server/server.py --transcribe \
+  uv run slp transcribe \
       topics/<slug>/exams/<exam>/attempts/<audio-file> [lang]
   ```
 

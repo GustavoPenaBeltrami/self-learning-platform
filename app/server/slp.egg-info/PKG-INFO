@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: slp
+Version: 0.1.0
+Summary: SLP: SelfLearningPlatform, an agent-powered hub for self-learners
+Requires-Python: >=3.9
+License-File: LICENSE
+Requires-Dist: mlx-whisper; sys_platform == "darwin" and platform_machine == "arm64"
+Requires-Dist: faster-whisper; sys_platform != "win32" or platform_machine != "ARM64"
+Dynamic: license-file

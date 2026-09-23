@@ -91,17 +91,17 @@ Each topic's `topic.json` has a `language` block that sets the defaults: `source
 - **git**, to clone the repo.
 - **A coding agent**, whichever you use.
 - **A browser** with a microphone for dictation and oral exams.
-- **Internet mainly for `./start setup`**, which downloads the packages and the voice model. After that it aims to work offline: Mermaid, KaTeX and the reading fonts ship in the repo (`app/vendor/`).
+- **Internet mainly for the first `uv run slp` and `uv run slp setup`**, which download the packages and the voice model. After that it aims to work offline: Mermaid, KaTeX and the reading fonts ship in the repo (`app/vendor/`).
 
 ### Platforms
 
 | System | Dictation | Disk (packages + model) | How to start it |
 |---|---|---|---|
-| macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `./start learning` |
-| macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `./start learning` (Windows: `.\start learning`) |
-| Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none --with faster-whisper app/server/server.py app/views/notes.html` |
+| macOS Apple Silicon | mlx-whisper, on the GPU | ~2.7 GB | `uv run slp` |
+| macOS Intel, Linux x64, Windows x64 | faster-whisper, on the CPU | ~0.7 GB | `uv run slp` |
+| Windows ARM | faster-whisper, with emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none slp` |
 
-`./start learning` runs `uv run --offline app/server/server.py app/views/notes.html`: it never touches the network, and if setup never ran it falls back to `python3`, which starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`.
+`uv run slp` installs the packages into `.venv/` the first time and starts the app; after that it runs offline from the lockfile. Without uv, `python3 app/server/server.py` starts everything except dictation. On CPU, dictation uses the `small` model; on a powerful machine, `turbo` makes it more accurate. Pick the model size in `/settings`.
 
 Without a dictation engine or model, the microphone points you to your OS dictation instead.
 
@@ -110,7 +110,7 @@ Without a dictation engine or model, the microphone points you to your OS dictat
 ```sh
 git clone https://github.com/GustavoPenaBeltrami/Notas.git
 cd Notas
-./start setup        # Windows: .\start setup
+uv run slp setup
 ```
 
 Setup is the step meant for the network. It fetches the Python packages, asks for your **profile** — Auto (recommended: Online when there is a connection, Offline when not), Online (downloads the largest dictation model, turbo, ~1.6 GB) or Offline (pick a size that fits your RAM and disk, the path to a model you already have, or none) — and writes the choices to `settings.json`. Running it again offers to keep them. Skipping it only costs dictation.
@@ -124,7 +124,7 @@ Read AGENTS.md and run slp-setup-agent.
 It detects which agent it is and exposes the skills in that agent's format — symlinks if it supports them, conversion if not. Whatever it creates goes to `.git/info/exclude`, so it doesn't clutter the repo. Then start the app:
 
 ```sh
-./start learning     # Windows: .\start learning
+uv run slp
 ```
 
 **Going to keep your topics in your own repo?** Change the remote:

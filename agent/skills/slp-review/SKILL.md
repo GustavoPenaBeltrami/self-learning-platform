@@ -119,7 +119,7 @@ If a question can only be asked one way, keep it — but let those be few.
 1. Validate: `python3 -m json.tool topics/review/exams/<date>/exam.json > /dev/null`.
 2. Check that `answer` is between 0 and 3, that they all have 4 options, and
    that the correct index is spread out.
-3. Tell them the path and to open it with `./start learning`.
+3. Tell them the path and to open it with `uv run slp`.
 4. Tell them in two lines **why each card went in**: "six from DDIA ch. 3, in
    the fast box because of a miss last week; four from FoSA ch. 2, just coming
    in; two from AWS to interleave". The review teaches more when its criterion

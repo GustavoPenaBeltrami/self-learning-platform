@@ -1,0 +1,11 @@
+LICENSE
+README.md
+pyproject.toml
+app/server/server.py
+app/server/text.py
+app/server/slp.egg-info/PKG-INFO
+app/server/slp.egg-info/SOURCES.txt
+app/server/slp.egg-info/dependency_links.txt
+app/server/slp.egg-info/entry_points.txt
+app/server/slp.egg-info/requires.txt
+app/server/slp.egg-info/top_level.txt

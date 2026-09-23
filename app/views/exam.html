@@ -80,7 +80,7 @@ async function index() {
     topics = await load();
   } catch {
     app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
-      <p>Open a terminal here and run <code>./start learning</code>.</p></div>`;
+      <p>Open a terminal here and run <code>uv run slp</code>.</p></div>`;
     return;
   }
   path('~/notes/topics/*/exams');
@@ -113,7 +113,7 @@ function header(exam, n, command) {
 }
 
 function take(exam) {
-  const questions = shuffle(exam.questions);
+  const questions = shuffle(exam.questions.map((q, i) => ({ ...q, i })));
   document.title = exam.title || 'Exam';
   path('~/notes/' + file);
 
@@ -236,7 +236,7 @@ async function grade(exam, questions) {
       const sel = document.querySelector(`input[name=q${i}]:checked`);
       const chosen = sel ? +sel.value : null;
       if (chosen === q.answer) right++;
-      answers.push({ i, type, chosen });
+      answers.push({ i: q.i, type, chosen });
       return `<div class="question">${stem}
         ${q.options.map((o, j) => {
           const cls = j === q.answer ? 'correct' : (j === chosen ? 'wrong-pick' : '');
@@ -250,21 +250,21 @@ async function grade(exam, questions) {
       const qEl = app.querySelectorAll('.question')[i];
       const audio = qEl.querySelector('.oral-preview');
       if (audio._blob) {
-        answers.push({ i, type, audio: await blobToBase64(audio._blob), mime: audio._mime });
+        answers.push({ i: q.i, type, audio: await blobToBase64(audio._blob), mime: audio._mime });
         return `<div class="question">${stem}
           <p class="given-answer">(audio recorded)</p>
           <p class="pending">pending grading</p>
         </div>`;
       }
       const text = qEl.querySelector('.oral-text').value.trim();
-      answers.push({ i, type, text });
+      answers.push({ i: q.i, type, text });
       return `<div class="question">${stem}
         <p class="given-answer">${text ? esc(text) : '<em>(no answer)</em>'}</p>
         <p class="pending">pending grading</p>
       </div>`;
     }
     const text = document.querySelector(`textarea[name=q${i}]`)?.value.trim() || '';
-    answers.push({ i, type, text });
+    answers.push({ i: q.i, type, text });
     return `<div class="question">${stem}
       <p class="given-answer">${text ? esc(text) : '<em>(no answer)</em>'}</p>
       <p class="pending">pending grading</p>

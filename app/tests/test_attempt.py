@@ -13,7 +13,8 @@ def with_test_topic(f):
         server.ROOT, server.TOPICS = tmp, tmp / "topics"
         d = server.TOPICS / "demo" / "exams" / "ch-01"
         d.mkdir(parents=True)
-        (d / "exam.json").write_text('{"title": "demo", "questions": []}')
+        (d / "exam.json").write_text(json.dumps({"title": "demo", "questions": [
+            {"q": "a", "options": ["x", "y"], "answer": 1}, {"type": "open", "q": "b"}, {"type": "oral", "q": "c"}]}))
         try:
             f()
         finally:
@@ -61,6 +62,22 @@ def test_empty_topics():
 
 
 @with_test_topic
+def test_answers_follow_exam_json():
+    path = server.save_attempt("demo", "ch-01", [
+        {"i": 1, "type": "multiple_choice", "text": "shuffled first"}, {"i": 0, "chosen": 1}])
+    data = json.loads((server.ROOT / path).read_text())
+    assert [a["i"] for a in data["answers"]] == [0, 1], "answers must be in exam.json order"
+    assert [a["type"] for a in data["answers"]] == ["multiple_choice", "open"], "type comes from exam.json"
+
+
+@with_test_topic
+def test_rejects_bad_index():
+    for i in (3, -1, "0", None):
+        expect_rejection(lambda: server.save_attempt("demo", "ch-01", [{"i": i}]))
+    expect_rejection(lambda: server.save_attempt("demo", "ch-01", [{"i": 0}, {"i": 0}]))
+
+
+@with_test_topic
 def test_rejects_missing_slug():
     expect_rejection(lambda: server.save_attempt("../outside", "ch-01", []))
 
@@ -78,6 +95,8 @@ def test_rejects_missing_exam():
 if __name__ == "__main__":
     test_writes_attempt()
     test_saves_oral_audio()
+    test_answers_follow_exam_json()
+    test_rejects_bad_index()
     test_rejects_missing_slug()
     test_rejects_escaping_exam()
     test_rejects_missing_exam()
