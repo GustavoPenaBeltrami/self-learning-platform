@@ -9,3 +9,4 @@ plan.md
 agent/agents/teacher-*
 /settings.json
 /fonts/
+/models/

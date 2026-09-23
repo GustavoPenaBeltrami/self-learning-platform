@@ -30,9 +30,9 @@ const FIELDS = [
     'Online: paid agent, web lookups, largest dictation model. Offline: everything on this machine.'],
   ['theme', [['', 'auto (follows the OS)'], ...Object.entries(THEMES)], 'Colors of the whole app.'],
   ['font', [['mono', 'mono'], ['serif', 'serif'], ['inter', 'inter']], 'Reading font for the note body. Headings stay mono.'],
-  ['voice_model', [['', 'default (turbo on Apple Silicon, small on CPU)'], ['tiny', 'tiny · ~75 MB'], ['base', 'base · ~145 MB'],
+  ['voice_model', [['', 'default (online: turbo; offline: turbo on Apple Silicon, small on CPU)'], ['tiny', 'tiny · ~75 MB'], ['base', 'base · ~145 MB'],
     ['small', 'small · ~480 MB'], ['medium', 'medium · ~1.5 GB'], ['turbo', 'turbo · ~1.6 GB (online)'], ['large-v3', 'large-v3 · ~3 GB']],
-    'Dictation model, downloaded on first use. Bigger is more accurate and slower. A local model folder: set its path as voice_model in settings.json.'],
+    'Dictation model. Bigger is more accurate and slower. download saves the selected size to models/ so it works offline; otherwise it is fetched on first use. A local model folder: set its path as voice_model in settings.json.'],
 ];
 
 tree.innerHTML = `<details open class="current"><summary><span class="name">notes/</span><span class="count">1</span></summary>
@@ -50,7 +50,7 @@ Promise.all([settings, userFonts]).then(([s, fonts]) => {
     ${FIELDS.map(([key, choices, hint]) => `
       <div class="field">
         <label for="set-${key}">${key}</label>
-        <select id="set-${key}" data-key="${key}">${opts(choices, s[key] ?? '')}</select>
+        <span><select id="set-${key}" data-key="${key}">${opts(choices, s[key] ?? '')}</select>${key === 'voice_model' ? ' <button id="voice-dl">download</button>' : ''}</span>
         <p class="hint">${hint}</p>
       </div>`).join('')}
     <div class="field">
@@ -68,6 +68,14 @@ Promise.all([settings, userFonts]).then(([s, fonts]) => {
       statusEl.textContent = '✕ ' + e.message;
     }
   });
+  document.getElementById('voice-dl').onclick = async () => {
+    statusEl.textContent = 'downloading…';
+    const r = await fetch('/api/voice-model/download', { method: 'POST', body: JSON.stringify({ size: document.getElementById('set-voice_model').value }) })
+      .then(r => r.json()).catch(e => ({ error: e.message }));
+    if (r.error) return statusEl.textContent = '✕ ' + r.error;
+    statusEl.textContent = 'saved';
+    location.reload();
+  };
   document.getElementById('font-file').onchange = async e => {
     const file = e.target.files[0];
     statusEl.textContent = 'uploading…';
