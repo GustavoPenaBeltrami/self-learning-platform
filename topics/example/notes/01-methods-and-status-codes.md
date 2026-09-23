@@ -12,14 +12,14 @@ Example note. Real topics live only on your machine; this one shows the format.
 ## Status codes
 
 | Range | Meaning | Example |
-|-------|---------|---------|
-| 2xx | Success | 200 OK, 201 Created |
-| 3xx | Redirection | 301 Moved Permanently |
-| 4xx | Client error | 404 Not Found |
-| 5xx | Server error | 503 Service Unavailable |
 
-```mermaid
-sequenceDiagram
-  Client->>Server: GET /users/1
-  Server-->>Client: 200 OK
-```
+|-------|---------|---------|
+
+| 2xx | Success | 200 OK, 201 Created |
+
+| 3xx | Redirection | 301 Moved Permanently |
+
+| 4xx | Client error | 404 Not Found |
+
+| 5xx | Server error | 503 Service Unavailable |
+<br>

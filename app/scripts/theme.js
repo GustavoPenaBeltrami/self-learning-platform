@@ -1,12 +1,13 @@
 (() => {
-  const THEMES = { hypr: 'hypr', light: 'light', eink: 'e-ink', sakura: 'sakura', forest: 'forest', amber: 'amber crt' };
+  const THEMES = { sumi: 'sumi', kami: 'kami' };
   const FONTS = [['mono', 'mono'], ['serif', 'serif'], ['inter', 'inter']];
   const root = document.documentElement;
-  const current = () => root.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'hypr');
+  const current = () => root.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'kami' : 'sumi');
   const cached = () => { try { return JSON.parse(localStorage.getItem('settings')) || {}; } catch { return {}; } };
   const apply = s => {
     if (THEMES[s.theme]) root.dataset.theme = s.theme; else delete root.dataset.theme;
     root.dataset.font = s.font || 'mono';
+    root.dataset.uiFont = s.ui_font || 'mono';
     const sel = document.getElementById('theme-sel');
     if (sel) sel.value = current();
     dispatchEvent(new CustomEvent('settings-applied', { detail: s }));

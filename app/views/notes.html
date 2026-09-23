@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Notes</title>
+<title>独学 · notes</title>
 <link rel="stylesheet" href="/app/styles/style.css">
 <script src="/app/scripts/theme.js"></script>
 <script src="/app/scripts/viz.js"></script>
@@ -12,8 +12,8 @@
 
   :root[data-font="serif"] { --reading-font: var(--serif); }
   :root[data-font="inter"] { --reading-font: Inter, "SF Pro Text", -apple-system, "Helvetica Neue", sans-serif; }
-  :root[data-font="mono"]  { --reading-font: var(--mono); }
-  .doc { font-family: var(--reading-font, var(--mono)); }
+  :root[data-font="mono"]  { --reading-font: var(--code); }
+  .doc { font-family: var(--reading-font, var(--code)); }
   :root[data-font="serif"] .doc, :root[data-font="inter"] .doc { font-size: 15px; }
 
   .cover { margin: 0 0 var(--spacing-32); }
@@ -30,7 +30,7 @@
     font-family: var(--mono); font-weight: 400; font-style: normal; color: var(--color-slate);
   }
   .doc > :is(ul, ol) > li::after { left: calc(-1 * var(--gutter) - 1.4rem); }
-  .doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6 { font-family: var(--mono); scroll-margin-top: calc(var(--bar-h) + 1rem); }
+  .doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6 { font-family: var(--reading-font, var(--code)); scroll-margin-top: calc(var(--bar-h) + 1rem); }
   .doc h1 { counter-increment: h1 ln; counter-reset: h2; font-size: 17px; line-height: 1.5; color: var(--ansi-blue); margin-top: 2.5rem; }
   .doc h1:first-child { margin-top: 0; }
   .doc h2 { counter-increment: h2 ln; counter-reset: h3; font-size: 15px; line-height: 1.6; color: var(--ansi-cyan); }
@@ -50,7 +50,7 @@
   .doc strong, .doc b { color: var(--color-paper); }
   .doc em, .doc i { color: var(--ansi-yellow); }
 
-  mark { --c: #d8c06a; background: none; color: inherit; cursor: pointer; }
+  mark { --c: var(--ansi-yellow); background: none; color: inherit; cursor: pointer; }
   mark.mk-highlight { background: color-mix(in srgb, var(--c) 35%, transparent); padding: 0 .1em; }
   mark.mk-underline { border-bottom: 2px solid var(--c); }
   mark.mk-strike { text-decoration: line-through; text-decoration-color: var(--c); text-decoration-thickness: 2px; }
@@ -142,7 +142,13 @@
 <body>
 <script>
 /* Highlight and card palette. Edit this array and the whole app changes. */
-const COLORS = ['#d8c06a', '#8fbf7f', '#d67a6a', '#5a9be0', '#a88cc4', '#66b8c4', '#d08a4c'];
+const PALETTE = { yellow: '#d8c06a', green: '#8fbf7f', red: '#d67a6a', blue: '#5a9be0', magenta: '#a88cc4', cyan: '#66b8c4', orange: '#d08a4c' };
+const COLORS = Object.entries(PALETTE).map(([n, hex]) => `var(--ansi-${n}, ${hex})`);
+const THEMED = Object.fromEntries(Object.values(PALETTE).map((hex, i) => [hex, COLORS[i]]));
+const themeColors = root => root.querySelectorAll('[style*="--c"]').forEach(el => {
+  const c = THEMED[el.style.getPropertyValue('--c').trim().toLowerCase()];
+  if (c) el.style.setProperty('--c', c);
+});
 
 /* Icons. viewBox 20x20, 1.5 stroke, they inherit the button color. */
 const ICON = {
@@ -244,7 +250,7 @@ async function openTopic(name) {
     </div>
     <div class="wb-mod pill">
       ${COLORS.map((c, i) => `<button class="swatch" style="--c:${c};background:${c}"
-        data-color="${c}" aria-pressed="${i === 0}" data-tip="Color ${c}"></button>`).join('')}
+        data-color="${c}" aria-pressed="${i === 0}" data-tip="${Object.keys(PALETTE)[i]}"></button>`).join('')}
       <button data-mark="mk-highlight" data-tip="Highlight">${svg('highlight')}</button>
       <button data-mark="mk-underline" data-tip="Underline">${svg('underline')}</button>
       <button data-mark="mk-strike" data-tip="Strikethrough">${svg('strike')}</button>
@@ -277,6 +283,7 @@ async function openTopic(name) {
   buildResources();
   doc.innerHTML = topic.html || '';
   vizPaint(doc);
+  themeColors(doc);
   placeCards();
   buildIndex();
   if (location.hash) goTo(decodeURIComponent(location.hash.slice(1)));
@@ -323,6 +330,7 @@ async function openTopic(name) {
   // mousedown on the bar would move focus out of the editable and execCommand
   // would stop applying. Cancelling it keeps the caret and selection.
   tools.querySelectorAll('button').forEach(b => b.onmousedown = e => e.preventDefault());
+  tools.addEventListener('click', closeTip);
   tools.addEventListener('mouseover', e => {
     const el = e.target.closest('[data-tip]');
     if (el) showTip(el);
@@ -339,8 +347,13 @@ async function openTopic(name) {
   tools.querySelectorAll('[data-mark]').forEach(b => b.onclick = () => mark(b.dataset.mark));
   document.getElementById('reference').onclick = e => referenceMenu(e.currentTarget);
   document.getElementById('card').onclick = () => { createCard({}); save(); };
-  document.getElementById('image').onclick = () => document.getElementById('image-file').click();
-  document.getElementById('image-file').onchange = e => insertImage(e.target.files[0]);
+  const imageBtn = document.getElementById('image'), imageFile = document.getElementById('image-file');
+  imageBtn.onclick = e => dropMenu(imageBtn, [
+    ['inline', svg('image', 14) + 'embedded in text'],
+    ['card', svg('note', 14) + 'sticky image note'],
+  ], as => { imageFile.dataset.as = as; imageFile.click(); }, null, e.detail === 0);
+  tools.querySelectorAll('select').forEach(dropdown);
+  imageFile.onchange = e => { (imageFile.dataset.as === 'card' ? imageCard : insertImage)(e.target.files[0]); imageFile.value = ''; };
   document.getElementById('diagram').onclick = () => insertViz('mermaid');
   document.getElementById('formula').onclick = () => insertViz('math');
   document.getElementById('voice').onclick = e => dictate(e.currentTarget);
@@ -359,8 +372,13 @@ async function openTopic(name) {
   });
 }
 
-/* Image in the text flow. For a floating one: create a margin note and
-   paste the image inside it; the same handler inserts it at the caret. */
+function imageCard(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { createCard({ img: reader.result }); save(); };
+  reader.readAsDataURL(file);
+}
+
 function insertImage(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -718,8 +736,8 @@ function openMenu(anchor, html) {
 function markMenu(markEl) {
   const current = markEl.style.getPropertyValue('--c').trim();
   const m = openMenu(markEl,
-    COLORS.map(c => `<button class="swatch" data-color="${c}" style="background:${c}"
-        aria-pressed="${c === current}" data-tip="${c}"></button>`).join('')
+    COLORS.map((c, i) => `<button class="swatch" data-color="${c}" style="background:${c}"
+        aria-pressed="${c === current}" data-tip="${Object.keys(PALETTE)[i]}"></button>`).join('')
     + '<span class="sep"></span>'
     + `<input type="text" id="mark-comment" placeholder="Comment…" value="${esc(markEl.dataset.comment || '')}">`
     + `<button data-action="remove" data-tip="Remove the mark">${svg('remove', 14)}</button>`);
@@ -840,6 +858,7 @@ const closeTip = () => { tip?.remove(); tip = null; };
 
 function showTip(el) {
   closeTip();
+  if (el.getAttribute('aria-expanded') === 'true') return;
   tip = document.createElement('div');
   tip.className = 'tip';
   tip.textContent = el.dataset.tip;

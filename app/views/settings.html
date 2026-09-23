@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Settings</title>
+<title>独学 · settings</title>
 <link rel="stylesheet" href="/app/styles/style.css">
 <script src="/app/scripts/theme.js"></script>
 <script src="/app/scripts/shell.js"></script>
@@ -11,12 +11,13 @@
   .field + .field { border-top: 1px solid var(--line); }
   .field label { color: var(--ansi-cyan); }
   .field .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-  .field select, .field input {
+  .field select, .field input, .field button.drop {
     border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
     background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
   }
   .field input[type=text] { min-width: 0; flex: 1 1 24ch; }
-  .field :is(select, input):focus { outline: 1px solid var(--accent); }
+  .field :is(select, input, button.drop):focus { outline: 1px solid var(--accent); }
+  .field button.drop { display: flex; gap: .5rem; align-items: center; }
   .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
   .field .hint::before { content: '// '; color: var(--color-steel); }
 </style>
@@ -61,7 +62,7 @@ Promise.all([settings, fontChoices, api('/api/voice-models').catch(() => ({}))])
     ${field('profile', select('profile', [['auto', 'auto (recommended)'], ['online', 'online'], ['offline', 'offline']], s.profile),
       `auto picks online when the server finds a connection at start, offline otherwise (now: ${s.active_profile || 'unknown'}). Online: paid agent, web lookups, models fetched when missing. Offline: everything on this machine, nothing is fetched.`)}
     ${field('theme', select('theme', [['', 'auto (follows the OS)'], ...Object.entries(THEMES)], s.theme ?? ''), 'Colors of the whole app.')}
-    ${field('font', select('font', fonts, s.font ?? 'mono'), 'Reading font for the note body. Headings stay mono.')}
+    ${field('ui_font', select('ui_font', fonts, s.ui_font ?? 'mono'), 'Font of the whole app: bars, menus, pages. The note body has its own font, picked in the notes toolbar. If you need it bigger/smaller play with the zoom in your browser')}
     ${field('voice_model', select('voice_model', models, s.voice_model ?? '') + key('⏎', 'download', 'voice-dl'),
       'Dictation model. Bigger is more accurate and slower. download saves the selected size to models/, so it works offline. A size that is not downloaded is fetched on first use when online, and falls back to the OS dictation when offline.')}
     ${field('model path', `<input type="text" id="model-path" placeholder="/path/to/a/whisper/model" value="${isPath ? esc(s.voice_model) : ''}">` + key('⏎', 'use path', 'voice-path'),
@@ -72,12 +73,12 @@ Promise.all([settings, fontChoices, api('/api/voice-models').catch(() => ({}))])
 
   app.querySelectorAll('[data-key]').forEach(sel => sel.onchange = () =>
     run('saving…', () => saveSettings({ [sel.dataset.key]: sel.value })));
+  app.querySelectorAll('select').forEach(dropdown);
 
   const modelSel = document.getElementById('set-voice_model');
   const download = () => run('downloading…', () => api('/api/voice-model/download', JSON.stringify({ size: modelSel.value })))
     .then(ok => ok && location.reload());
   app.querySelector('.voice-dl').onclick = download;
-  modelSel.onkeydown = e => { if (e.key === 'Enter') download(); };
 
   const pathInput = document.getElementById('model-path');
   const usePath = () => run('saving…', () => saveSettings({ voice_model: pathInput.value.trim() }))

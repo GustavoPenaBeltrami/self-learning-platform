@@ -1,15 +1,81 @@
 (() => {
-  const PAGES = [['notes', 'notes.html'], ['exams', 'exam.html'], ['settings', 'settings.html']];
+  const PAGES = [['notes', 'notes.html'], ['exams', 'exam.html'], ['project', 'project.html'], ['settings', 'settings.html']];
 
   window.key = (k, text, extra = '') => `<button class="key ${extra}"><kbd>${k}</kbd><span>${text}</span></button>`;
 
-  window.noTopicsRow = cols => `<tr><td></td><td class="wide" colspan="${cols}"><span class="sub">no topics yet: ask your agent to "create a new topic" (slp-init)</span></td></tr>`;
+  window.noTopicsRow = cols => `<tr class="no-topics"><td colspan="${cols + 1}"><img class="brand" src="/app/assets/lockup-stacked.png" alt="独学 Self Learning Platform"><span class="sub">no topics yet: ask your agent to "create a new topic" (slp-init)</span></td></tr>`;
+
+  let drop;
+  window.closeDrop = () => {
+    if (!drop) return;
+    drop.menu.remove();
+    drop.anchor.setAttribute('aria-expanded', 'false');
+    drop = null;
+  };
+  window.dropMenu = (anchor, items, pick, current, focus = false) => {
+    if (drop?.anchor === anchor) return closeDrop();
+    closeDrop();
+    const menu = document.createElement('div');
+    menu.className = 'drop-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.innerHTML = items.map(([v, label]) =>
+      `<button type="button" role="option" data-v="${esc(v)}" aria-selected="${v === current}">${label}</button>`).join('');
+    menu.onmousedown = e => e.preventDefault();
+    menu.onclick = e => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      closeDrop();
+      pick(b.dataset.v);
+    };
+    menu.onkeydown = e => {
+      const all = [...menu.children], i = all.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        all[(i + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length].focus();
+      }
+      if (e.key === 'Escape') { closeDrop(); anchor.focus(); }
+    };
+    document.body.append(menu);
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.style.top = (r.bottom + 6 + menu.offsetHeight > innerHeight ? r.top - menu.offsetHeight - 6 : r.bottom + 6) + 'px';
+    anchor.setAttribute('aria-expanded', 'true');
+    drop = { anchor, menu };
+    if (focus) (menu.querySelector('[aria-selected="true"]') || menu.firstChild)?.focus();
+  };
+  document.addEventListener('mousedown', e => {
+    if (drop && !drop.menu.contains(e.target) && !drop.anchor.contains(e.target)) closeDrop();
+  });
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeDrop(); });
+
+  window.dropdown = sel => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'drop';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    for (const a of ['data-tip', 'aria-label', 'title']) if (sel.hasAttribute(a)) btn.setAttribute(a, sel.getAttribute(a));
+    sel.hidden = true;
+    sel.after(btn);
+    const sync = () => btn.textContent = sel.selectedOptions[0]?.text ?? '';
+    const value = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    Object.defineProperty(sel, 'value', { get() { return value.get.call(this); }, set(v) { value.set.call(this, v); sync(); } });
+    new MutationObserver(sync).observe(sel, { childList: true, subtree: true });
+    btn.onmousedown = e => e.preventDefault();
+    btn.onclick = e => dropMenu(btn, [...sel.options].map(o => [o.value, esc(o.text)]), v => {
+      sel.value = v;
+      sel.dispatchEvent(new Event('change'));
+    }, sel.value, e.detail === 0);
+    sync();
+    return btn;
+  };
 
   window.mountShell = current => {
+    document.title = '独学 · ' + current;
+    document.head.insertAdjacentHTML('beforeend', '<link rel="icon" href="/app/assets/favicon.svg">');
     document.body.insertAdjacentHTML('afterbegin', `
       <header class="waybar">
         <div class="wb-left">
-          <span class="wb-logo" aria-hidden="true"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5.2C8.4 4 6.2 3.5 3 3.5v11.8c3.2 0 5.4.5 7 1.7 1.6-1.2 3.8-1.7 7-1.7V3.5c-3.2 0-5.4.5-7 1.7z"/><path d="M10 5.2V17"/></svg></span>
+          <a class="wb-logo" href="project.html" title="独学 · SLP"><img class="brand" src="/app/assets/mark.png" alt="独学" width="20" height="20"></a>
           <nav class="wb-mod workspaces">${PAGES.map(([name, href], i) =>
             `<a href="${href}"${name === current ? ' aria-current="page"' : ''}>${i + 1}<span>${name}</span></a>`).join('')}</nav>
         </div>
@@ -45,6 +111,7 @@
       </footer>`);
 
     document.getElementById('theme-sel').onchange = e => pickTheme(e.target.value);
+    dropdown(document.getElementById('theme-sel'));
 
     const clock = document.getElementById('clock');
     const tick = () => {

@@ -112,7 +112,7 @@ def transcribe(raw, lang=None):
 
 
 AUTO, ONLINE, OFFLINE = PROFILES = ("auto", "online", "offline")
-SETTINGS = {"profile": AUTO, "theme": "", "font": "mono", "voice_model": ""}
+SETTINGS = {"profile": AUTO, "theme": "", "ui_font": "mono", "font": "mono", "voice_model": ""}
 network = None
 
 
@@ -217,7 +217,8 @@ def list_fonts():
 
 def fonts_css():
     return "\n".join(f'@font-face {{ font-family: "{f}"; src: url("/fonts/{f}"); }}\n'
-                     f':root[data-font="{f}"] {{ --reading-font: "{f}", var(--mono); }}' for f in list_fonts())
+                     f':root[data-font="{f}"] {{ --reading-font: "{f}", var(--code); }}\n'
+                     f':root[data-ui-font="{f}"] {{ --mono: "{f}", var(--code); }}' for f in list_fonts())
 
 
 def save_font(upload, raw):

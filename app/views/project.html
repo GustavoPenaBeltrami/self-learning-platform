@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>独学 · project</title>
+<link rel="stylesheet" href="/app/styles/style.css">
+<script src="/app/scripts/theme.js"></script>
+<script src="/app/scripts/shell.js"></script>
+<style>
+  .lockup { display: block; width: 100%; max-width: 560px; margin: var(--spacing-32) auto var(--spacing-48); }
+  .tagline { text-align: center; color: var(--muted); margin: calc(-1 * var(--spacing-32)) 0 var(--spacing-64); }
+  .gloss { display: flex; gap: var(--spacing-40); flex-wrap: wrap; margin: 0 0 var(--spacing-32); }
+  .gloss div { display: grid; gap: var(--spacing-8); justify-items: center; }
+  .gloss b { font: 900 72px/1 var(--kanji); }
+  .gloss span { font-size: 13px; color: var(--muted); }
+  .sec { font-size: 15px; color: var(--ink); margin: var(--spacing-64) 0 var(--spacing-16); scroll-margin-top: calc(var(--bar-h) + 1rem); }
+  .sec::before { content: '## '; color: var(--color-steel); }
+  .lead { color: var(--color-chalk); max-width: 62ch; }
+  .htop tbody tr { cursor: default; }
+  .htop code { color: inherit; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .grid > div { background: var(--bg); padding: var(--spacing-24) var(--spacing-24) var(--spacing-24); display: grid; gap: .6rem; align-content: start; }
+  .grid .k { font: 700 36px/1 var(--kanji); }
+  .grid strong { font-size: 14px; }
+  .grid strong span { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: .6rem; }
+  .grid p { margin: 0; font-size: 13px; color: var(--color-chalk); }
+  .grid .rule { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--color-slate); padding-top: .6rem; }
+  .grid .rule::before { content: '// '; color: var(--color-steel); }
+</style>
+
+<body>
+<script>
+const { app, tree, path } = mountShell('project');
+path('~/notes/README.md');
+
+const SECTIONS = [['name', 'name'], ['windows', 'three windows'], ['loop', 'the loop'], ['pieces', 'pieces'], ['principles', 'principles']];
+tree.innerHTML = `<details open class="current"><summary><span class="name">notes/</span><span class="count">${SECTIONS.length}</span></summary>
+  <ol>${SECTIONS.map(([id, label], i) => `<li><a href="#${id}"><span class="n">${i + 1}</span><span>${label}</span></a></li>`).join('')}</ol></details>`;
+
+const rows = list => list.map(r => `<tr>${r.map((c, i) => `<td${i === r.length - 1 ? ' class="wide"' : ''}>${c}</td>`).join('')}</tr>`).join('');
+const table = (head, list) => `<table class="htop"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows(list)}</tbody></table>`;
+
+app.innerHTML = `
+  <div class="sheet">
+  <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/notes</span> <span class="p-sig">❯</span> cat README.md</p>
+  <img class="brand lockup" src="/app/assets/lockup-horizontal.png" alt="独学 Self Learning Platform">
+  <p class="tagline">an agent-powered hub for self-learners</p>
+
+  <h2 class="sec" id="name">name</h2>
+  <div class="gloss">
+    <div><b>独</b><span>doku · by oneself</span></div>
+    <div><b>学</b><span>gaku · learning</span></div>
+  </div>
+  <p class="lead">独学 (dokugaku) is the Japanese word for self-study. SLP, the Self Learning Platform, is built for exactly that: one person, one topic, and the discipline to keep going. The agent teaches, quizzes and grades. The learning stays yours.</p>
+  <p class="lead">Everything you study is a topic: a book, a certification, a tool's docs, a course. SLP builds the full loop around it (preparation, practice, feedback, spaced review) and keeps it all as Markdown and JSON on your disk. No database, no account, no cloud.</p>
+
+  <h2 class="sec" id="windows">three windows</h2>
+  ${table(['#', 'WINDOW', 'USE'], [
+    ['1', 'material', 'the pdf, the course, the docs. whatever you are studying'],
+    ['2', 'app', 'this notebook and exam simulator at <code>localhost:8321</code>'],
+    ['3', 'agent', 'open at the repo root. teaches, builds exams, grades'],
+  ])}
+
+  <h2 class="sec" id="loop">the loop</h2>
+  ${table(['COMMAND', 'STEP', 'WHAT IT DOES'], [
+    ['<code>/slp-init</code>', 'setup', 'interviews you, creates the topic, checks your level'],
+    ['<code>/slp-session</code>', 'plan', "what's pending today across every topic, and what to do"],
+    ['<code>/slp-teach</code>', 'prepare', 'teaches until it is understood, not memorized'],
+    ['<code>/slp-summarize</code>', 'prepare', 'summarizes material into the topic notes'],
+    ['<code>/slp-exam</code>', 'practice', 'builds an exam you sit in <code>2 exams</code>'],
+    ['<code>/slp-exercises</code>', 'practice', 'an applied exercise: code, an adr, a critique'],
+    ['<code>/slp-grade</code>', 'feedback', 'grades the attempt against a rubric'],
+    ['<code>/slp-review</code>', 'review', 'spaced, interleaved leitner review so it does not fade'],
+  ])}
+  <p class="minor">// everything they produce lands in topics/&lt;slug&gt;/ and shows up here on its own</p>
+
+  <h2 class="sec" id="pieces">pieces</h2>
+  ${table(['PATH', 'PIECE', 'ROLE'], [
+    ['<code>agent/skills/</code>', 'skills', 'the method: teach, build exams and exercises, grade, review'],
+    ['<code>agent/agents/</code>', 'agents', 'a researcher that verifies before stating, a teacher per topic'],
+    ['<code>topics/&lt;slug&gt;/</code>', 'filesystem', 'notes in markdown, exams in json, attempts and progress'],
+    ['<code>app/</code>', 'app', 'local notebook and exam simulator, dictation, mermaid, latex'],
+  ])}
+  <p class="minor">// any agent works: skills use SKILL.md, AGENTS.md explains the project</p>
+
+  <h2 class="sec" id="principles">principles</h2>
+  <div class="grid">
+    <div><span class="k">簡素</span><strong>kanso<span>simplicity</span></strong><p>Remove until only what is needed is left.</p><span class="rule">one font, no shadows, no gradients</span></div>
+    <div><span class="k">間</span><strong>ma<span>negative space</span></strong><p>Empty space is part of the design, not a gap to fill.</p><span class="rule">the ~ buffer, the space around the mark</span></div>
+    <div><span class="k">渋い</span><strong>shibui<span>quiet beauty</span></strong><p>Understated. Nothing is decorated for its own sake.</p><span class="rule">hierarchy by lightness, not size</span></div>
+    <div><span class="k">静寂</span><strong>seijaku<span>calm</span></strong><p>The interface stays silent while you study.</p><span class="rule">chrome lives in two bars</span></div>
+  </div>
+  <div class="tildes"></div></div>`;
+</script>

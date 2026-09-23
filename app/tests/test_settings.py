@@ -21,16 +21,16 @@ def with_temp_root(f):
 @with_temp_root
 def test_defaults_without_file():
     assert not (server.ROOT / "settings.json").exists()
-    assert server.read_settings() == {"profile": "auto", "theme": "", "font": "mono", "voice_model": ""}
+    assert server.read_settings() == {"profile": "auto", "theme": "", "ui_font": "mono", "font": "mono", "voice_model": ""}
 
 
 @with_temp_root
 def test_round_trip():
-    saved = server.save_settings({"profile": "offline", "theme": "sakura", "font": "serif", "junk": 1})
-    assert saved == {"profile": "offline", "theme": "sakura", "font": "serif", "voice_model": ""}
+    saved = server.save_settings({"profile": "offline", "theme": "kami", "font": "serif", "junk": 1})
+    assert saved == {"profile": "offline", "theme": "kami", "ui_font": "mono", "font": "serif", "voice_model": ""}
     assert server.read_settings() == saved
     assert json.loads((server.ROOT / "settings.json").read_text()) == saved
-    assert server.save_settings({"theme": "amber"})["profile"] == "offline", "a partial write must keep the rest"
+    assert server.save_settings({"theme": "sumi"})["profile"] == "offline", "a partial write must keep the rest"
 
 
 @with_temp_root
