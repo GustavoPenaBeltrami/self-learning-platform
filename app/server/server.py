@@ -245,9 +245,6 @@ def folder(slug):
     return d
 
 
-TYPES = ("book", "certification", "documentation", "course")
-
-
 def meta(d):
     """What describes the topic. `order` rules the lists; without it, it goes last."""
     file = d / "topic.json"

@@ -1,9 +1,11 @@
 # Status — Example topic: HTTP basics
 
-**Updated:** 2026-09-22
+**Updated:** 2026-09-24
 
-- **Current unit:** — (not started)
-- **Summary written:** no
+- **Current unit:** 01 — methods and status codes
+- **Summary written:** yes
 - **Next exam:** —
 
 ## Up next
+- [ ] Grade the exercise `choose-status-codes` (slp-grade)
+- [ ] Read about idempotency keys

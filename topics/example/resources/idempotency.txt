@@ -1,0 +1,8 @@
+Idempotency, in one paragraph
+
+A method is idempotent when sending the same request several times has the same
+effect on the server as sending it once. GET, HEAD, PUT and DELETE are idempotent;
+POST and PATCH are not guaranteed to be. Clients and proxies may retry idempotent
+requests after a network failure without asking the user. To retry a POST safely,
+APIs often accept an idempotency key: the server stores the result of the first
+request with that key and returns it again for the retries.

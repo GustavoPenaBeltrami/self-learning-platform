@@ -89,7 +89,7 @@
 
   .card {
     position: absolute; z-index: 10; width: 14rem; margin: 0;
-    background: var(--bg); border: 1px solid var(--c, var(--accent)); border-radius: 0;
+    background: var(--bg); border: 1px solid var(--accent); border-radius: 0;
     font: 400 13px/1.6 var(--mono);
     opacity: .55; transition: opacity .15s ease;
   }
@@ -102,7 +102,7 @@
   }
   .card .handle span, .card .handle button {
     pointer-events: auto; border: 0; padding: 0 .4rem; background: var(--bg);
-    font: 700 12px/1.1 var(--mono); color: var(--c, var(--accent));
+    font: 700 12px/1.1 var(--mono); color: var(--accent);
   }
   .card .handle span { cursor: grab; }
   .card.dragging .handle span { cursor: grabbing; }
@@ -930,11 +930,10 @@ function buildIndex() {
 }
 
 /* ---------- cards ---------- */
-function createCard({ x, y, c, body = '', img = null, caption = '' }) {
+function createCard({ x, y, body = '', img = null, caption = '' }) {
   const el = document.createElement('aside');
   el.className = 'card';
   el.contentEditable = 'false';
-  el.style.setProperty('--c', c || color);
   el.dataset.x = x ?? doc.offsetWidth + 32;
   el.dataset.y = y ?? Math.max(0, Math.round(scrollY / zoom() + 100 - doc.offsetTop));
   el.innerHTML = handle(img)

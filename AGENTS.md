@@ -7,9 +7,16 @@ to you in this one.
 
 ## First time
 
-If your tool doesn't see the skills in `agent/skills/` as its own yet, read
-`agent/skills/slp-setup-agent/SKILL.md` and follow it. It configures the
-project for you without touching anything under version control.
+The user starts with this prompt:
+
+```
+Read AGENTS.md, then read agent/skills/slp-setup/SKILL.md and follow it.
+```
+
+On the first run your tool hasn't loaded the skills in `agent/skills/` yet,
+so it can't invoke `slp-setup` by name: read that file and follow it. It
+configures the project for you without touching anything under version
+control. After that, skills load normally.
 
 ## Skills
 
@@ -17,6 +24,9 @@ Each skill is `agent/skills/<name>/SKILL.md` (Agent Skills format:
 `name` + `description` frontmatter, instructions below). If your tool doesn't
 load skills on its own, whenever a request matches a `description`, read that
 whole `SKILL.md` and follow it. The entry point is `slp-session`.
+Skills with `disable-model-invocation: true` in their frontmatter
+(`slp-setup`, `slp-init`) run only when the user asks for them by name:
+never start them on your own.
 
 The agents in `agent/agents/*.md` are subagents: `researcher` and one
 `teacher-<slug>` per topic. Without subagents, read the file and do its work

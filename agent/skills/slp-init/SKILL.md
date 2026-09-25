@@ -1,5 +1,6 @@
 ---
 name: slp-init
+disable-model-invocation: true
 description: Registers a new study topic — interviews the user to fill in topic.json, creates the folder structure and progress files, writes learning.md with the Mission, runs a level diagnosis in the terminal and offers to generate the topic's dedicated teacher agent. Use when the user says "I want to start studying X", "create a new topic", "add a topic", "/slp-init".
 ---
 
@@ -43,8 +44,8 @@ ask about** (even if the answer can be "none"):
   `offline` → `local`; `online` → `both`; `auto` or no file → `both` if you
   have web access right now, `local` if not.
 
-Folder `slug`: snake_case of the title
-(e.g. `the_pragmatic_programmer`). If it already exists, stop and ask.
+Folder `slug`: kebab-case of the title
+(e.g. `the-pragmatic-programmer`). If it already exists, stop and ask.
 `order`: the next free one.
 
 ## 2. Generate the filesystem

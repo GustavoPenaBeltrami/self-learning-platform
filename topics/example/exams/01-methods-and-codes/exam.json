@@ -2,28 +2,61 @@
   "title": "Example — HTTP: methods and codes",
   "questions": [
     {
+      "type": "multiple_choice",
       "q": "A client retries the same request three times after a timeout. With which method does the server end up in the same state as with a single request?",
-      "options": ["POST", "PUT", "PATCH that increments", "POST with an empty body"],
+      "options": [
+        "POST",
+        "PUT",
+        "PATCH that increments",
+        "POST with an empty body"
+      ],
       "answer": 1,
       "explanation": "PUT is idempotent: replacing the resource three times leaves the same result as once. POST may create three resources. A PATCH that increments a counter adds one on every attempt. An empty body doesn't make POST idempotent."
     },
     {
+      "type": "multiple_choice",
       "q": "The API reports that the requested resource doesn't exist. Which code fits?",
-      "options": ["500", "301", "404", "201"],
+      "options": [
+        "500",
+        "301",
+        "404",
+        "201"
+      ],
       "answer": 2,
       "explanation": "404 is a client error: it asked for something that doesn't exist. 500 blames the server. 301 is a redirect. 201 means something was created."
     },
     {
+      "type": "multiple_choice",
       "q": "The server is overloaded and can't handle requests for a while. Which code does it return?",
-      "options": ["503", "404", "400", "302"],
+      "options": [
+        "503",
+        "404",
+        "400",
+        "302"
+      ],
       "answer": 0,
       "explanation": "503 Service Unavailable signals a temporary server failure. 404 and 400 blame the client. 302 is a redirect."
     },
     {
+      "type": "multiple_choice",
       "q": "Which method is used to read a resource without modifying it?",
-      "options": ["POST", "DELETE", "PUT", "GET"],
+      "options": [
+        "POST",
+        "DELETE",
+        "PUT",
+        "GET"
+      ],
       "answer": 3,
       "explanation": "GET is safe: it doesn't change state. POST and PUT write, DELETE deletes."
+    },
+    {
+      "type": "open",
+      "q": "A client times out on a PUT and retries it. Why is that safe, and would the same retry be safe with POST?",
+      "rubric": [
+        "States that PUT is idempotent: repeating it leaves the same state",
+        "Explains that POST is not idempotent and a retry may create a duplicate",
+        "Names a way to make POST retries safe (for example an idempotency key) or says it needs one"
+      ]
     }
   ]
 }

@@ -16,9 +16,9 @@
 
 </div>
 
-## Repository description
+SLP is a self-hosted study environment you fully own: it runs on your machine, needs no subscription, and works with any agent and any model, local or paid.
 
-Four pieces that talk to each other through the filesystem:
+Reading is not learning. You read, connect it to what you know, then express it again and again with someone pointing out your mistakes, until you can defend it in an exam. SLP gives you that someone: an agent that teaches, quizzes, grades and makes you review, and a local app where you take notes and sit exams.
 
 | Path | Piece | Role |
 |---|---|---|
@@ -27,131 +27,65 @@ Four pieces that talk to each other through the filesystem:
 | `topics/<slug>/` | filesystem | Notes in Markdown, exams in JSON, attempts, grading and progress. No database |
 | `app/` | app | Local notebook and exam simulator, with dictation (Whisper), Mermaid and LaTeX |
 
-The **filesystem** reads fine on GitHub, in Obsidian or in any editor. `topics/example/` shows the structure; your real topics stay out of git.
+**Full documentation: [selflearningplatform.github.io/docs](https://selflearningplatform.github.io/docs/overview).**
 
-## Getting started
+## Requirements
 
-### Installation
-
-#### Requirements
-
-- **[uv](https://docs.astral.sh/uv/)**: The only thing you need to install.
+- **[uv](https://docs.astral.sh/uv/)**: the only thing you need to install. It fetches Python and the packages.
 
   ```sh
-  curl -LsSf https://astral.sh/uv/install.sh | sh # macOS and Linux
+  curl -LsSf https://astral.sh/uv/install.sh | sh                        # macOS and Linux
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
   ```
-    ```sh
-  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex" # Windows
-  ```
-- **A coding agent**, whichever you use. It has to have permission in the folder of the repo. We recommend claude code.
-- **Internet for the first `uv run slp`**, which downloads the packages. After that it aims to work offline: Mermaid, KaTeX and the fonts ship in the repo (`app/vendor/`).
 
-#### Steps
+- **Recommended**: a coding agent with permission in the repo folder ([Claude Code](https://claude.com/claude-code) recommended, any works), VS Code, and GitHub to keep your topics in your own repo.
+- **Internet for the first `uv run slp`**, which downloads the packages. After that it aims to work offline: Mermaid, KaTeX and the fonts ship in `app/vendor/`.
+
+## Installation
 
 ```sh
 git clone https://github.com/GustavoPenaBeltrami/self-learning-platform.git
 cd self-learning-platform
-```
-
-Add `uv run slp setup` here if you want [dictation](#notes-dictator-support-optional) ready offline.
-
-Open your agent in the folder and run this prompt:
-
-```
-Read AGENTS.md and run slp-setup.
-```
-
-It detects which agent it is and exposes the skills in that agent's format: symlinks if it supports them, conversion if not. Whatever it creates goes to `.git/info/exclude`, so it doesn't clutter the repo. Then start the app:
-
-```sh
 uv run slp
 ```
 
-**Going to keep your topics in your own repo?** Change the remote:
+Want [dictation](https://selflearningplatform.github.io/docs/dictation) ready offline? Run `uv run slp setup` too. Going to keep your topics in your own repo? `git remote set-url origin <your-repo>`.
 
-```sh
-git remote set-url origin <your-repo>
-```
+Work with three windows side by side: your **material** (the PDF, the course), the **app** (`uv run slp`), and your **agent**, open at the repo root.
 
-#### Note's dictator support (optional)
+## Getting started
 
-Speak instead of type: dictate notes, or answer oral exam questions out loud. It runs locally with Whisper. Without it, the mic falls back to your OS dictation.
+Before you start, know your subject, your sources, your timeframe, how often you'll study, and your goal.
 
-<details>
-<summary>Engines, models and setup</summary>
+1. Open your agent in the repo folder and send:
 
-| System | Engine | Disk | Start with |
+   ```
+   Read AGENTS.md, then read agent/skills/slp-setup/SKILL.md and follow it.
+   ```
+
+   On the first run your agent hasn't loaded the skills yet, so it can't call `/slp-setup`: the prompt points it at the file. It exposes the skills in your agent's format (symlinks, or conversion) and adds whatever it creates to `.git/info/exclude`.
+
+2. Run `/slp-init`: from now on the skills load normally. The agent interviews you, creates `topics/<slug>/`, checks your level and offers a teacher for that topic. `topics/example/` shows the structure; your own topics are git-ignored.
+
+3. Start each study session with `/slp-session`.
+
+## Skills
+
+Every skill can be called by name. *manual* ones run only when you call them; *auto* ones are also started by the agent when your request matches.
+
+| Command | Step | Starts | What it does |
 |---|---|---|---|
-| macOS Apple Silicon | mlx-whisper (GPU) | ~2.7 GB | `uv run slp` |
-| macOS Intel, Linux x64, Windows x64 | faster-whisper (CPU) | ~0.7 GB | `uv run slp` |
-| Windows ARM | faster-whisper, emulated x64 Python | ~0.7 GB | `uv run --python cpython-3.12-windows-x86_64-none slp` |
+| `/slp-setup` | setup | manual | Exposes the skills and agents to your agent |
+| `/slp-init` | setup | manual | Creates a topic and checks your level |
+| `/slp-session` | plan | auto | What's pending today across every topic, and what to do |
+| `/slp-summarize` | prepare | invoked | Summarizes material into the topic's notes |
+| `/slp-teach` | prepare | auto | Teaches until it's understood, not memorized |
+| `/slp-exercises` | practice | auto | An applied exercise: code, an ADR, a critique |
+| `/slp-exam` | practice | invoked | Builds an exam you sit in the app |
+| `/slp-grade` | feedback | auto | Grades the attempt against a rubric |
+| `/slp-review` | review | auto | Spaced, interleaved Leitner review so it doesn't fade |
 
-- **Model**: `small` by default on CPU, `turbo` (~1.6 GB) is more accurate. Change it in `/settings`.
-- **Offline**: `uv run slp setup` downloads the model ahead of time. Pick a profile: `auto` (default, downloads on first mic use), `online` (turbo) or `offline` (pick a size, a local model path, or none).
-- **Oral exams**: the audio is saved next to the attempt, and the agent transcribes it with `uv run slp transcribe` to grade the content, not pronunciation.
-
-</details>
-
-### First setup
-
-Once `/slp-setup` is done, create your first **topic**: a book, a certification, a paper, a course. Anything you study, organized the way you want. Run `/slp-init` and the agent asks what it needs to set it up.
-
-#### A topic on disk
-
-Everything about a topic lives in one folder, as Markdown and JSON:
-
-```
-topics/<slug>/
-├── topic.json                  # title, goals, languages, sources, routine
-├── learning.md                 # what you've shown you know, and what you got wrong
-├── resources/                  # your material: PDFs, slides, transcripts
-├── notes/
-│   └── 01-<chapter>.md         # summaries, lessons and your own notes
-├── exams/
-│   └── <exam>/
-│       ├── exam.json           # questions and rubric
-│       └── attempts/
-│           ├── <date>.json     # your answers
-│           ├── <date>-p3.webm  # audio of an oral answer
-│           └── <date>.md       # the grade and feedback
-├── exercises/
-│   └── <exercise>/
-│       ├── prompt.md
-│       └── attempts/<date>.<ext>
-└── progress/
-    ├── status.md               # where you are
-    └── log.md                  # session history
-```
-
-`topics/example/` is a small one to look at. Your own topics are git-ignored.
-
-#### Language
-
-`topic.json` → `language` sets the defaults: `source` is the material's language, `notes` for notes, summaries and lessons, `exams` for exams, exercises and feedback. Ask for another language in any single request ("give me the exam in English") without touching the file. The agent chats in whatever language you write in.
-
-### Studying loop
-
-| Command | Step | What it does |
-|---|---|---|
-| `/slp-session` | plan | What's pending today across every topic, and what to do |
-| `/slp-summarize` | prepare | Summarizes material into the topic's notes |
-| `/slp-teach` | prepare | Teaches until it's understood, not memorized |
-| `/slp-exercises` | practice | An applied exercise: code, an ADR, a critique |
-| `/slp-exam` | practice | Builds an exam you sit in the app |
-| `/slp-grade` | feedback | Grades the attempt against a rubric |
-| `/slp-review` | review | Spaced, interleaved Leitner review so it doesn't fade |
-
-Everything they produce lands in the topic folder and shows up in the app on its own.
-
-### Recommended setup
-
-Three windows side by side. Two monitors help.
-
-| # | Window | Use |
-|---|---|---|
-| 1 | **material** | The PDF, the course, the docs. Whatever you're studying |
-| 2 | **app** | `uv run slp` in the browser: notes, exams, progress |
-| 3 | **agent** | Open at the repo root. Teaches, builds exams, grades |
+Everything they produce lands in the topic folder and shows up in the app on its own. Details: [skills](https://selflearningplatform.github.io/docs/skills).
 
 ## Project identity
 
@@ -162,11 +96,11 @@ Three windows side by side. Two monitors help.
 <table align="center">
   <tr>
     <td><h1 align="center">独</h1><b>doku</b> · by oneself</td>
-    <td><h1 align="center">学</h1>gaku</b> · learning</td>
+    <td><h1 align="center">学</h1><b>gaku</b> · learning</td>
   </tr>
 </table>
 
-A book, a certification, a tool's documentation, a course: everything you study is a **topic**, and SLP builds the full loop around it (preparation, practice, feedback, spaced review). Everything stays as Markdown and JSON on your disk. No database, no account. It all starts with one line in your agent:
+A book, a certification, a tool's documentation, a course: everything you study is a **topic**, and SLP builds the full loop around it (preparation, practice, feedback, spaced review). Everything stays as Markdown and JSON on your disk. No database, no account.
 
 ### Why
 
@@ -185,20 +119,20 @@ Four Japanese design ideas describe what SLP does. They settle decisions; they a
 | 渋い | **shibui** | quiet beauty | hierarchy by lightness, not size |
 | 静寂 | **seijaku** | calm | chrome lives in two bars; content stays quiet |
 
-Two themes, ink and paper: `sumi` 墨 and `kami` 紙. The full design reference is [`app/styles/DESIGN.md`](app/styles/DESIGN.md).
+Two themes, ink and paper: `sumi` 墨 and `kami` 紙. The full design reference is [`app/styles/Design.md`](app/styles/Design.md).
 
-## documentation
+## Roadmap
 
-**Online or offline?** The online profile (a paid agent) is recommended. To run everything on your machine, use opencode + Ollama + `qwen3-coder:30b` (or `gpt-oss:20b` on 16 GB of RAM).
+Test `slp-setup` on Codex, Gemini CLI, Antigravity and Cline, native dictation on Windows ARM, and more: see the [roadmap](https://selflearningplatform.github.io/docs/roadmap) and the [open issues](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues).
 
-**Roadmap:** test `slp-setup-agent` on Codex, Gemini CLI, Antigravity and Cline, and native dictation on Windows ARM. See the [open issues](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues).
+**Online or offline?** The online profile (a paid agent) is recommended. To run everything on your machine, use opencode + Ollama + `qwen3-coder:30b` (or `gpt-oss:20b` on 16 GB of RAM). See [profiles](https://selflearningplatform.github.io/docs/profiles).
 
 **Thanks to** [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `slp-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory and spaced review.
 
-## contributing
+## Contributing
 
 Contributions are welcome. Fork the repo, create your branch, and open a pull request. Skills are edited in `agent/skills/`, never inside an agent's own folder. For bugs or ideas, [open an issue](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues/new).
 
-## license
+## License
 
 [MIT](LICENSE).

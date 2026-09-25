@@ -4,8 +4,11 @@
   "type": "documentation",
   "area": "web",
   "order": 99,
-  "goals": [],
-  "reason": "",
+  "goals": [
+    "Pick the right method for a request and justify it by safety and idempotency",
+    "Choose the status code a response should carry, by range and meaning"
+  ],
+  "reason": "Design and review small REST APIs without guessing methods and codes.",
   "language": {
     "source": "en",
     "notes": "en",

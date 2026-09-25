@@ -3,7 +3,6 @@ topics/*
 .DS_Store
 __pycache__/
 node_modules/
-.claude/settings.local.json
 plan.md
 agent/agents/teacher-*
 local/
