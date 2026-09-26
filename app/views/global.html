@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>独学 · global settings</title>
+<link rel="stylesheet" href="/app/styles/style.css">
+<script src="/app/scripts/theme.js"></script>
+<script src="/app/scripts/shell.js"></script>
+<style>
+  .field { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: .3rem 1rem; padding: var(--spacing-16) 0; }
+  .field + .field { border-top: 1px solid var(--line); }
+  .field label { color: var(--ansi-cyan); }
+  .field .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .field select, .field input, .field button.drop {
+    border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
+    background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
+  }
+  .field input[type=text] { min-width: 0; flex: 1 1 24ch; }
+  .field :is(select, input, button.drop):focus { outline: 1px solid var(--accent); }
+  .field button.drop { display: flex; gap: .5rem; align-items: center; }
+  .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
+  .field .hint::before { content: '// '; color: var(--color-steel); }
+</style>
+
+<body>
+<script>
+const { app, tree, path } = mountShell('settings');
+const statusEl = document.getElementById('status');
+const run = async (busy, work, done = 'saved') => {
+  statusEl.textContent = busy;
+  try {
+    await work();
+    statusEl.textContent = done;
+    return true;
+  } catch (e) {
+    statusEl.textContent = '✕ ' + e.message;
+    return false;
+  }
+};
+const field = (key, control, hint, id = 'set-' + key) => `
+  <div class="field">
+    <label for="${id}">${key}</label>
+    <span class="row">${control}</span>
+    <p class="hint">${hint}</p>
+  </div>`;
+const select = (key, choices, value) => `<select id="set-${key}" data-key="${key}">${optionTags(choices, value)}</select>`;
+
+tree.innerHTML = configTree('global.html');
+path('~/self-learning-platform/settings.json › global');
+
+Promise.all([settings, fontChoices, api('/api/voice-models').catch(() => ({}))]).then(([s, fonts, sizes]) => {
+  const models = [['', 'default (turbo on apple silicon, small on cpu)'],
+    ...Object.entries(sizes).map(([k, m]) => [k, `${k} · ${m.disk} disk · ${m.ram} RAM`])];
+  const isPath = s.voice_model && !(s.voice_model in sizes);
+  if (isPath) models.push([s.voice_model, s.voice_model]);
+  app.innerHTML = `
+    <div class="sheet">
+    ${settingsCrumbs('global', '<button type="button" class="reset" id="reset">reset all to defaults</button>')}
+    ${promptLine('~/self-learning-platform', 'nvim settings.json')}
+    <h1>Global</h1>
+    <p class="minor"># saved under "global" in settings.json at the repo root, on every change</p>
+    ${field('profile', select('profile', [['auto', 'auto (recommended)'], ['online', 'online'], ['offline', 'offline']], s.profile),
+      `auto picks online when the server finds a connection at start, offline otherwise (now: ${esc(s.active_profile || 'unknown')}). online: paid agent, web lookups, models fetched when missing. offline: everything on this machine, nothing is fetched.`)}
+    ${field('ui_font', select('ui_font', fonts, s.ui_font ?? 'mono'), 'font of the whole app: bars, menus, pages. the note body has its own font, picked in the notes toolbar. size: use the zoom in the statusline.')}
+    ${field('voice_model', select('voice_model', models, s.voice_model ?? '') + '<button type="button" class="voice-dl">download</button>',
+      'dictation model. bigger is more accurate and slower. download saves the selected size to models/, so it works offline. a size not downloaded is fetched on first use when online, and falls back to the os dictation when offline.')}
+    ${field('model path', `<input type="text" id="model-path" placeholder="/path/to/a/whisper/model" value="${isPath ? esc(s.voice_model) : ''}">` + key('⏎', 'use path', 'voice-path'),
+      'a model folder you already have (mlx on apple silicon, ctranslate2 elsewhere). used as-is, never downloaded.', 'model-path')}
+    ${field('upload font', '<input type="file" id="font-file" accept=".woff2,.ttf,.otf">',
+      'a .woff2, .ttf or .otf file, stored in fonts/ as a lowercase name with dashes for spaces. a font with the same name is refused.', 'font-file')}
+    <div class="tildes"></div></div>`;
+
+  app.querySelectorAll('[data-key]').forEach(el => el.onchange = () =>
+    run('saving…', () => saveSettings({ [el.dataset.key]: el.value.trim() })));
+  app.querySelectorAll('select').forEach(dropdown);
+
+  document.getElementById('reset').onclick = () => run('saving…', () => saveSettings(s.defaults)).then(ok => ok && location.reload());
+
+  const modelSel = document.getElementById('set-voice_model');
+  app.querySelector('.voice-dl').onclick = () => run('downloading…', () => api('/api/voice-model/download', JSON.stringify({ size: modelSel.value })))
+    .then(ok => ok && location.reload());
+
+  const pathInput = document.getElementById('model-path');
+  const usePath = () => run('saving…', () => saveSettings({ voice_model: pathInput.value.trim() }))
+    .then(ok => ok && location.reload());
+  app.querySelector('.voice-path').onclick = usePath;
+  pathInput.onkeydown = e => { if (e.key === 'Enter') usePath(); };
+
+  document.getElementById('font-file').onchange = e => {
+    const f = e.target.files[0];
+    if (f) run('uploading…', () => api('/api/font?name=' + encodeURIComponent(f.name), f)).then(ok => ok && location.reload());
+  };
+});
+</script>

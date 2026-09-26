@@ -85,9 +85,9 @@ Skills use the Agent Skills format, so they work with Claude Code, Codex, Gemini
 
 - **[notes](https://selflearningplatform.github.io/docs/editor)**: a notebook per topic, saved as Markdown as you type. Tables, Mermaid, LaTeX and images. Upload sources to the topic and open local `path` sources from the app
 - **[exams](https://selflearningplatform.github.io/docs/exam-app)**: sit exams built by the agent: multiple choice, open, practical and oral
-- **cards** (`3 cards` tab): study flashcards from your notes, one concept each, written by `/slp-cards` or by hand (`N` in the cards view, or select text in a note). Answer to yourself, click the card to reveal it, then "knew it", "don't know" or **unsure**: unsure cards wait for `/slp-session` to go over them with you. Leitner scheduling shows only the due ones
+- **cards** (`3 cards` tab): study flashcards from your notes, one concept each, written by `/slp-cards` or by hand (`N` in the cards view, or select text in a note). Answer to yourself, click the card to reveal it, then "knew it", "don't know" or **unsure**: unsure cards wait for `/slp-session` to go over them with you. Leitner scheduling shows only the due ones, with growing waits (set in settings → cards) until a card counts as learned
 - **[dictation](https://selflearningplatform.github.io/docs/dictation)**: speak your notes or oral answers. Runs locally with Whisper, on a key you choose (`ctrl+m` by default)
-- **[settings](https://selflearningplatform.github.io/docs/settings)**: profile, fonts, and themes: two built in, or a theme builder that derives a whole palette from one color. Plus slash commands and keyboard [shortcuts](https://selflearningplatform.github.io/docs/shortcuts)
+- **[settings](https://selflearningplatform.github.io/docs/settings)**: profile, fonts, and themes: six built in, or your own, generated from one color and tweaked color by color. Plus slash commands and keyboard [shortcuts](https://selflearningplatform.github.io/docs/shortcuts)
 
 ## Your topics
 

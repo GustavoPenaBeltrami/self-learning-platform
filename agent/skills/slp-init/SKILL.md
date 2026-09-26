@@ -35,8 +35,8 @@ the answer is "none":
   offer to copy the file into `resources/` (then it needs no `links` entry);
   if they decline, keep the `path`. A missing path: warn in one line, keep
   going.
-- `sources_mode`: offer the default from `profile` in `settings.json` at the
-  repo root: `offline` → `local`; `online` → `both`; `auto` or no file →
+- `sources_mode`: offer the default from `global.profile` in `settings.json` at
+  the repo root (a flat `profile` in older files): `offline` → `local`; `online` → `both`; `auto` or no file →
   `both` if you have web access now, `local` if not.
 
 Slug: kebab-case of the title (`the-pragmatic-programmer`). If the folder

@@ -13,8 +13,9 @@ to the user.
 
 ## 0. Read the Profile
 
-Read `profile` from `settings.json` at the repo root (or `active_profile`
-from `GET /api/settings` if the app is running). Missing file or key = `auto`.
+Read `global.profile` from `settings.json` at the repo root (a flat
+`profile` in older files), or `active_profile`
+from `GET /api/settings` if the app is running. Missing file or key = `auto`.
 `auto` is Online when there is a connection, Offline otherwise; recommend as
 Online and mention the Reference stack in one line.
 

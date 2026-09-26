@@ -106,7 +106,7 @@ With `AskUserQuestion`, one round: **topic(s)** (pending ones first) and
 | Leave it | nothing |
 
 The app is at `http://localhost:8321` (`uv run slp`). An exam opens at
-`/app/views/exam.html?f=topics/<slug>/exams/<exam>/exam.json`.
+`/app/views/exam.html?topic=<slug>&exam=<exam>`.
 
 ## 5. Hand off
 

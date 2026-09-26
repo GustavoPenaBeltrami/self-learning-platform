@@ -53,7 +53,7 @@ def test_http():
         own = {"Origin": f"http://localhost:{port}"}
         assert get("/api/topics", headers=own, host=f"localhost:{port}")[0] == 200
 
-        for p in ("/.git/config", "/app/../.git/config", "/settings.json", "/topics/../.git/config", "/app/"):
+        for p in ("/.git/config", "/app/../.git/config", "/settings.json", "/shortcuts.json", "/topics/../.git/config", "/app/"):
             assert get(p)[0] == 404, p
         assert get("/app/x.js")[0] == 200
         assert get("/settings")[1]["Location"] == "/app/views/settings.html"
@@ -62,6 +62,7 @@ def test_http():
         assert s == 404 and "error" in json.loads(body)
         assert post("/api/nope", b"{}")[0] == 404
         assert get("/api/topic/..%2f..")[0] == 404
+        assert json.loads(get("/api/settings")[2])["defaults"]["profile"] == "auto"
         assert post("/api/settings", b"[1]")[0] == 400
         assert post("/api/settings", b"{}", headers={"Content-Length": "-1"})[0] == 400
         assert post("/api/settings", b"{}", headers={"Content-Length": str(store.BODY_LIMIT + 1)})[0] == 400
@@ -108,6 +109,24 @@ def test_http():
         assert post("/api/cards/demo", b'{"upsert":{"front":"","back":"b"}}')[0] == 400
         assert post("/api/cards/demo", b'{"delete":"new-one"}')[0] == 200
         assert post("/api/cards/demo", b'{"delete":"new-one"}')[0] == 404
+
+        (d / "exams" / "e1").mkdir(parents=True)
+        (d / "exams" / "e1" / "exam.json").write_text(json.dumps({"title": "E", "questions": [{"q": "a", "options": ["x", "y"], "answer": 0}]}))
+        attempt = json.dumps({"attempt": {"exam": "e1", "answers": [{"i": 0, "type": "multiple_choice", "chosen": 0}]}}).encode()
+        assert post("/api/exams/demo", attempt, headers=evil)[0] == 403
+        s, h, body = post("/api/exams/demo", attempt)
+        assert s == 200 and json.loads(body)["path"].startswith("topics/demo/exams/e1/attempts/")
+        assert post("/api/exams/demo", b'{"attempt":{"exam":"nope","answers":[]}}')[0] == 404
+        assert post("/api/exams/demo", b'{"answers":[]}')[0] == 400
+        s, h, body = get("/api/exams")
+        topic = json.loads(body)["topics"][0]
+        assert s == 200 and "links" not in topic and topic["exams"] == [{"name": "e1", "title": "E", "questions": 1, "attempts": 1, "pending": 1}]
+        assert get("/api/index")[0] == 404
+        assert json.loads(get("/api/card-config")[2]) == {"intervals": store.INTERVALS, "default": store.INTERVALS}
+        assert post("/api/card-config", b'{"intervals":[3,4]}', headers=evil)[0] == 403
+        s, h, body = post("/api/card-config", b'{"intervals":[3,4]}')
+        assert s == 200 and json.loads(body)["intervals"] == [3, 4] and json.loads((tmp / "settings.json").read_text())["cards"] == {"intervals": [3, 4]}
+        assert post("/api/card-config", b'{"intervals":[0]}')[0] == 400
 
         assert get("/topics/demo/resources/page.html")[1].get("Content-Security-Policy") == "sandbox"
         assert "Content-Security-Policy" not in get("/topics/demo/resources/pic.png")[1]

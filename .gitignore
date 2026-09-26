@@ -7,6 +7,8 @@ plan.md
 agent/agents/teacher-*
 local/
 /settings.json
+/shortcuts.json
+/card-config.json
 /fonts/
 /models/
 /.venv/

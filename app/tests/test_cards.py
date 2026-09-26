@@ -8,19 +8,40 @@ import store
 def test_schedule():
     at = "2026-09-26T10:00"
     cases = [
-        ([], None, (0, True)),
-        (["again"], "2026-09-26T09:00", (0, True)),
-        (["good"], "2026-09-26T09:00", (1, False)),
-        (["good"], "2026-09-25T10:00", (1, True)),
-        (["good", "good"], "2026-09-24T10:00", (2, False)),
-        (["good", "good"], "2026-09-23T10:00", (2, True)),
-        (["good"] * 5, "2026-09-20T10:00", (3, False)),
-        (["good"] * 5, "2026-09-19T10:00", (3, True)),
-        (["good", "good", "again", "good"], "2026-09-25T10:00", (1, True)),
-        (["good", "good", "again"], "2026-09-26T09:59", (0, True)),
+        ([], None, (0, True, None)),
+        (["again"], "2026-09-26T09:00", (0, True, "2026-09-26T09:00")),
+        (["good"], "2026-09-26T09:00", (1, False, "2026-09-27T09:00")),
+        (["good"], "2026-09-25T10:00", (1, True, "2026-09-26T10:00")),
+        (["good", "good"], "2026-09-24T10:00", (2, False, "2026-09-27T10:00")),
+        (["good", "good"], "2026-09-23T10:00", (2, True, "2026-09-26T10:00")),
+        (["good"] * 3, "2026-09-22T10:00", (3, False, "2026-09-27T10:00")),
+        (["good"] * 6, "2026-09-01T10:00", (6, False, "2026-10-11T10:00")),
+        (["good"] * 7, "2026-09-01T10:00", (7, False, None)),
+        (["good"] * 9, "2026-01-01T10:00", (7, False, None)),
+        (["good", "good", "again", "good"], "2026-09-25T10:00", (1, True, "2026-09-26T10:00")),
+        (["good"] * 7 + ["again"], "2026-09-26T09:59", (0, True, "2026-09-26T09:59")),
     ]
     for recalls, last, want in cases:
         assert store.schedule(recalls, last, at) == want, (recalls, last, want)
+    assert store.schedule(["good", "good"], "2026-09-22T10:00", at, [3, 4]) == (2, True, "2026-09-26T10:00")
+    assert store.schedule(["good"] * 3, "2026-09-22T10:00", at, [3, 4]) == (3, False, None)
+
+
+def test_card_config():
+    tmp = pathlib.Path(tempfile.mkdtemp()).resolve()
+    real = store.ROOT
+    store.ROOT = tmp
+    try:
+        assert store.read_card_config() == {"intervals": store.INTERVALS, "default": store.INTERVALS}
+        assert store.save_card_config({"intervals": [3, 4]}) == {"intervals": [3, 4], "default": store.INTERVALS}
+        assert json.loads((tmp / "settings.json").read_text())["cards"] == {"intervals": [3, 4]}
+        for bad in ([], [0], [1.5], [True], ["3"], [3651], list(range(1, 22)), None):
+            expect_rejection(lambda: store.save_card_config({"intervals": bad}))
+        (tmp / "settings.json").write_text('{"global": {}, "cards": {"intervals": [0]}}')
+        assert store.read_card_config() == {"intervals": store.INTERVALS, "default": store.INTERVALS}, "hand-broken file reads as defaults"
+    finally:
+        store.ROOT = real
+        shutil.rmtree(tmp)
 
 
 def expect_rejection(f):
@@ -45,6 +66,7 @@ def test_deck():
         (c / "reviews.jsonl").write_text('{"at": "2026-09-26T09:00", "id": "gone", "recall": "good"}\nbroken')
         idx = {t["slug"]: t for t in store.cards_index()["topics"]}
         assert (idx["demo"]["cards"], idx["demo"]["due"], idx["empty"]["cards"]) == (2, 2, 0), idx
+        assert [c["front"] for c in idx["demo"]["sets"][0]["index"]] == ["fa", "fb"] and idx["empty"]["sets"] == [], idx
 
         assert store.save_reviews("demo", [{"id": "a", "recall": "good"}]) == {"ok": True, "due": 1}
         lines = (c / "reviews.jsonl").read_text().splitlines()
@@ -52,7 +74,7 @@ def test_deck():
         deck = store.read_deck("demo")
         assert [x["id"] for x in deck["cards"]] == ["b", "a"], "due first"
         a = deck["cards"][1]
-        assert (a["box"], a["due"], a["front"], a["note"]) == (1, False, "fa", "A › B") and a["last"]
+        assert (a["box"], a["due"], a["learned"], a["front"], a["note"]) == (1, False, False, "fa", "A › B") and a["last"] and a["next"]
         assert deck["cards"][0]["last"] is None
 
         expect_rejection(lambda: store.save_reviews("demo", [{"id": "gone", "recall": "good"}]))
@@ -74,6 +96,7 @@ def test_manual_cards():
         (tmp / "demo").mkdir()
         deck = store.upsert_card("demo", {"front": " Why is PUT idempotent? ", "back": "It replaces.", "note": "A › B"})
         assert deck["cards"][0]["id"] == "why-is-put-idempotent" and deck["cards"][0]["front"] == "Why is PUT idempotent?"
+        assert deck["cards"][0]["note"] == "A", "a card belongs to its H1 only"
         deck = store.upsert_card("demo", {"front": "Why is PUT idempotent?", "back": "Again."})
         assert [c["id"] for c in deck["cards"]] == ["why-is-put-idempotent", "why-is-put-idempotent-2"]
         saved = json.loads((tmp / "demo" / "cards" / "cards.json").read_text())
@@ -111,8 +134,36 @@ def test_manual_cards():
         shutil.rmtree(tmp)
 
 
+def test_card_sets():
+    tmp = pathlib.Path(tempfile.mkdtemp()).resolve()
+    real = store.TOPICS
+    store.TOPICS = tmp
+    try:
+        (tmp / "demo" / "notes").mkdir(parents=True)
+        (tmp / "demo" / "notes" / "01-a.md").write_text("# A\n\n## B\n")
+        (tmp / "demo" / "notes" / "02-empty.md").write_text("# Empty\n")
+        store.upsert_card("demo", {"front": "from note", "back": "b", "note": "A › B"})
+        store.upsert_card("demo", {"front": "custom", "back": "b", "set": " Verbs "})
+        store.upsert_card("demo", {"front": "loose", "back": "b"})
+        deck = store.upsert_card("demo", {"front": "picked", "back": "b", "set": "A"})
+        assert {c["front"]: c["set"] for c in deck["cards"]} == {"from note": "A", "custom": "Verbs", "loose": "unsorted", "picked": "A"}
+        assert [(x["name"], x["file"], x["cards"]) for x in deck["sets"]] == [("A", "01-a.md", 2), ("Verbs", None, 1), ("unsorted", None, 1)]
+        assert deck["notes"] == ["A", "Empty"], "notes without cards have no set"
+        saved = {c["front"]: c for c in json.loads((tmp / "demo" / "cards" / "cards.json").read_text())}
+        assert saved["picked"]["note"] == "A" and "set" not in saved["picked"], "a note set is stored as the note"
+        assert saved["custom"]["set"] == "Verbs"
+        deck = store.upsert_card("demo", {"id": saved["custom"]["id"], "front": "custom", "back": "b", "set": ""})
+        assert "set" not in json.loads((tmp / "demo" / "cards" / "cards.json").read_text())[1], "clearing the set drops it"
+        expect_rejection(lambda: store.upsert_card("demo", {"front": "f", "back": "b", "set": 1}))
+    finally:
+        store.TOPICS = real
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     test_manual_cards()
+    test_card_sets()
     test_schedule()
+    test_card_config()
     test_deck()
     print("ok")

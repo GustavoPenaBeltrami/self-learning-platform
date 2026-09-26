@@ -37,7 +37,7 @@ Language: `language.notes` of `topic.json`.
 - 5-15 cards per note (per h1). Favor what the note stresses: definitions,
   distinctions, reasons, trade-offs. Skip trivia and examples that are only
   illustrations.
-- `note` is the heading path the fact sits under: `H1 › H2`.
+- `note` is the H1 of the note the fact sits under (just the H1, no H2/H3).
 - `id`: kebab-case from the fact (`put-idempotent`), unique in the topic.
 
 ## 3. Upsert, never rewrite
@@ -53,6 +53,8 @@ Match each existing card to the notes:
 
 Keep `flagged` as it is on every card you keep or update: only the learner
 sets it, and it is cleared after going over the concept (slp-session).
+
+Every card you write has a `note` whose H1 names its note: that puts it in the note's card set. Never set `set`; custom sets are the learner's.
 
 Cards with `"by": "user"` are the learner's: never edit or delete them, and
 don't add a card for a fact one of them already covers. Cards outside the

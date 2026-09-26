@@ -18,29 +18,27 @@
   .source::before { content: '// '; color: var(--color-steel); }
   .source a { color: var(--ansi-cyan); }
   .flag { color: var(--ansi-yellow); margin-left: .6rem; }
+  .tree details details > summary { color: var(--ansi-cyan); }
   .stage { display: flex; flex-direction: column; align-items: center; gap: var(--spacing-24); padding: var(--spacing-32) 0 var(--spacing-16); }
-  .fcard { width: min(520px, 100%); min-height: 300px; display: flex; flex-direction: column; justify-content: center; gap: 1rem;
-    padding: 2rem; background: var(--color-graphite); color: var(--ink); border: 1px solid var(--color-slate); border-radius: 14px;
-    font: inherit; font-size: 18px; line-height: 1.5; text-align: center; cursor: pointer; }
-  .fcard .flag { margin: 0; font-size: 13px; }
-  .fc-num { font-size: 12px; color: var(--muted); }
-  .fc-a { font-size: 18px; }
-  .fcard .source { margin: 0; font-size: 13px; }
+  .fcard { position: relative; width: min(520px, 100%); min-height: 300px; display: flex; flex-direction: column; justify-content: center; gap: 1rem;
+    padding: 2rem; background: var(--color-graphite); color: var(--ink); border: 1px solid var(--color-slate); border-radius: 0;
+    font: 400 15px/1.6 var(--mono); text-align: center; cursor: pointer; transition: border-color .12s; }
+  .fcard .frame-title { position: absolute; top: -.8em; left: .6rem; margin: 0; font-size: 12px; }
+  .stage .fcard:hover, .stage .fcard:focus-visible { border-color: var(--accent); outline: 0; }
+  .fcard .flag { margin: 0; font-size: 12px; }
+  .fcard .source { margin: 0; font-size: 12px; }
   .reveal-layer { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: var(--spacing-24); padding: 16px; perspective: 1400px;
-    background: color-mix(in srgb, var(--color-void) 45%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
-  .reveal-layer .keys { margin: 0; justify-content: center; }
-  .stage + .keys { margin-top: 0; justify-content: center; }
-  .flipper { display: grid; padding: 0; transform-style: preserve-3d; cursor: default; }
+    gap: var(--spacing-24); padding: 16px; perspective: 1400px; background: color-mix(in srgb, var(--color-void) 60%, transparent); }
+  body:has(.reveal-layer) :is(.stage, .stage + .keys) { visibility: hidden; }
+  .reveal-layer .keys { margin: 0; }
+  .stage + .keys { margin-top: 0; }
+  .flipper { display: grid; padding: 0; transform-style: preserve-3d; cursor: default; border-color: var(--accent); }
   .flipper.flipped { transform: rotateY(180deg); }
-  .flipper .face { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; gap: .9rem; padding: 2rem;
-    border-radius: inherit; background: var(--color-graphite); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+  .flipper .face { position: relative; grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; gap: .9rem; padding: 2rem;
+    margin: 0; background: var(--color-graphite); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
   .flipper .back { transform: rotateY(180deg); }
-  .flipper .back .fc-q { font-size: 13px; color: var(--muted); }
+  .flipper .back .fc-q { font-size: 12px; color: var(--muted); }
   @media (prefers-reduced-motion: no-preference) {
-    .stage .fcard { transition: transform .2s ease, box-shadow .2s ease; }
-    .stage .fcard:hover, .stage .fcard:focus-visible { transform: translateY(-8px) rotate(-.4deg);
-      box-shadow: 0 18px 36px color-mix(in srgb, var(--color-void) 70%, transparent); }
     .flipper { transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
   }
 </style>
@@ -51,24 +49,46 @@ const params = new URLSearchParams(location.search);
 const { app, tree, tools, path, mode } = mountShell('cards');
 const statusEl = document.getElementById('status');
 const slug = params.get('topic');
-const INTERVALS = [0, 1, 3, 7];
-const pad = n => String(n).padStart(2, '0');
 const headingId = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
 const deckUrl = () => '/api/cards/' + encodeURIComponent(slug);
 let pending = [], onKey = null, deck;
 
-function buildTree(topics) {
-  tree.innerHTML = topics.map(t => folder(t.slug + '/', t.cards,
-    `<ul><li><a href="?topic=${encodeURIComponent(t.slug)}"${t.slug === slug ? ' aria-current="page"' : ''}>
-      <span class="n">›</span><span>${t.cards ? `${t.due} due` : '(no cards)'}</span></a></li></ul>`,
-    t.slug === slug, t.title)).join('');
+const setName = params.get('set');
+let topicsCache = [], jump = null, currentId = null;
+const inSet = () => deck.cards.filter(c => !setName || c.set === setName);
+const setLabel = s => s.file ? s.file : s.name;
+const setUrl = (topic, name) => `?topic=${encodeURIComponent(topic)}&set=${encodeURIComponent(name)}`;
+
+const cardRows = (cards, href) => cards.map((c, i) => `<li><a href="${href(c)}" data-card="${esc(c.id)}"${c.id === currentId ? ' aria-current="page"' : ''}>
+  <span class="n">${i + 1}</span><span>${esc(c.front)}</span></a></li>`).join('');
+
+function buildTree() {
+  tree.innerHTML = topicsCache.map(t => {
+    const mine = t.slug === slug && deck;
+    const sets = mine ? deck.sets.map(s => ({ ...s, index: deck.cards.filter(c => c.set === s.name) })) : t.sets;
+    const body = !sets.length ? '<ol><li class="empty">(no cards)</li></ol>' : sets.map(s => {
+      const open = mine && (!setName || s.name === setName);
+      const html = folder(setLabel(s), s.cards,
+        `<ol>${cardRows(s.index, c => setUrl(t.slug, s.name) + '&card=' + encodeURIComponent(c.id))}</ol>`, false, s.name);
+      return open ? html : html.replace('<details open', '<details');
+    }).join('');
+    return folder(t.slug + '/', t.cards, body, t.slug === slug, t.title);
+  }).join('');
 }
 
+tree.addEventListener('click', e => {
+  const a = e.target.closest('a[data-card]');
+  const q = a && new URLSearchParams(a.search);
+  if (!a || !deck || !setName || q.get('topic') !== slug || q.get('set') !== setName) return;
+  e.preventDefault();
+  jump ? jump(a.dataset.card) : study(false, a.dataset.card);
+});
+
 const load = async () => {
-  const data = await api('/api/cards');
-  buildTree(data.topics);
-  return data.topics;
+  topicsCache = (await api('/api/cards')).topics;
+  buildTree();
+  return topicsCache;
 };
 
 async function index() {
@@ -79,20 +99,29 @@ async function index() {
     app.innerHTML = offline(e);
     return;
   }
-  path('~/notes/topics/*/cards');
+  path('~/topics/*/cards');
   app.innerHTML = `
     <div class="sheet">
+    ${crumbs([['cards']])}
     ${promptLine('~/topics', 'ls */cards')}
     <table class="htop">
-      <thead><tr><th class="num">#</th><th>TOPIC</th><th class="num">CARDS</th><th class="num">DUE</th><th class="num">UNSURE</th></tr></thead>
+      <thead><tr><th class="num">#</th><th>TOPIC</th><th class="num">CARDS</th><th class="num">DUE</th><th class="num">UNSURE</th><th class="num">LEARNED</th></tr></thead>
       <tbody>${topics.map(l => `
         <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
-          <td class="num">${l.order < 999 ? pad(l.order) : '—'}</td>
+          <td class="num">${l.order < 1000 ? String(l.order).padStart(3, '0') : '—'}</td>
           <td class="wide"><a href="?topic=${encodeURIComponent(l.slug)}">${esc(l.title)}</a><br><span class="sub">${esc(l.subtitle || '')}</span></td>
           <td class="num${l.cards ? '' : ' zero'}">${l.cards}</td>
           <td class="num${l.due ? '' : ' zero'}">${l.due}</td>
           <td class="num${l.flagged ? '' : ' zero'}">${l.flagged}</td>
-        </tr>`).join('')}${topics.length ? '' : noTopicsRow(5)}</tbody>
+          <td class="num${l.learned ? '' : ' zero'}">${l.learned}</td>
+        </tr>${l.sets.map(s => `
+        <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
+          <td></td><td class="wide"><span class="sub">└─ </span><a href="${esc(setUrl(l.slug, s.name))}">${esc(setLabel(s))}</a></td>
+          <td class="num">${s.cards}</td>
+          <td class="num${s.due ? '' : ' zero'}">${s.due}</td>
+          <td class="num${s.flagged ? '' : ' zero'}">${s.flagged}</td>
+          <td class="num${s.learned ? '' : ' zero'}">${s.learned}</td>
+        </tr>`).join('')}`).join('')}${topics.length ? '' : noTopicsRow(6)}</tbody>
     </table>
     <div class="tildes"></div></div>`;
 }
@@ -113,46 +142,63 @@ addEventListener('pagehide', () => {
 
 const leave = () => {
   if (pending.length && !confirm('leave the session? the ratings so far are saved')) return;
-  location.href = 'cards.html';
+  location.href = setName ? '?topic=' + encodeURIComponent(slug) : 'cards.html';
 };
 
 function nextIn(cards) {
-  const soon = Math.min(...cards.filter(c => c.last).map(c => new Date(c.last).getTime() + INTERVALS[c.box] * 864e5));
+  const soon = Math.min(...cards.filter(c => c.next).map(c => new Date(c.next).getTime()));
   const hours = Math.max(1, Math.round((soon - Date.now()) / 36e5));
   return !isFinite(soon) ? '—' : hours < 48 ? hours + 'h' : Math.round(hours / 24) + 'd';
 }
 
 
-const KEYNAME = { Space: ' ', '⏎': 'Enter' };
-const keysHTML = defs => `<div class="keys">${defs.map(([k, t, c]) => key(k, t, c)).join('')}</div>`;
+const keysHTML = defs => `<div class="keys">${defs.map(([k, t, c]) => key(keyFor(k), t, c)).join('')}</div>`;
 
-function toolbar(bar) {
-  tools.innerHTML = bar.length ? `<div class="wb-mod pill">${bar.map(([k, t]) =>
-    `<button type="button" title="${esc(t)} · ${esc(k)}" aria-label="${esc(t)}">${esc(t.toLowerCase())}</button>`).join('')}</div>` : '';
-  tools.querySelectorAll('button').forEach((b, i) => {
+const TOOL = { 'new set': 'newset', 'new card': 'plus', new: 'plus', edit: 'edit', delete: 'trash', list: 'list', skip: 'skip',
+  'study due': 'due', 'study all': 'flashcard', back: 'back' };
+const GROUP = { newset: 0, plus: 0, edit: 0, trash: 0, list: 1, skip: 1, due: 1, flashcard: 1, back: 2 };
+
+function toolbar(bar, info) {
+  const mods = [[], [], []];
+  bar.forEach(([k, t, , fn]) => {
+    const icon = TOOL[t.toLowerCase()];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.tip = `${t} · ${keyFor(k)}`;
+    b.setAttribute('aria-label', t);
+    b.innerHTML = svg(icon);
     b.onmousedown = e => e.preventDefault();
-    b.onclick = bar[i][3];
+    b.onclick = fn;
+    mods[GROUP[icon]].push(b);
   });
+  tools.replaceChildren(...mods.filter(m => m.length).map(m => {
+    const mod = document.createElement('div');
+    mod.className = 'wb-mod pill';
+    mod.append(...m);
+    return mod;
+  }));
+  tools.insertAdjacentHTML('beforeend', `<div class="wb-mod pill">${infoButton(info)}</div>`);
 }
 
 function wire(defs, bar = [], root = app) {
   const buttons = root.querySelectorAll('.keys .key');
   defs.forEach((d, i) => buttons[i].onclick = d[3]);
-  toolbar(bar);
   const all = defs.concat(bar);
+  toolbar(bar, all.map(([k]) => k).filter(k => k !== 'Esc').concat(root === app ? ['cards.back', 'cards.save'] : ['cards.close']));
   onKey = e => {
-    const pressed = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    const d = all.find(([k]) => k !== 'Esc' && (KEYNAME[k] || k.toLowerCase()) === pressed);
-    if (!d || (pressed === ' ' || pressed === 'Enter') && e.target.closest?.('button, a')) return;
+    const d = all.find(([k]) => k !== 'Esc' && pressed(e, k));
+    if (!d || native(e) && e.target.closest?.('button, a')) return;
     e.preventDefault();
     d[3]();
   };
 }
 
 function header(note, command) {
+  const set = setName && deck.sets.find(s => s.name === setName);
   return `
     <div class="sheet">
-    ${promptLine('~/topics/' + slug, command)}
+    ${crumbs([['cards', 'cards.html'], [deck.title, '?topic=' + encodeURIComponent(slug)], ...(setName ? [[set ? setLabel(set) : setName]] : [])])}
+    ${promptLine('~/topics/' + slug, command + (setName ? ' ' + (set?.file ? 'notes/' + set.file : setName) : ''))}
     <h1>${esc(deck.title)}</h1>
     <p class="minor"># ${note}</p>`;
 }
@@ -171,7 +217,7 @@ const cardHTML = (c, i, open) => `<div class="card">
 </div>`;
 
 const reloadList = () => api(deckUrl()).then(r => { deck = r; list(); });
-const newCard = then => cardForm(slug).then(r => r && then(r));
+const newCard = then => cardForm(slug, { set: setName || '' }).then(r => r && (load(), then(r)));
 const page = (note, command, body, defs, bar = []) => {
   app.innerHTML = header(note, command) + body + (defs.length ? keysHTML(defs) : '') + '<div class="tildes"></div></div>';
   vizPaint(app);
@@ -180,62 +226,79 @@ const page = (note, command, body, defs, bar = []) => {
 const BACK = ['Esc', 'Back', '', () => leave()];
 
 function empty() {
-  const none = !deck.cards.length;
-  const add = ['N', 'New card', none ? 'cta' : '', () => newCard(r => { deck = r; study(false); })];
-  page(none ? 'no cards yet — press N to write one, or ask your agent: /slp-cards' : `nothing due · next in ${nextIn(deck.cards)}`,
-    'ls cards/', '', none ? [add] : [['A', 'Study all', 'cta', () => study(true)]],
-    none ? [BACK] : [add, ['L', 'List', '', list], BACK]);
+  jump = null;
+  currentId = null;
+  buildTree();
+  const none = !inSet().length;
+  const add = ['cards.new', 'New card', none ? 'cta' : '', () => newCard(r => { deck = r; study(false); })];
+  page(none ? `no cards yet — press ${keyFor('cards.new')} to write one, or ask your agent: /slp-cards` : `nothing due · next in ${nextIn(inSet())}`,
+    'ls cards/', '', none ? [add] : [['cards.all', 'Study all', 'cta', () => study(true)]],
+    none ? [BACK] : [add, ['cards.list', 'List', '', list], BACK]);
   mode('NORMAL');
-  statusEl.textContent = none ? 'no cards' : `${deck.cards.length} cards · 0 due`;
+  statusEl.textContent = none ? 'no cards' : `${inSet().length} cards · 0 due`;
 }
 
 function list() {
-  page(`${deck.cards.length} cards · ${deck.cards.filter(c => c.due).length} due · click a card to edit it`, 'ls -l cards/', `
+  jump = null;
+  currentId = null;
+  buildTree();
+  const cards = inSet();
+  page(`${cards.length} cards · ${cards.filter(c => c.due).length} due · click a card to edit it`, 'ls -l cards/', `
     <table class="htop">
       <thead><tr><th class="num">#</th><th>FRONT</th><th class="num">BOX</th><th>DUE</th><th>UNSURE</th><th></th></tr></thead>
-      <tbody>${deck.cards.map((c, i) => `
+      <tbody>${cards.map((c, i) => `
         <tr data-i="${i}">
           <td class="num">${pad(i + 1)}</td>
           <td class="wide">${vizText(c.front)}<br><span class="sub">${esc(c.note || '')}</span></td>
           <td class="num">${c.box}</td>
-          <td class="${c.due ? '' : 'zero'}">${c.due ? 'now' : 'later'}</td>
+          <td class="${c.due ? '' : 'zero'}">${c.due ? 'now' : c.learned ? 'learned' : 'later'}</td>
           <td class="${c.flagged ? '' : 'zero'}">${c.flagged ? '?' : '—'}</td>
           <td><a href="#" data-del aria-label="delete card">✕</a></td>
         </tr>`).join('')}</tbody>
-    </table>`, [], [['N', 'New card', '', () => newCard(r => { deck = r; list(); })],
-      ['S', 'Study due', '', () => study(false)], ['A', 'Study all', '', () => study(true)], BACK]);
+    </table>`, [], [['cards.new', 'New card', '', () => newCard(r => { deck = r; list(); })],
+      ['cards.due', 'Study due', '', () => study(false)], ['cards.all', 'Study all', '', () => study(true)], BACK]);
   mode('NORMAL');
-  statusEl.textContent = `${deck.cards.length} cards`;
+  statusEl.textContent = `${cards.length} cards`;
   app.querySelector('tbody').onclick = e => {
     const row = e.target.closest('tr[data-i]');
     if (!row) return;
     e.preventDefault();
-    const card = deck.cards[row.dataset.i];
+    const card = cards[row.dataset.i];
     (e.target.closest('[data-del]') ? deleteCard(slug, card) : cardForm(slug, card)).then(r => { if (r) { deck = r; list(); } });
   };
 }
 
-function study(all) {
-  let queue = deck.cards.filter(c => all || c.due);
+function study(all, first) {
+  let queue = inSet().filter(c => all || c.due || c.id === first);
   if (!queue.length) return empty();
+  const toFront = id => {
+    const i = queue.findIndex(c => c.id === id);
+    if (i >= 0) return queue.unshift(...queue.splice(i, 1));
+    const card = deck.cards.find(c => c.id === id);
+    if (card) { queue.unshift(card); total++; }
+  };
   let total = queue.length, done = 0;
   const rated = new Map();
+  if (first) toFront(first);
+  jump = id => { toFront(id); show(); };
   const again = () => [...rated.values()].filter(r => r === 'again').length;
   const unsureCount = () => deck.cards.filter(c => c.flagged && rated.has(c.id)).length;
 
   const show = () => {
     closeLayer();
     const c = queue[0];
+    currentId = c.id;
+    buildTree();
     page(`${total} cards${all ? ' · all' : ' due'} · answer it to yourself, then reveal`, 'cards ' + (all ? '--all' : '--due'), `
       <div class="stage">
         <button type="button" class="fcard" id="fcard" aria-label="Reveal the answer">
-          <span class="fc-num">${pad(done + 1)} / ${pad(total)}</span>
+          <span class="frame-title">card ${pad(done + 1)}/${pad(total)}</span>
           <span class="fc-q">${vizText(c.front)}</span>${flagHTML(c)}
         </button>
       </div>`,
-      [['Space', 'Reveal', 'cta', reveal]],
-      [['N', 'New', '', add], ['E', 'Edit', '', edit], ['L', 'List', '', toList], ['S', 'Skip', '', skip],
-       ['D', 'Delete', '', remove], ...(all || rated.size ? [] : [['A', 'Study all', '', () => study(true)]]), BACK]);
+      [['cards.reveal', 'Reveal', 'cta', reveal]],
+      [['cards.new', 'New', '', add], ['cards.edit', 'Edit', '', edit], ['cards.list', 'List', '', toList], ['cards.skip', 'Skip', '', skip],
+       ['cards.delete', 'Delete', '', remove], ...(all || rated.size ? [] : [['cards.all', 'Study all', '', () => study(true)]]), BACK]);
     app.querySelector('#fcard').onclick = reveal;
     statusEl.textContent = `${done}/${total} · didn't know ${again()}`;
     mode('NORMAL');
@@ -245,11 +308,11 @@ function study(all) {
     closeLayer();
     layer = document.createElement('div');
     layer.className = 'reveal-layer';
-    layer.setAttribute('aria-label', 'answer · 1 don\'t know, 2 knew it, 3 unsure, esc back');
+    layer.setAttribute('aria-label', `answer · ${choices.map(([k, t]) => keyFor(k) + ' ' + t.toLowerCase()).join(', ')}, esc back`);
     layer.innerHTML = `
       <div class="fcard flipper" role="dialog" aria-label="Answer">
-        <div class="face front"><span class="fc-q">${vizText(c.front)}</span></div>
-        <div class="face back"><span class="fc-q">${vizText(c.front)}</span><span class="fc-a">${vizText(c.back)}</span>${sourceHTML(c)}</div>
+        <div class="face front"><span class="frame-title">question</span><span class="fc-q">${vizText(c.front)}</span></div>
+        <div class="face back"><span class="frame-title">answer</span><span class="fc-q">${vizText(c.front)}</span><span class="fc-a">${vizText(c.back)}</span>${sourceHTML(c)}</div>
       </div>
       ${keysHTML(choices)}`;
     document.body.append(layer);
@@ -287,8 +350,8 @@ function study(all) {
       queue.length ? show() : finish();
     }).catch(e => statusEl.textContent = '✕ ' + e.message);
   };
-  const choices = [['1', "Don't know", '', () => rate('again')], ['2', 'Knew it', 'cta', () => rate('good')],
-                   ['3', 'Unsure', '', unsure]];
+  const choices = [['cards.forgot', "Don't know", '', () => rate('again')], ['cards.knew', 'Knew it', 'cta', () => rate('good')],
+                   ['cards.unsure', 'Unsure', '', unsure]];
   const skip = () => { queue.push(queue.shift()); show(); };
   const add = () => newCard(r => {
     const card = r.cards.find(c => !deck.cards.some(o => o.id === c.id));
@@ -316,6 +379,9 @@ function study(all) {
   const finish = async () => {
     closeLayer();
     onKey = null;
+    jump = null;
+    currentId = null;
+    buildTree();
     let saved;
     try {
       const r = await flush();
@@ -329,7 +395,7 @@ function study(all) {
       missed.map((c, i) => cardHTML(c, i, true)).join('')
         + (flagged ? '<p class="minor"># cards marked unsure wait for your agent: /slp-session offers to go over them</p>' : '')
         + `<p class="minor"># ${saved}</p>`,
-      [['⏎', 'Again', 'cta', () => location.reload()]], [['L', 'List', '', reloadList], BACK]);
+      [['cards.again', 'Again', 'cta', () => location.reload()]], [['cards.list', 'List', '', reloadList], BACK]);
     mode('DONE');
     statusEl.textContent = `didn't know ${missed.length - flagged} · unsure ${flagged}`;
     scrollTo(0, 0);
@@ -344,21 +410,52 @@ function closeLayer() {
 }
 
 addEventListener('keydown', e => {
-  if (!slug || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!slug || e.repeat) return;
   if (e.target.closest?.('textarea, input, select, dialog')) return;
-  if (e.key === 'Escape' && layer) return backToCard();
-  if (e.key === 'Escape') return leave();
+  const escape = e.key === 'Escape' && !(e.metaKey || e.ctrlKey || e.altKey);
+  if (escape && layer) return backToCard();
+  if (escape) return leave();
   onKey?.(e);
 });
 
 app.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
 
+const newSet = () => cardForm(slug, {}, true).then(r => {
+  if (!r) return;
+  const card = r.cards.find(c => !deck.cards.some(o => o.id === c.id));
+  location.href = setUrl(slug, card.set);
+});
+
+function sets() {
+  jump = null;
+  currentId = null;
+  buildTree();
+  if (!deck.cards.length) return empty();
+  const due = deck.cards.filter(c => c.due).length;
+  page(`${deck.sets.length} sets · ${deck.cards.length} cards · ${due} due`, 'ls cards/', `
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>SET</th><th class="num">CARDS</th><th class="num">DUE</th><th class="num">UNSURE</th><th class="num">LEARNED</th></tr></thead>
+      <tbody>${deck.sets.map((s, i) => `
+        <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
+          <td class="num">${pad(i + 1)}</td>
+          <td class="wide"><a href="${esc(setUrl(slug, s.name))}">${esc(s.name)}</a><br><span class="sub">${s.file ? 'notes/' + esc(s.file) : s.name === 'unsorted' ? 'no set, no note' : 'custom set'}</span></td>
+          <td class="num">${s.cards}</td>
+          <td class="num${s.due ? '' : ' zero'}">${s.due}</td>
+          <td class="num${s.flagged ? '' : ' zero'}">${s.flagged}</td>
+          <td class="num${s.learned ? '' : ' zero'}">${s.learned}</td>
+        </tr>`).join('')}</tbody>
+    </table>`, due ? [['cards.due', 'Study due', 'cta', () => study(false)]] : [],
+    [['cards.newset', 'New set', '', newSet], ['cards.new', 'New card', '', () => newCard(r => { deck = r; sets(); })], ['cards.list', 'List', '', list], ['cards.all', 'Study all', '', () => study(true)], BACK]);
+  mode('NORMAL');
+  statusEl.textContent = `${deck.cards.length} cards · ${due} due`;
+}
+
 slug
   ? Promise.all([api(deckUrl()), load()]).then(([d]) => {
       deck = d;
       document.title = '独学 · ' + deck.title;
-      path(`~/notes/topics/${slug}/cards`);
-      study(false);
+      path(`~/topics/${slug}/cards`);
+      setName ? study(false, params.get('card')) : sets();
     }).catch(e => app.innerHTML = offline(e))
   : index();
 </script>

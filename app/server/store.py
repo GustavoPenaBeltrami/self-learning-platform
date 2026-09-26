@@ -40,13 +40,12 @@ def now(fmt="%Y-%m-%dT%H:%M"):
 
 
 AUTO, ONLINE, OFFLINE = PROFILES = ("auto", "online", "offline")
-SETTINGS = {"profile": AUTO, "theme": "", "theme_seed": "", "ui_font": "mono", "font": "mono",
-            "voice_model": "", "dictation_key": "ctrl+m"}
+SETTINGS = {"profile": AUTO, "theme": "", "ui_font": "mono", "font": "mono",
+            "voice_model": "", "mark_colors": "", "shortcuts": {}, "themes": []}
+SECTIONS = ("shortcuts", "theme", "themes")
 SETTING_RULES = {
     "profile": (lambda v: v in PROFILES, "unknown profile"),
-    "theme": (lambda v: v in ("", "sumi", "kami", "seed"), "theme must be '', sumi, kami or seed"),
-    "theme_seed": (lambda v: v == "" or re.fullmatch(r"#[0-9a-fA-F]{6}", v), "theme_seed must be #rrggbb"),
-    "dictation_key": (lambda v: re.fullmatch(r"((ctrl|alt|shift|meta)\+)+[a-z0-9]", v), "dictation_key must look like ctrl+m"),
+    "mark_colors": (lambda v: re.fullmatch(r"(#[0-9a-f]{6}(,#[0-9a-f]{6})*)?", v), "mark_colors must be #rrggbb,#rrggbb"),
 }
 
 
@@ -54,14 +53,151 @@ def settings_file():
     return ROOT / "settings.json"
 
 
-def read_settings():
+LEGACY_FILES = ("shortcuts.json", "card-config.json")
+
+
+def settings_sections():
     saved = read_json(settings_file())
-    return {k: saved.get(k, v) for k, v in SETTINGS.items()}
+    theme = saved.get("theme") if isinstance(saved.get("theme"), dict) else {}
+    if isinstance(saved.get("global"), dict):
+        cards = saved.get("cards")
+        return {**saved["global"], **theme_keys(theme, saved["global"])}, saved.get("shortcuts"), cards if isinstance(cards, dict) else {}
+    old = ROOT / "shortcuts.json"
+    shortcuts = read_json(old) if old.exists() else saved.get("shortcuts")
+    if shortcuts is None and "dictation_key" in saved:
+        shortcuts = legacy_dictation(saved["dictation_key"])
+    return {**saved, **theme_keys(theme, saved)}, shortcuts, read_json(ROOT / "card-config.json")
+
+
+def theme_keys(section, flat):
+    active = section.get("active", flat.get("theme", ""))
+    return {"theme": active if isinstance(active, str) else "", "themes": section.get("custom", [])}
+
+
+def write_settings_file(settings, cards):
+    write_json(settings_file(), {"global": {k: v for k, v in settings.items() if k not in SECTIONS},
+                                 "shortcuts": settings["shortcuts"],
+                                 "theme": {"active": settings["theme"], "custom": settings["themes"]}, "cards": cards})
+    for name in LEGACY_FILES:
+        (ROOT / name).unlink(missing_ok=True)
+
+
+KEY_SPEC = re.compile(r"(ctrl\+)?(alt\+)?(shift\+)?(meta\+)?([a-z0-9]|space|enter)")
+MODS = ("ctrl", "alt", "shift", "meta")
+SHORTCUTS = {
+    "notes.dictate": ("ctrl+m", "notes"),
+    "exam.grade": ("enter", "exam"),
+    "exam.record": ("r", "exam"),
+    "exam.write": ("t", "exam"),
+    "exam.retake": ("enter", "exam.results"),
+    "cards.due": ("enter", "cards.sets cards.list"),
+    "cards.all": ("a", "cards.sets cards.empty cards.list cards.study"),
+    "cards.newset": ("c", "cards.sets"),
+    "cards.new": ("n", "cards.sets cards.empty cards.list cards.study"),
+    "cards.list": ("l", "cards.sets cards.empty cards.study cards.done"),
+    "cards.reveal": ("space", "cards.study"),
+    "cards.edit": ("e", "cards.study"),
+    "cards.skip": ("s", "cards.study"),
+    "cards.delete": ("d", "cards.study"),
+    "cards.forgot": ("1", "cards.reveal"),
+    "cards.knew": ("2", "cards.reveal"),
+    "cards.unsure": ("3", "cards.reveal"),
+    "cards.again": ("enter", "cards.done"),
+}
+
+
+def check_shortcuts(overrides):
+    if not isinstance(overrides, dict):
+        raise ValueError("shortcuts must be an object of action: key")
+    for action, spec in overrides.items():
+        if action not in SHORTCUTS:
+            raise ValueError(f"unknown shortcut action: {action}")
+        if not isinstance(spec, str) or not KEY_SPEC.fullmatch(spec):
+            raise ValueError(f"{action} must look like n, space, enter or ctrl+shift+k: {spec}")
+        if action.startswith("notes.") and not {"ctrl", "alt", "meta"} & set(spec.split("+")[:-1]):
+            raise ValueError(f"{action} needs ctrl, alt or meta, a plain key would type in the note: {spec}")
+        if action.startswith("notes.") and re.fullmatch(r"(ctrl|meta)\+[abcisvxyz]", spec):
+            raise ValueError(f"{spec} is taken by the editor (bold, italic, copy, paste, undo…)")
+    keys = {a: overrides.get(a, d) for a, (d, _) in SHORTCUTS.items()}
+    for i, a in enumerate(keys):
+        for b in list(keys)[i + 1:]:
+            if keys[a] == keys[b] and set(SHORTCUTS[a][1].split()) & set(SHORTCUTS[b][1].split()):
+                raise ValueError(f"{keys[a]} is used by both {a} and {b}")
+
+
+BUILTIN_THEMES = ("sumi", "kami", "taiyo", "sakura", "umi", "mori")
+THEME_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,23}")
+THEME_COLORS = ("void", "carbon", "graphite", "iron", "slate", "pewter", "steel", "ash", "fog", "chalk", "paper",
+                "accent", "red", "green", "yellow", "blue", "magenta", "cyan", "orange")
+
+
+def check_themes(themes):
+    if not isinstance(themes, list):
+        raise ValueError("themes must be a list of {name, dark, colors}")
+    names = set()
+    for t in themes:
+        if not isinstance(t, dict) or set(t) != {"name", "dark", "colors"}:
+            raise ValueError("each theme needs exactly name, dark and colors")
+        name = t["name"]
+        if not isinstance(name, str) or not THEME_NAME.fullmatch(name):
+            raise ValueError(f"theme name must be lowercase letters, digits and dashes, up to 24: {name}")
+        if name in BUILTIN_THEMES or name in names:
+            raise ValueError(f"theme name already taken: {name}")
+        names.add(name)
+        if not isinstance(t["dark"], bool):
+            raise ValueError(f"{name}: dark must be true or false")
+        colors = t["colors"]
+        if not isinstance(colors, dict) or set(colors) != set(THEME_COLORS):
+            raise ValueError(f"{name}: colors must be exactly {', '.join(THEME_COLORS)}")
+        bad = [k for k, v in colors.items() if not (isinstance(v, str) and re.fullmatch(r"#[0-9a-f]{6}", v))]
+        if bad:
+            raise ValueError(f"{name}: colors must be lowercase #rrggbb: {', '.join(bad)}")
+
+
+def check_theme(active, themes):
+    if active not in ("", *BUILTIN_THEMES, *(t["name"] for t in themes)):
+        raise ValueError(f"unknown theme: {active}")
+
+
+def legacy_dictation(spec):
+    parts = str(spec).lower().split("+")
+    spec = "+".join([m for m in MODS if m in parts[:-1]] + parts[-1:])
+    try:
+        check_shortcuts({"notes.dictate": spec})
+    except ValueError:
+        return {}
+    return {} if spec == SHORTCUTS["notes.dictate"][0] else {"notes.dictate": spec}
+
+
+def read_settings():
+    saved, shortcuts, _ = settings_sections()
+    settings = {k: saved.get(k, v) for k, v in SETTINGS.items() if k not in SECTIONS}
+    try:
+        check_shortcuts(shortcuts or {})
+    except ValueError:
+        shortcuts = {}
+    themes = saved["themes"]
+    try:
+        check_themes(themes)
+    except ValueError:
+        themes = []
+    try:
+        check_theme(saved["theme"], themes)
+        theme = saved["theme"]
+    except ValueError:
+        theme = ""
+    return {**settings, "shortcuts": dict(shortcuts or {}), "theme": theme, "themes": themes}
 
 
 def save_settings(data):
     incoming = {k: data[k] for k in SETTINGS if k in data}
+    if "shortcuts" in incoming:
+        check_shortcuts(incoming["shortcuts"])
+    if "themes" in incoming:
+        check_themes(incoming["themes"])
     for k, v in incoming.items():
+        if k in ("shortcuts", "themes"):
+            continue
         if not isinstance(v, str):
             raise ValueError(f"setting {k} must be a string")
         ok, message = SETTING_RULES.get(k, (lambda v: True, ""))
@@ -71,7 +207,8 @@ def save_settings(data):
         import voice
         voice.check_voice_model(incoming["voice_model"])
     settings = {**read_settings(), **incoming}
-    write_json(settings_file(), settings)
+    check_theme(settings["theme"], settings["themes"])
+    write_settings_file(settings, settings_sections()[2])
     return settings
 
 
@@ -132,9 +269,9 @@ def meta(d):
     saved = read_json(d / "topic.json")
     title = d.name if " " in d.name else d.name.replace("-", " ").capitalize()
     try:
-        order = int(saved.get("order", 999))
+        order = int(saved.get("order", 1000))
     except (TypeError, ValueError):
-        order = 999
+        order = 1000
     return {"title": saved.get("title") or title,
             "subtitle": saved.get("subtitle", ""),
             "type": saved.get("type", "book"),
@@ -248,8 +385,12 @@ def headings(d):
             for l in f.read_text(encoding="utf-8").splitlines() if l.startswith("# ")]
 
 
+def edited(d):
+    return max((f.stat().st_mtime for f in d.rglob("*") if f.is_file() and not f.name.startswith(".")), default=0)
+
+
 def topics():
-    return sort_topics([{"slug": d.name, **meta(d), "sections": len(sections(d)),
+    return sort_topics([{"slug": d.name, **meta(d), "sections": len(sections(d)), "edited": edited(d),
                          "resources": len(resources(d)), "index": headings(d)} for d in topic_dirs()])
 
 
@@ -337,13 +478,20 @@ def source_file(slug, i):
     return f, mimetypes.guess_type(f.name)[0] or "application/octet-stream"
 
 
+def topic_row(d):
+    return {"slug": d.name, **{k: v for k, v in meta(d).items() if k in ("title", "subtitle", "order", "type")}}
+
+
+def exam_row(f):
+    e, attempts = read_json(f), sorted((f.parent / "attempts").glob("*.json"))
+    return {"name": f.parent.name, "title": e.get("title", f.parent.name),
+            "questions": len(q) if isinstance(q := e.get("questions"), list) else 0,
+            "attempts": len(attempts), "pending": sum(not a.with_suffix(".feedback.md").is_file() for a in attempts)}
+
+
 def exam_index():
-    out = [{"slug": d.name, **meta(d),
-            "exams": [{"path": f"topics/{d.name}/exams/{f.parent.name}/exam.json",
-                       "title": read_json(f).get("title", f.parent.name)}
-                      for f in sorted((d / "exams").glob("*/exam.json"))]}
-           for d in topic_dirs()]
-    return {"topics": sort_topics(out)}
+    return {"topics": sort_topics([{**topic_row(d), "exams": [exam_row(f) for f in sorted((d / "exams").glob("*/exam.json"))]}
+                                   for d in topic_dirs()])}
 
 
 def exam_folder(d, exam):
@@ -542,19 +690,42 @@ def sweep_sessions(close=False):
     return found
 
 
-INTERVALS = (0, 1, 3, 7)
+INTERVALS = [1, 3, 5, 10, 20, 40]
 RECALLS = ("again", "good")
 
 
-def schedule(recalls, last, at):
+def check_intervals(v):
+    if not (isinstance(v, list) and 1 <= len(v) <= 20
+            and all(type(d) is int and 1 <= d <= 3650 for d in v)):
+        raise ValueError("intervals must be 1 to 20 whole numbers of days, each 1 to 3650")
+
+
+def read_card_config():
+    v = settings_sections()[2].get("intervals", INTERVALS)
+    try:
+        check_intervals(v)
+    except ValueError:
+        v = INTERVALS
+    return {"intervals": list(v), "default": INTERVALS}
+
+
+def save_card_config(data):
+    check_intervals(data.get("intervals"))
+    write_settings_file(read_settings(), {**settings_sections()[2], "intervals": data["intervals"]})
+    return read_card_config()
+
+
+def schedule(recalls, last, at, intervals=INTERVALS):
     streak = 0
     for r in recalls:
         streak = streak + 1 if r == "good" else 0
-    box = min(streak, 3)
+    box = min(streak, len(intervals) + 1)
+    if box > len(intervals):
+        return box, False, None
     if last is None:
-        return box, True
-    due_at = datetime.datetime.fromisoformat(last) + datetime.timedelta(days=INTERVALS[box])
-    return box, datetime.datetime.fromisoformat(at) >= due_at
+        return box, True, None
+    due_at = datetime.datetime.fromisoformat(last) + datetime.timedelta(days=intervals[box - 1] if box else 0)
+    return box, datetime.datetime.fromisoformat(at) >= due_at, due_at.isoformat(timespec="minutes")
 
 
 def read_cards(d):
@@ -565,9 +736,31 @@ def read_cards(d):
     return [c for c in data if isinstance(c, dict) and isinstance(c.get("id"), str)] if isinstance(data, list) else []
 
 
+def note_files(d):
+    out = {}
+    for f in sections(d):
+        h1 = next((text.plain(l[2:]) for l in f.read_text(encoding="utf-8").splitlines() if l.startswith("# ")), None)
+        if h1 is not None:
+            out.setdefault(h1, f.name)
+    return out
+
+
+def card_set(c):
+    return (c.get("set") or "").strip() or (c.get("note") or "").split("›")[0].strip() or "unsorted"
+
+
+def card_sets(d, cards):
+    files, groups = note_files(d), {}
+    for c in cards:
+        groups.setdefault(c["set"], []).append(c)
+    order = list(files) + sorted(k for k in groups if k not in files and k != "unsorted") + ["unsorted"]
+    return [{"name": k, "file": files.get(k), "cards": len(groups[k]), "due": sum(c["due"] for c in groups[k]),
+             "flagged": sum(c["flagged"] for c in groups[k]), "learned": sum(c["learned"] for c in groups[k])} for k in order if k in groups]
+
+
 def deck(d, at=None):
     at = at or now()
-    history = {}
+    history, intervals = {}, read_card_config()["intervals"]
     for r in read_jsonl(d / "cards" / "reviews.jsonl"):
         if r.get("recall") in RECALLS and isinstance(r.get("at"), str):
             history.setdefault(r.get("id"), []).append(r)
@@ -576,11 +769,11 @@ def deck(d, at=None):
         h = history.get(c["id"], [])
         last = h[-1]["at"] if h else None
         try:
-            box, due = schedule([r["recall"] for r in h], last, at)
+            box, due, next_at = schedule([r["recall"] for r in h], last, at, intervals)
         except ValueError:
-            box, due = 0, True
-        out.append({**{k: c.get(k, "") for k in ("id", "front", "back", "note")}, "flagged": c.get("flagged") is True,
-                    "box": box, "due": due, "last": last})
+            box, due, next_at = 0, True, None
+        out.append({**{k: c.get(k, "") for k in ("id", "front", "back", "note")}, "set": card_set(c), "flagged": c.get("flagged") is True,
+                    "box": box, "due": due, "learned": box > len(intervals), "last": last, "next": next_at})
     return sorted(out, key=lambda c: (not c["due"], c["box"]))
 
 
@@ -588,14 +781,18 @@ def cards_index():
     out = []
     for d in topic_dirs():
         cards = deck(d)
-        out.append({"slug": d.name, **{k: v for k, v in meta(d).items() if k in ("title", "subtitle", "order")},
-                    "cards": len(cards), "due": sum(c["due"] for c in cards), "flagged": sum(c["flagged"] for c in cards)})
+        out.append({**topic_row(d),
+                    "cards": len(cards), "due": sum(c["due"] for c in cards), "flagged": sum(c["flagged"] for c in cards),
+                    "learned": sum(c["learned"] for c in cards), "sets": [{**s, "index": [{k: c[k] for k in ("id", "front", "due")} for c in cards if c["set"] == s["name"]]}
+                             for s in card_sets(d, cards)]})
     return {"topics": sort_topics(out)}
 
 
 def read_deck(slug):
     d = folder(slug)
-    return {"slug": slug, "title": meta(d)["title"], "cards": deck(d)}
+    cards = deck(d)
+    return {"slug": slug, "title": meta(d)["title"], "cards": cards, "sets": card_sets(d, cards),
+            "notes": list(note_files(d))}
 
 
 def write_cards(d, cards):
@@ -611,21 +808,31 @@ def upsert_card(slug, card):
     if not all(isinstance(v, str) for v in fields.values()):
         raise ValueError("front, back and note must be strings")
     fields = {k: v.strip() for k, v in fields.items()}
+    fields["note"] = fields["note"].split("›")[0].strip()
     if not fields["front"] or not fields["back"]:
         raise ValueError("front and back cannot be empty")
+    chosen = card.get("set", "")
+    if not isinstance(chosen, str):
+        raise ValueError("set must be a string")
+    chosen = "" if chosen.strip() == "unsorted" else chosen.strip()
+    if chosen in note_files(d):
+        fields["note"], chosen = chosen, ""
     cards = read_cards(d)
     if "id" in card:
         old = next((c for c in cards if c["id"] == card["id"]), None)
         if old is None:
             raise NotFound(f"no such card: {card['id']!r}")
         old.update(fields)
+        old.pop("set", None)
+        if chosen:
+            old["set"] = chosen
     else:
         ids, base = {c["id"] for c in cards}, text.slug(fields["front"], "card")[:48].strip("-")
         new_id, n = base, 1
         while new_id in ids:
             n += 1
             new_id = f"{base}-{n}"
-        cards.append({"id": new_id, **fields, "by": "user"})
+        cards.append({"id": new_id, **fields, **({"set": chosen} if chosen else {}), "by": "user"})
     write_cards(d, cards)
     return read_deck(slug)
 

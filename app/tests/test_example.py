@@ -131,7 +131,7 @@ assert ids and len(ids) == len(set(ids)), "card ids not unique"
 for c in cards:
     assert c["id"] == slug(c["id"]), c
     assert all(isinstance(c[k], str) and c[k].strip() for k in ("front", "back", "note")), c
-    assert " › " in c["note"], c
+    assert "›" not in c["note"], c
     assert c.get("by", "user") == "user", c
     assert isinstance(c.get("flagged", False), bool), c
 for n, line in enumerate((T / "cards" / "reviews.jsonl").read_text(encoding="utf-8").splitlines(), 1):

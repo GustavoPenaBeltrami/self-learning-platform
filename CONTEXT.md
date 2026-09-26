@@ -113,11 +113,15 @@ One concept from the learner's notes as a question (front) and a short answer (b
 _Avoid_: Flashcard
 
 **Deck**:
-All the Cards of one topic, in `cards/cards.json`; studying it shows the due ones.
-_Avoid_: Set, pack
+All the Cards of one topic, in `cards/cards.json`, split into Card sets; studying it shows the due ones.
+_Avoid_: pack
+
+**Card set**:
+The Cards of one note (one `notes/*.md`, named by its h1), or a custom group the learner names. A note can have no Card set.
+_Avoid_: Collection, subdeck
 
 **Box**:
-A Card's Leitner level, 0 to 3, derived from its "good" streak since the last "again"; it sets how many days until the Card is due again.
+A Card's Leitner level, derived from its "good" streak since the last "again"; it sets how many days until the Card is due again. The steps are set under `cards` in `settings.json`; past the last step the Card is learned and stops being due.
 _Avoid_: Stage, bucket
 
 **Quiz**:

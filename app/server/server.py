@@ -74,14 +74,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if segs[0] != "api":
             return self.static(path)
         if path == "/api/settings":
-            return self.respond(200, {**store.read_settings(), "active_profile": voice.active_profile()})
+            return self.respond(200, {**store.read_settings(), "active_profile": voice.active_profile(),
+                                      "defaults": {k: v for k, v in store.SETTINGS.items() if k not in store.SECTIONS}})
         if path == "/api/voice-models":
             return self.respond(200, {k: {"disk": m["disk"], "ram": m["ram"]} for k, m in voice.MODELS.items()})
         if path == "/api/fonts":
             return self.respond(200, {"fonts": store.list_fonts()})
         if path == "/api/fonts.css":
             return self.send_bytes(200, store.fonts_css().encode(), "text/css; charset=utf-8")
-        if path == "/api/index":
+        if path == "/api/card-config":
+            return self.respond(200, store.read_card_config())
+        if path == "/api/exams":
             return self.respond(200, store.exam_index())
         if path == "/api/cards":
             return self.respond(200, store.cards_index())
@@ -138,11 +141,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def write(self, path, segs, q, raw):
         if path == "/api/settings":
             return store.save_settings(json_body(raw))
+        if path == "/api/card-config":
+            return store.save_card_config(json_body(raw))
         if path == "/api/font":
             return store.save_font(q.get("name", [""])[0], raw)
-        if path == "/api/attempt":
-            data = json_body(raw)
-            return {"path": store.save_attempt(data["slug"], data["exam"], data["answers"])}
+        if segs[:2] == ["api", "exams"] and len(segs) == 3:
+            data = json_body(raw)["attempt"]
+            return {"path": store.save_attempt(segs[2], data["exam"], data["answers"])}
         if segs[:2] == ["api", "cards"] and len(segs) == 3:
             data = json_body(raw)
             if "upsert" in data:

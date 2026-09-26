@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>独学 · card settings</title>
+<link rel="stylesheet" href="/app/styles/style.css">
+<script src="/app/scripts/theme.js"></script>
+<script src="/app/scripts/shell.js"></script>
+<style>
+  .steps input {
+    width: 8ch; border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
+    background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
+  }
+  .steps input:focus { outline: 1px solid var(--accent); }
+  .steps input:invalid { border-color: var(--bad); }
+  .steps .unit { color: var(--muted); margin-left: .4rem; }
+  .steps .learned td { color: var(--good); }
+</style>
+
+<body>
+<script>
+const { app, tree, path } = mountShell('settings');
+const statusEl = document.getElementById('status');
+tree.innerHTML = configTree('card-config.html');
+path('~/self-learning-platform/settings.json › cards');
+
+let gaps = [], defaults = [];
+const starts = () => gaps.reduce((a, g) => [...a, (a.at(-1) || 0) + g], []);
+const days = n => n === 1 ? '1 day' : n + ' days';
+
+const save = async () => {
+  if (gaps.some(g => !Number.isInteger(g) || g < 1)) return statusEl.textContent = '✕ each step must come at least 1 day after the one before';
+  statusEl.textContent = 'saving…';
+  try {
+    gaps = (await api('/api/card-config', JSON.stringify({ intervals: gaps }))).intervals;
+    statusEl.textContent = 'saved';
+  } catch (e) {
+    statusEl.textContent = '✕ ' + e.message;
+    gaps = (await api('/api/card-config').catch(() => ({ intervals: gaps }))).intervals;
+  }
+  rows();
+};
+
+function rows() {
+  const at = starts();
+  app.querySelector('tbody').innerHTML = `
+    <tr><td class="num">0</td><td class="wide">new card, or "don't know"</td><td>now</td><td>now</td><td></td></tr>
+    ${gaps.map((g, i) => `
+    <tr data-i="${i}">
+      <td class="num">${i + 1}</td>
+      <td class="wide">after ${i + 1} "knew it" in a row</td>
+      <td><input type="number" min="1" max="3650" step="1" value="${g}" data-gap aria-label="step ${i + 1}, days since the previous step"><span class="unit">d</span></td>
+      <td><input type="number" min="${(at[i - 1] || 0) + 1}" step="1" value="${at[i]}" data-start aria-label="step ${i + 1}, days since the start"><span class="unit">d</span></td>
+      <td>${gaps.length > 1 ? '<button type="button" class="reset" data-del aria-label="remove step">✕</button>' : ''}</td>
+    </tr>`).join('')}
+    <tr><td class="num">+</td><td colspan="4"><button type="button" class="reset" id="add">add step</button></td></tr>
+    <tr class="learned"><td class="num">✓</td><td class="wide">learned: one more "knew it" after ${days(gaps.at(-1))}</td><td>—</td><td>${days(at.at(-1))}</td><td></td></tr>`;
+}
+
+app.addEventListener('change', e => {
+  const row = e.target.closest('tr[data-i]');
+  if (!row) return;
+  const i = +row.dataset.i, v = Math.round(+e.target.value);
+  if (e.target.matches('[data-gap]')) gaps[i] = v;
+  else {
+    const at = starts(), prev = at[i - 1] || 0;
+    gaps[i] = v - prev;
+    if (i + 1 < gaps.length) gaps[i + 1] = at[i + 1] - v;
+  }
+  save();
+});
+
+app.addEventListener('click', e => {
+  if (e.target.closest('[data-del]')) {
+    gaps.splice(+e.target.closest('tr').dataset.i, 1);
+    save();
+  }
+  if (e.target.closest('#add')) {
+    gaps.push(gaps.at(-1) * 2);
+    save();
+  }
+  if (e.target.closest('#reset')) {
+    gaps = [...defaults];
+    save();
+  }
+});
+
+api('/api/card-config').then(c => {
+  gaps = c.intervals;
+  defaults = c.default;
+  app.innerHTML = `
+    <div class="sheet">
+    ${settingsCrumbs('cards', `<button type="button" class="reset" id="reset" title="${defaults.join(', ')} days">reset all to defaults</button>`)}
+    ${promptLine('~/self-learning-platform', 'nvim settings.json')}
+    <h1>Cards</h1>
+    <p class="minor"># how long a card waits before it is due again. each "knew it" moves it one step up, "don't know" sends it back to step 0. type the days since the previous step or since the start: the other column follows. saved under "cards" in settings.json at the repo root, for every topic</p>
+    <table class="htop static steps">
+      <thead><tr><th class="num">STEP</th><th>WHEN</th><th>SINCE PREVIOUS</th><th>SINCE START</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+  rows();
+}).catch(e => app.innerHTML = offline(e));
+</script>

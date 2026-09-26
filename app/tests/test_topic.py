@@ -133,7 +133,7 @@ def test_bad_topic_json_and_ordering():
     (store.TOPICS / "broken" / "exams" / "e" / "exam.json").write_text("{bad")
     assert [t["slug"] for t in store.topics()] == ["strorder", "alpha", "demo", "badorder", "broken", "list"]
     exams = {t["slug"]: t["exams"] for t in store.exam_index()["topics"]}
-    assert exams["broken"] == [{"path": "topics/broken/exams/e/exam.json", "title": "e"}]
+    assert exams["broken"] == [{"name": "e", "title": "e", "questions": 0, "attempts": 0, "pending": 0}]
 
 
 @with_temp_topics

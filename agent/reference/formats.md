@@ -51,7 +51,7 @@ topics/<slug>/
 | `title`, `subtitle` | string | shown in the app |
 | `type` | enum below | missing = `book` |
 | `area` | string | kebab-case, reuse existing values; tone and vocabulary context only |
-| `order` | int | position in the app lists |
+| `order` | int | position in the app lists, shown as the 3-digit `#` (1–999; missing = last, shown as `—`) |
 | `goals` | list of 1-3 strings | concrete; with `reason` they are the Mission |
 | `reason` | string | what changes once they have it |
 | `language` | `{source, notes, exams}` | defaults per output, see `AGENTS.md` |
@@ -223,13 +223,16 @@ Flashcards made from the learner's notes. `cards/cards.json` is written by
 [
   { "id": "put-idempotent", "front": "Why is PUT idempotent?",
     "back": "It replaces the whole resource, so repeating it leaves the same state.",
-    "note": "Methods and status codes › Methods" }
+    "note": "Methods and status codes" }
 ]
 ```
 
 - `id`: kebab-case, unique in the topic, stable forever (reviews join on it). Never reuse an id for a different fact; to retire a card, delete it.
 - `front`: a question. `back`: at most 2 sentences. Plain text; inline `**`/`*` and `$…$` LaTeX are fine.
-- `note`: the heading path of the note it came from (`H1 › H2`), never a file name.
+- `note`: the H1 of the note it came from (one H1 = one `.md`), never an H2/H3 and never a file name.
+- `set` (optional): a custom card set name, for cards that don't belong to one note. Missing = the card is in its note's set.
+
+**Card sets** (derived, no state file): a card's set is `set` if present, else the H1 of `note` (that is, the note `.md` it came from), else `unsorted`. The app shows one set per note that has cards, in note order, then the custom sets by name, then `unsorted`. A note without cards has no set.
 - `by` (optional): `"user"` for a card written by hand in the app. `slp-cards` never edits or deletes those; missing = written by `slp-cards`.
 - `flagged` (optional, boolean): `true` when the learner marked the card **unsure** after revealing it in the app: they got it but doubt it, or want to dig deeper. Only the app sets it to `true`; the agent sets it to `false` after going over the concept with the learner. Editing a card keeps the flag.
 
@@ -240,7 +243,7 @@ Flashcards made from the learner's notes. `cards/cards.json` is written by
 - Append-only, one line per rating. `recall` is `again` ("didn't know") or `good` ("knew it"), self-graded after the learner answers to themselves and reveals the back; `at` is local time `YYYY-MM-DDTHH:MM`.
 - Lines whose `id` is not in `cards.json` are ignored.
 
-**Scheduling** (Leitner, derived, no state file): a card's streak is the number of `good` since its last `again` (all of them if it was never `again`). Box = min(streak, 3). Interval by box: 0 → 0 days, 1 → 1, 2 → 3, 3 → 7. A card is **due** when it has no reviews, or now ≥ its last review `at` + interval.
+**Scheduling** (Leitner, derived, no state file): a card's streak is the number of `good` since its last `again` (all of them if it was never `again`). The steps come from `cards.intervals` in `settings.json` at the repo root (days since the previous step; default `[1, 3, 5, 10, 20, 40]`, same for every topic). Box = min(streak, n + 1) where n = number of steps. Box 0 waits 0 days, box k (1…n) waits `intervals[k-1]` days after its last review. Box n + 1 is **learned**: never due again, until an `again` sends it back to box 0. A card is **due** when it has no reviews, or it is not learned and now ≥ its last review `at` + its wait.
 
 ## progress/status.md
 

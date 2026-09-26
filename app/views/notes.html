@@ -72,6 +72,9 @@
   .mark-menu button:hover { background: var(--color-iron); }
   .mark-menu .swatch { width: 12px; height: 12px; min-width: 0; padding: 0; border-radius: 50%; margin: 0 .15rem; }
   .mark-menu .swatch[aria-pressed="true"] { outline: 1.5px solid var(--ink); outline-offset: 2px; }
+  .swatches { display: contents; }
+  #hex-preview { display: inline-block; border: 1px solid var(--line); flex: none; }
+  #hex { width: 6.5rem; }
   .mark-menu .sep { width: 1px; height: 1.1rem; background: var(--line); margin: 0 .25rem; }
   .mark-menu select { border: 0; background: none; color: var(--ink); font: 400 12px/1 var(--mono); max-width: 18rem; padding: .35rem; }
   .mark-menu input[type="range"] { width: 8rem; accent-color: var(--accent); padding: 0 .4rem; }
@@ -111,11 +114,40 @@
   .doc img.inline { display: block; max-width: 100%; height: auto; margin: var(--spacing-24) auto; cursor: pointer; }
   .doc img.inline.active { outline: 1px solid var(--accent); outline-offset: 3px; }
 
-  .tip {
-    z-index: 80; pointer-events: none; padding: .25rem .5rem;
-    font: 400 12px/1.4 var(--mono); color: var(--ink); white-space: nowrap;
-  }
   .provisional { color: var(--muted); }
+
+  .panel:has(.viewer) { padding-bottom: 0; }
+  .viewer { display: flex; flex-direction: column; padding: var(--spacing-16) 1rem .5rem; }
+  .viewer-head { display: flex; align-items: baseline; gap: 1rem; }
+  .viewer-head .prompt { flex: 1; min-width: 0; margin-bottom: .6rem; }
+  .viewer-close { border: 0; padding: 0 .3rem; background: none; color: var(--muted); cursor: pointer; font: inherit; }
+  .viewer-close:hover { color: var(--ink); }
+  .viewer-body { flex: 1; min-height: 0; overflow: auto; }
+  .viewer-body iframe { display: block; width: 100%; height: 100%; border: 0; }
+  .viewer-body img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  .viewer-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 400 13px/1.55 var(--mono); color: var(--ink); }
+  .viewer-body td, .viewer-body th { white-space: nowrap; }
+
+  .ls-row { display: flex; align-items: center; gap: 1rem; margin: 0 0 var(--spacing-16); }
+  .ls-row .prompt { flex: 1; min-width: 0; margin: 0; }
+  .ls-tools { display: flex; align-items: center; gap: .25rem; }
+  .ls-btn {
+    display: inline-flex; align-items: center; gap: .15rem; height: 1.7rem; padding: 0 .45rem;
+    border: 1px solid transparent; background: none; color: var(--muted); cursor: pointer; font: 700 11px/1 var(--mono);
+  }
+  .ls-btn:hover { color: var(--ink); border-color: var(--color-slate); }
+  .ls-btn.on { color: var(--accent); border-color: var(--accent); }
+  .ls-btn .arrow { display: none; transition: transform .2s; }
+  .ls-btn.on .arrow { display: block; }
+  .ls-btn.desc .arrow { transform: rotate(180deg); }
+  .ls-search { width: 0; opacity: 0; overflow: hidden; transition: width .25s ease, opacity .2s ease; }
+  .ls-row.searching .ls-search { width: 14rem; opacity: 1; }
+  .ls-search input {
+    width: 14rem; height: 1.7rem; padding: 0 .5rem; border: 0; border-bottom: 1px solid var(--accent);
+    background: none; color: var(--ink); font: inherit; outline: 0;
+  }
+  .ls-search input::placeholder { color: var(--muted); }
+  .ls-row.searching #ls-find { color: var(--accent); }
 
   .tree .fold {
     flex: 0 0 1rem; padding: 0; border: 0; background: none; cursor: pointer;
@@ -125,7 +157,6 @@
   .tree .fold[aria-expanded="true"] { transform: rotate(90deg); }
   .tree a.n2 { padding-left: 1rem; } .tree a.n3 { padding-left: 2rem; }
   .tree #index a.n1 { color: var(--ansi-blue); }
-  .tree .nothing { color: var(--color-steel); padding: 0 .3rem; margin: 0; }
   .tree button.add { flex: 1; text-align: left; border: 0; padding: .02rem .3rem; background: none; color: var(--muted); font: inherit; }
   .tree button.add:hover, .tree button.add.active { background: var(--color-iron); color: var(--ink); }
 
@@ -136,40 +167,30 @@
 
 <body>
 <script>
-const PALETTE = { yellow: '#d8c06a', green: '#8fbf7f', red: '#d67a6a', blue: '#5a9be0', magenta: '#a88cc4', cyan: '#66b8c4', orange: '#d08a4c' };
-const COLORS = Object.values(PALETTE);
-const NAMES = Object.keys(PALETTE);
+const PALETTE = { yellow: '#d8c06a', green: '#8fbf7f', 'light blue': '#7ab8e0', pink: '#e08cb4' };
+let custom = [];
+const palette = () => [...Object.entries(PALETTE), ...custom.map(c => [c, c])];
 const fixedColors = root => root.querySelectorAll('[style*="--c"]').forEach(el => {
   const hex = /var\(--ansi-\w+,\s*(#[0-9a-f]{3,8})\s*\)/i.exec(el.style.getPropertyValue('--c'))?.[1];
   if (hex) el.style.setProperty('--c', hex);
 });
 
-const ICON = {
-  highlight: '<path d="M3.5 16.5h13"/><path d="M6.5 13.5 12.5 3.5l3.5 2.2-6 10.3z"/><path d="M6.5 13.5 10 15.7"/>',
-  underline: '<path d="M6 3v5.5a4 4 0 0 0 8 0V3"/><path d="M4.5 16.8h11"/>',
-  strike:    '<path d="M3.5 10h13"/><path d="M13.5 5.6a3.4 2.7 0 0 0-6.2 1.1c0 1.6 1.7 2.2 3.2 2.6"/><path d="M7 13.4a3.4 2.7 0 0 0 6.4-.6"/>',
-  reference: '<path d="M8.6 11.4a3.2 3.2 0 0 0 4.5 0l2.6-2.6a3.2 3.2 0 0 0-4.5-4.5l-.9.9"/><path d="M11.4 8.6a3.2 3.2 0 0 0-4.5 0L4.3 11.2a3.2 3.2 0 0 0 4.5 4.5l.9-.9"/>',
-  note:      '<path d="M4 3.5h12v8.5l-3.5 4H4z"/><path d="M16 12h-3.5v4"/>',
-  flashcard: '<rect x="2.5" y="6" width="12" height="9" rx="1"/><path d="M5.5 6V3.5h12v9H14.5"/>',
-  voice:     '<rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0"/><path d="M10 15v2.5"/>',
-  image:     '<rect x="3" y="4" width="14" height="12" rx="1.5"/><circle cx="7.3" cy="8" r="1.2"/><path d="M3.6 14.2 8 10l3 2.8 2.2-2 3.2 3"/>',
-  remove:    '<path d="M5 5l10 10M15 5 5 15"/>',
-  diagram:   '<rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="1.8" y="13.5" width="5.4" height="4" rx="1"/><rect x="12.8" y="13.5" width="5.4" height="4" rx="1"/><path d="M10 6.5v3M4.5 13.5v-2.5h11v2.5"/>',
-  formula:   '<path d="M14.6 4.2H6.4l4.6 5.8-4.6 5.8h8.2"/>',
-};
-const svg = (n, t = 16) => `<svg viewBox="0 0 20 20" width="${t}" height="${t}" fill="none"
-  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
-
 const { app, tree, tools, path, mode } = mountShell('notes');
 const statusEl = document.getElementById('status');
-let dictateKey = 'ctrl+m', isDictate = hotkey(dictateKey);
 const applySettings = s => {
   const fontSel = document.getElementById('font');
   if (fontSel) fontSel.value = s.font || 'mono';
-  dictateKey = s.dictation_key || 'ctrl+m';
-  isDictate = hotkey(dictateKey);
   const voice = document.getElementById('voice');
-  if (voice) voice.setAttribute('aria-label', voice.dataset.tip = 'Dictate · ' + dictateKey);
+  if (voice) voice.setAttribute('aria-label', voice.dataset.tip = 'Dictate · ' + keyFor('notes.dictate'));
+  custom = s.mark_colors ? s.mark_colors.split(',') : [];
+  renderSwatches();
+};
+const renderSwatches = () => {
+  const box = document.getElementById('swatches');
+  if (!box) return;
+  if (!palette().some(([, c]) => c === color)) color = PALETTE.yellow;
+  box.innerHTML = palette().map(([name, c]) => `<button class="swatch" style="--c:${c}" data-color="${c}"
+    aria-pressed="${c === color}" data-tip="${esc(custom.includes(c) ? c + ' · right-click to remove' : name)}"${custom.includes(c) ? ' data-custom' : ''}></button>`).join('');
 };
 settings.then(applySettings);
 addEventListener('settings-applied', e => applySettings(e.detail));
@@ -177,7 +198,7 @@ const zoom = () => parseFloat(app.style.zoom) || 1;
 const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
 
-let color = COLORS[0], doc, titleEl, subtitle, index, topic, lastRange, stamp;
+let color = PALETTE.yellow, doc, titleEl, subtitle, index, topic, lastRange, stamp;
 
 const loadTopics = async () => (await api('/api/topics')).topics;
 
@@ -199,22 +220,65 @@ async function menu() {
     return;
   }
   buildTree(topics, null);
-  path('~/notes/topics');
+  path('~/topics');
+  const arrow = '<svg class="arrow" viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M8 2v12M3.5 9.5 8 14l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   app.innerHTML = `
     <div class="sheet">
-    ${promptLine('~/topics', 'ls -l')}
+    <div class="ls-row">
+      <p class="prompt" id="ls-prompt"></p>
+      <div class="ls-tools">
+        <button class="ls-btn" data-sort="az" title="Sort alphabetically" aria-label="Sort alphabetically"><b>AZ</b>${arrow}</button>
+        <button class="ls-btn" data-sort="edited" title="Sort by last edit" aria-label="Sort by last edit"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>${arrow}</button>
+        <label class="ls-search"><input id="ls-q" type="search" placeholder="grep…" aria-label="Search topics" autocomplete="off" spellcheck="false"></label>
+        <button class="ls-btn" id="ls-find" title="Search topics" aria-label="Search topics"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
     <table class="htop">
       <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">SECT</th><th class="num">RES</th></tr></thead>
-      <tbody>${topics.map(l => `
+      <tbody id="ls-rows"></tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+
+  const q = document.getElementById('ls-q'), find = document.getElementById('ls-find');
+  let sortBy = '', dir = 1;
+  const render = () => {
+    const needle = q.value.trim().toLowerCase();
+    let list = topics.filter(l => !needle || [l.title, l.subtitle, l.slug, l.type].join(' ').toLowerCase().includes(needle));
+    if (sortBy === 'az') list = [...list].sort((a, b) => dir * a.title.localeCompare(b.title));
+    if (sortBy === 'edited') list = [...list].sort((a, b) => dir * (b.edited - a.edited));
+    const cmd = sortBy === 'az' ? `ls -l | sort${dir < 0 ? ' -r' : ''}` : sortBy === 'edited' ? `ls -lt${dir < 0 ? 'r' : ''}` : 'ls -l';
+    document.getElementById('ls-prompt').outerHTML = promptLine('~/topics', cmd + (needle ? ' | grep ' + needle : ''))
+      .replace('<p class="prompt"', '<p class="prompt" id="ls-prompt"');
+    app.querySelectorAll('[data-sort]').forEach(b => {
+      b.classList.toggle('on', b.dataset.sort === sortBy);
+      b.classList.toggle('desc', b.dataset.sort === sortBy && dir < 0);
+    });
+    document.getElementById('ls-rows').innerHTML = list.map(l => `
         <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
-          <td class="num">${l.order < 999 ? String(l.order).padStart(2, '0') : '—'}</td>
+          <td class="num">${l.order < 1000 ? String(l.order).padStart(3, '0') : '—'}</td>
           <td class="wide"><a href="?topic=${encodeURIComponent(l.slug)}">${esc(l.title)}</a><br><span class="sub">${esc(l.subtitle || '')}</span></td>
           <td class="type">${esc(l.type)}</td>
           <td class="num${l.sections ? '' : ' zero'}">${l.sections}</td>
           <td class="num${l.resources ? '' : ' zero'}">${l.resources}</td>
-        </tr>`).join('')}${topics.length ? '' : noTopicsRow(5)}</tbody>
-    </table>
-    <div class="tildes"></div></div>`;
+        </tr>`).join('') + (topics.length ? '' : noTopicsRow(5));
+  };
+  app.querySelectorAll('[data-sort]').forEach(b => b.onclick = () => {
+    if (sortBy !== b.dataset.sort) [sortBy, dir] = [b.dataset.sort, 1];
+    else if (dir > 0) dir = -1;
+    else sortBy = '';
+    render();
+  });
+  const close = () => { q.value = ''; app.querySelector('.ls-row').classList.remove('searching'); render(); };
+  find.onmousedown = e => e.preventDefault();
+  find.onclick = () => {
+    if (app.querySelector('.ls-row').classList.contains('searching')) return close();
+    app.querySelector('.ls-row').classList.add('searching');
+    q.focus();
+  };
+  q.oninput = render;
+  q.onkeydown = e => { if (e.key === 'Escape') { close(); find.focus(); } };
+  q.onblur = () => { if (!q.value) app.querySelector('.ls-row').classList.remove('searching'); };
+  render();
 }
 
 async function openTopic(name) {
@@ -223,7 +287,7 @@ async function openTopic(name) {
   stamp = t.stamp;
   document.title = '独学 · ' + topic.title;
   buildTree(topics, topic.slug);
-  path(`~/notes/topics/${topic.slug}/notes`);
+  path(`~/topics/${topic.slug}/notes`);
 
   tools.innerHTML = `
     <div class="wb-mod pill">
@@ -231,7 +295,7 @@ async function openTopic(name) {
         <option value="p">paragraph</option>
         ${[1, 2, 3, 4, 5, 6].map(n => `<option value="h${n}">heading ${n}</option>`).join('')}
         <option value="list">list</option>
-        <option value="ol">numbered list</option>
+        <option value="ol">num list</option>
       </select>
       <select id="font" data-tip="Reading font"></select>
     </div>
@@ -240,8 +304,8 @@ async function openTopic(name) {
       <button data-cmd="italic" data-tip="Italic · ⌘I" style="font-style:italic">I</button>
     </div>
     <div class="wb-mod pill">
-      ${COLORS.map((c, i) => `<button class="swatch" style="--c:${c}"
-        data-color="${c}" aria-pressed="${i === 0}" data-tip="${NAMES[i]}"></button>`).join('')}
+      <span class="swatches" id="swatches"></span>
+      <button id="add-color" data-tip="Add a color">${svg('plus')}</button>
       <button data-mark="mk-highlight" data-tip="Highlight">${svg('highlight')}</button>
       <button data-mark="mk-underline" data-tip="Underline">${svg('underline')}</button>
       <button data-mark="mk-strike" data-tip="Strikethrough">${svg('strike')}</button>
@@ -254,8 +318,9 @@ async function openTopic(name) {
       <input type="file" id="image-file" accept="image/*" hidden>
       <button id="diagram" data-tip="Diagram · Mermaid">${svg('diagram')}</button>
       <button id="formula" data-tip="Formula · LaTeX">${svg('formula')}</button>
-      <button id="voice" data-tip="Dictate · ${esc(dictateKey)}">${svg('voice')}</button>
-    </div>`;
+      <button id="voice" data-tip="Dictate · ${esc(keyFor('notes.dictate'))}">${svg('voice')}</button>
+    </div>
+    <div class="wb-mod pill">${infoButton(keyIds('notes'))}</div>`;
   tools.querySelectorAll('[data-tip]').forEach(b => b.setAttribute('aria-label', b.dataset.tip));
   app.innerHTML = `
     <div class="sheet">
@@ -312,7 +377,7 @@ async function openTopic(name) {
   });
   addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeMenu(); closeBubble(); closeTip(); }
-    if (isDictate(e)) { e.preventDefault(); dictate(document.getElementById('voice')); }
+    if (pressed(e, 'notes.dictate')) { e.preventDefault(); dictate(document.getElementById('voice')); }
   });
   document.addEventListener('mousedown', e => {
     if (menu2 && !menu2.contains(e.target) && !active?.contains(e.target)) closeMenu();
@@ -327,27 +392,56 @@ async function openTopic(name) {
     buildIndex(); save();
   };
   tools.querySelectorAll('button').forEach(b => b.onmousedown = e => e.preventDefault());
-  tools.addEventListener('click', closeTip);
-  tools.addEventListener('focusout', closeTip);
-  ['mouseover', 'focusin'].forEach(type => tools.addEventListener(type, e => {
-    const el = e.target.closest('[data-tip]');
-    if (el) showTip(el);
-  }));
   tools.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => {
     // ponytail: execCommand for bold/italic only. Deprecated but works in
     // every current browser and avoids writing a whole editor.
     restore(); document.execCommand(b.dataset.cmd); save();
   });
-  tools.querySelectorAll('[data-color]').forEach(b => b.onclick = () => {
+  renderSwatches();
+  const swatches = document.getElementById('swatches');
+  swatches.onmousedown = e => e.preventDefault();
+  swatches.onclick = e => {
+    const b = e.target.closest('[data-color]');
+    if (!b) return;
     color = b.dataset.color;
-    tools.querySelectorAll('[data-color]').forEach(o => o.setAttribute('aria-pressed', o === b));
-  });
+    swatches.querySelectorAll('[data-color]').forEach(o => o.setAttribute('aria-pressed', o === b));
+  };
+  const saveColors = list => saveSettings({ mark_colors: list.join(',') })
+    .then(s => { custom = s.mark_colors ? s.mark_colors.split(',') : []; renderSwatches(); })
+    .catch(e => statusEl.textContent = e.message);
+  swatches.oncontextmenu = e => {
+    const b = e.target.closest('[data-custom]');
+    if (!b) return;
+    e.preventDefault();
+    saveColors(custom.filter(c => c !== b.dataset.color));
+  };
+  document.getElementById('add-color').onclick = e => {
+    const m = openMenu(e.currentTarget, `<span class="swatch" id="hex-preview"></span>
+      <input type="text" id="hex" placeholder="#rrggbb" maxlength="7" aria-label="Hex color" spellcheck="false" autocomplete="off">`);
+    const field = m.querySelector('#hex'), preview = m.querySelector('#hex-preview');
+    const hex = () => {
+      const v = field.value.trim().replace(/^#?/, '#').toLowerCase();
+      return /^#[0-9a-f]{6}$/.test(v) ? v : /^#[0-9a-f]{3}$/.test(v) ? '#' + [...v.slice(1)].map(x => x + x).join('') : null;
+    };
+    field.oninput = () => preview.style.background = hex() || 'transparent';
+    field.onkeydown = k => {
+      if (k.key === 'Escape') closeMenu();
+      if (k.key !== 'Enter') return;
+      k.preventDefault();
+      const c = hex();
+      if (!c) return field.select();
+      color = c;
+      closeMenu();
+      saveColors(palette().some(([, x]) => x === c) ? custom : [...custom, c]);
+    };
+    field.focus();
+  };
   tools.querySelectorAll('[data-mark]').forEach(b => b.onclick = () => mark(b.dataset.mark));
   document.getElementById('reference').onclick = e => referenceMenu(e.currentTarget);
   document.getElementById('card').onclick = () => { createCard({}); save(); };
   document.getElementById('flashcard').onclick = () => {
     const node = lastRange && doc.contains(lastRange.startContainer) ? lastRange.startContainer : null;
-    cardForm(topic.slug, { back: node ? lastRange.toString().trim() : '', note: headingPath(node) })
+    cardForm(topic.slug, { back: node ? lastRange.toString().trim() : '', note: noteOf(node) })
       .then(r => { if (r) statusEl.textContent = `card saved · ${r.cards.length} in cards/`; });
   };
   const imageBtn = document.getElementById('image'), imageFile = document.getElementById('image-file');
@@ -432,7 +526,7 @@ async function dictate(button) {
   const sel = getSelection();
   sel.rangeCount ? sel.getRangeAt(0).insertNode(span) : doc.append(span);
   button.classList.add('recording');
-  status.textContent = `listening… ${dictateKey} or the mic to finish`;
+  status.textContent = `listening… ${keyFor('notes.dictate')} or the mic to finish`;
 
   const lang = topic.language?.notes;
   const voiceUrl = '/api/voice' + (lang ? '?lang=' + encodeURIComponent(lang) : '');
@@ -488,13 +582,13 @@ document.addEventListener('selectionchange', () => {
   document.getElementById('block').value = currentBlock();
 });
 
-function headingPath(node) {
-  let h1 = '', h2 = '';
-  for (const h of doc.querySelectorAll('h1, h2')) {
+function noteOf(node) {
+  let h1 = '';
+  for (const h of doc.querySelectorAll('h1')) {
     if (!node || !(h === node || h.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
-    h.tagName === 'H1' ? (h1 = h.textContent.trim(), h2 = '') : (h2 = h.textContent.trim());
+    h1 = h.textContent.trim();
   }
-  return [h1, h2].filter(Boolean).join(' › ');
+  return h1;
 }
 
 function restore() {
@@ -737,8 +831,8 @@ function openMenu(anchor, html) {
 function markMenu(markEl) {
   const current = markEl.style.getPropertyValue('--c').trim();
   const m = openMenu(markEl,
-    COLORS.map((c, i) => `<button class="swatch" data-color="${c}" style="background:${c}"
-        aria-pressed="${c.toLowerCase() === current.toLowerCase()}" aria-label="${NAMES[i]}"></button>`).join('')
+    palette().map(([name, c]) => `<button class="swatch" data-color="${c}" style="background:${c}"
+        aria-pressed="${c.toLowerCase() === current.toLowerCase()}" aria-label="${esc(name)}"></button>`).join('')
     + '<span class="sep"></span>'
     + `<input type="text" id="mark-comment" placeholder="Comment…" aria-label="comment" value="${esc(markEl.dataset.comment || '')}">`
     + `<button data-action="remove" aria-label="remove the mark">${svg('remove', 14)}</button>`);
@@ -853,34 +947,85 @@ function insertRef(id, text) {
   save();
 }
 
-let tip;
-const closeTip = () => { tip?.remove(); tip = null; };
-
-function showTip(el) {
-  closeTip();
-  if (el.getAttribute('aria-expanded') === 'true') return;
-  tip = document.createElement('div');
-  tip.className = 'tip float';
-  tip.textContent = el.dataset.tip;
-  el.removeAttribute('title');
-  document.body.appendChild(tip);
-  placeNear(tip, el, 6, true);
-  el.addEventListener('mouseleave', closeTip, { once: true });
-}
-
 function buildResources() {
   const box = document.getElementById('resources');
   const source = '/api/source?topic=' + encodeURIComponent(topic.slug) + '&i=';
   const rows = [
     ...(topic.resources || []).map(r =>
-      `<li><a href="${esc(r.path)}" target="_blank" title="${esc(r.name)}"><span>${esc(r.name)}</span><span class="size">${r.kb} KB</span></a></li>`),
+      `<li><a href="${esc(r.path)}" target="_blank" title="${esc(r.name)}" data-name="${esc(r.name)}"><span>${esc(r.name)}</span><span class="size">${r.kb < 1024 ? r.kb + ' KB' : (r.kb / 1024).toFixed(1) + ' MB'}</span></a></li>`),
     ...(topic.links || []).map((e, i) => e.url && /^https?:\/\//i.test(e.url)
       ? `<li><a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer" title="${esc(e.url)}"><span>${esc(e.title)}</span><span class="size">↗</span></a></li>`
-      : e.path ? `<li><a href="${source + i}" target="_blank" title="${esc(e.path)}"><span>${esc(e.title)}</span><span class="size">local</span></a></li>` : ''),
+      : e.path ? `<li><a href="${source + i}" target="_blank" title="${esc(e.path)}" data-name="${esc(e.path)}"><span>${esc(e.title)}</span><span class="size">local</span></a></li>` : ''),
   ];
   box.innerHTML = `<div class="folder">resources/</div><ul>${rows.join('')}<li><button class="add" aria-label="add a resource">+ add</button></li></ul>`;
   box.querySelector('.add').onclick = e => addMenu(e.currentTarget);
+  box.querySelectorAll('a[data-name]').forEach(a => a.onclick = e => {
+    if (e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    preview(a.href, a.dataset.name);
+  });
 }
+
+const TEXT_EXT = /\.(md|markdown|txt|text|log|json|ya?ml|toml|xml|html?|css|js|ts|py|sh|sql|ini|cfg|rst|tex)$/i;
+const IMG_EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
+
+function parseCsv(t, sep) {
+  const rows = [[]];
+  let f = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) {
+      if (c !== '"') f += c;
+      else if (t[i + 1] === '"') { f += '"'; i++; }
+      else q = false;
+    } else if (c === '"') q = true;
+    else if (c === sep) { rows.at(-1).push(f); f = ''; }
+    else if (c === '\n') { rows.at(-1).push(f.replace(/\r$/, '')); f = ''; rows.push([]); }
+    else f += c;
+  }
+  rows.at(-1).push(f.replace(/\r$/, ''));
+  return rows.filter(r => r.join(''));
+}
+
+function closePreview() {
+  const v = app.querySelector('.viewer');
+  if (!v) return;
+  v.remove();
+  app.querySelector('.sheet').hidden = false;
+  scrollTo(0, +v.dataset.y);
+}
+
+async function preview(href, name) {
+  const kind = /\.pdf$/i.test(name) ? 'pdf' : IMG_EXT.test(name) ? 'img' : /\.(csv|tsv)$/i.test(name) ? 'csv' : TEXT_EXT.test(name) ? 'text' : null;
+  if (!kind) return window.open(href, '_blank', 'noopener');
+  closePreview();
+  const v = document.createElement('div');
+  v.className = 'viewer';
+  v.dataset.y = scrollY;
+  v.style.height = `calc((100vh - var(--bar-h) - var(--status-h)) / ${zoom()})`;
+  app.querySelector('.sheet').hidden = true;
+  scrollTo(0, 0);
+  v.innerHTML = `<div class="viewer-head">${promptLine('~/topics/' + topic.slug, 'less ' + name.split('/').pop())}
+    <button class="viewer-close" aria-label="Close preview" title="Close · Esc">✕</button></div><div class="viewer-body"></div>`;
+  app.appendChild(v);
+  v.querySelector('.viewer-close').onclick = closePreview;
+  const body = v.querySelector('.viewer-body');
+  if (kind === 'pdf') return body.innerHTML = `<iframe src="${esc(href)}#toolbar=0&navpanes=0" title="${esc(name)}"></iframe>`;
+  if (kind === 'img') return body.innerHTML = `<img src="${esc(href)}" alt="${esc(name)}">`;
+  try {
+    const res = await fetch(href);
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    const t = await res.text();
+    if (kind === 'text') return body.innerHTML = `<pre>${esc(t)}</pre>`;
+    // ponytail: first 2000 rows only, paginate if big CSVs matter
+    const [head = [], ...rows] = parseCsv(t, /\.tsv$/i.test(name) ? '\t' : ',').slice(0, 2001);
+    body.innerHTML = `<table class="htop static"><thead><tr>${head.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  } catch (e) {
+    body.innerHTML = `<p class="prompt"><span class="p-sig">✕</span> could not open ${esc(name)}: ${esc(e.message)}</p>`;
+  }
+}
+addEventListener('keydown', e => { if (e.key === 'Escape' && app.querySelector('.viewer')) closePreview(); });
 
 function addMenu(button) {
   const m = openMenu(button, `<button data-action="file">file…</button><span class="sep"></span>`
@@ -968,16 +1113,31 @@ function buildIndex() {
     return `<li${hidden ? ' hidden' : ''}>${arrow}<a href="#${h.id}" class="n${h.level}">
       <span class="n">${esc(h.number)}</span><span>${esc(h.text)}</span></a></li>`;
   });
-  index.innerHTML = rows.length
-    ? `<div class="folder">notes/</div><ol>${rows.join('')}</ol>`
-    : '<p class="nothing">(no headings)</p>';
+  const add = '<li><span class="fold"></span><button class="add" aria-label="add a note">+ add</button></li>';
+  index.innerHTML = `<div class="folder">notes/</div><ol>${rows.join('')}${add}</ol>`;
+  index.querySelector('.add').onclick = addSection;
   index.querySelectorAll('a').forEach(a => a.onclick = e => {
-    e.preventDefault(); goTo(a.hash.slice(1));
+    e.preventDefault(); closePreview(); goTo(a.hash.slice(1));
   });
   index.querySelectorAll('button.fold').forEach(b => b.onclick = () => {
     expanded.delete(b.dataset.id) || expanded.add(b.dataset.id);
     buildIndex();
   });
+}
+
+function addSection() {
+  const h = document.createElement('h1');
+  h.textContent = 'New note';
+  const last = [...doc.children].filter(c => !c.classList.contains('card')).at(-1);
+  last ? last.after(h) : doc.prepend(h);
+  doc.focus();
+  const r = document.createRange();
+  r.selectNodeContents(h);
+  getSelection().removeAllRanges();
+  getSelection().addRange(r);
+  h.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  buildIndex();
+  save();
 }
 
 /* ---------- cards ---------- */

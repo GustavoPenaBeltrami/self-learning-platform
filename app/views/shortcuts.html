@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>独学 · shortcuts</title>
+<link rel="stylesheet" href="/app/styles/style.css">
+<script src="/app/scripts/theme.js"></script>
+<script src="/app/scripts/shell.js"></script>
+<style>
+  .field { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: .3rem 1rem; padding: var(--spacing-16) 0; }
+  .field + .field { border-top: 1px solid var(--line); }
+  .field label { color: var(--ansi-cyan); }
+  .field .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
+  .field .hint::before { content: '// '; color: var(--color-steel); }
+  .field button.capture {
+    border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
+    background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
+  }
+  .field button.capture:focus { outline: 1px solid var(--accent); }
+  .field button.capture { min-width: 12ch; text-align: left; cursor: pointer; }
+  .field button.capture[aria-pressed=true] { outline: 1px solid var(--accent); color: var(--accent); }
+  .field button.capture:disabled { cursor: default; color: var(--muted); }
+  .sc-page { color: var(--ansi-cyan); }
+</style>
+
+<body>
+<script>
+const { app, tree, path } = mountShell('settings');
+const statusEl = document.getElementById('status');
+const run = async (busy, work, done = 'saved') => {
+  statusEl.textContent = busy;
+  try {
+    await work();
+    statusEl.textContent = done;
+    return true;
+  } catch (e) {
+    statusEl.textContent = '✕ ' + e.message;
+    return false;
+  }
+};
+
+tree.innerHTML = configTree('shortcuts.html');
+path('~/self-learning-platform/settings.json › shortcuts');
+
+const PAGE_NAMES = { notes: 'notes', exam: 'exams', cards: 'cards' };
+const overrides = () => ({ ...currentSettings().shortcuts });
+const saveShortcuts = o => run('saving…', () => saveSettings({ shortcuts: o }));
+const conflict = (id, spec) => {
+  const me = SHORTCUTS.find(s => s.id === id);
+  return SHORTCUTS.find(s => s.id !== id && !s.fixed && shortcut(s.id) === spec && s.modes.some(m => me.modes.includes(m)));
+};
+function shortcutRows() {
+  const box = document.getElementById('sc-list');
+  if (!box || box.querySelector('[aria-pressed=true]')) return;
+  const o = overrides();
+  box.innerHTML = Object.entries(PAGE_NAMES).map(([page, name]) => `<p class="sc-page">${name}</p>` + SHORTCUTS.filter(s => s.id.startsWith(page + '.')).map(s => `
+    <div class="field">
+      <label for="sc-${s.id}">${esc(s.text)}</label>
+      <span class="row"><button type="button" class="capture" id="sc-${s.id}" data-id="${s.id}" aria-pressed="false"${s.fixed ? ' disabled' : ''}>${esc(keyFor(s.id))}</button>${s.id in o ? `<button type="button" class="reset" data-reset="${s.id}">reset to ${esc(keyLabel(s.key))}</button>` : ''}</span>
+      ${s.fixed ? '<p class="hint">fixed</p>' : ''}
+    </div>`).join('')).join('');
+  app.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => {
+    const next = overrides();
+    b.dataset.reset ? delete next[b.dataset.reset] : Object.keys(next).forEach(k => delete next[k]);
+    saveShortcuts(next);
+  });
+  box.querySelectorAll('button.capture:not(:disabled)').forEach(b => {
+    const stop = () => { b.setAttribute('aria-pressed', 'false'); b.textContent = keyFor(b.dataset.id); };
+    b.onclick = () => {
+      if (b.getAttribute('aria-pressed') === 'true') return stop();
+      b.setAttribute('aria-pressed', 'true');
+      b.textContent = 'press a key…';
+    };
+    b.onblur = stop;
+    b.onkeyup = e => { if (b._eat) { e.preventDefault(); b._eat = false; } };
+    b.onkeydown = e => {
+      if (b.getAttribute('aria-pressed') !== 'true' || e.key === 'Tab') return;
+      e.preventDefault();
+      e.stopPropagation();
+      b._eat = true;
+      if (e.key === 'Escape') return stop();
+      const spec = keySpec(e);
+      if (!spec) return;
+      stop();
+      const id = b.dataset.id, clash = conflict(id, spec);
+      if (clash) return statusEl.textContent = `✕ ${keyLabel(spec)} is already ${PAGE_NAMES[clash.id.split('.')[0]]} · ${clash.text}`;
+      const next = overrides();
+      spec === SHORTCUTS.find(s => s.id === id).key ? delete next[id] : next[id] = spec;
+      saveShortcuts(next);
+    };
+  });
+}
+
+settings.then(() => {
+  app.innerHTML = `
+    <div class="sheet">
+    ${settingsCrumbs('shortcuts', '<button type="button" class="reset" data-reset="">reset all to defaults</button>')}
+    ${promptLine('~/self-learning-platform', 'nvim settings.json')}
+    <h1>Shortcuts</h1>
+    <p class="minor"># saved under "shortcuts" in settings.json at the repo root. click a key, then press the new combo. esc cancels. the ⓘ in the top bar of each page lists them</p>
+    <div id="sc-list"></div>
+    <div class="tildes"></div></div>`;
+  shortcutRows();
+  addEventListener('settings-applied', shortcutRows);
+});
+</script>

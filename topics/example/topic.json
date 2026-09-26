@@ -3,7 +3,7 @@
   "subtitle": "Template showing how a topic is structured",
   "type": "documentation",
   "area": "web",
-  "order": 99,
+  "order": 999,
   "goals": [
     "Pick the right method for a request and justify it by safety and idempotency",
     "Choose the status code a response should carry, by range and meaning"

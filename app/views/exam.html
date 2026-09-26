@@ -49,25 +49,31 @@
 
 <body>
 <script>
+const legacy = new URLSearchParams(location.search).get('f')?.match(/^topics\/([^/]+)\/exams\/([^/]+)\/exam\.json$/);
+if (legacy) history.replaceState(null, '', `?topic=${encodeURIComponent(legacy[1])}&exam=${encodeURIComponent(legacy[2])}`);
 const params = new URLSearchParams(location.search);
-const { app, tree, path, mode } = mountShell('exams');
+const { app, tree, tools, path, mode } = mountShell('exams');
+const info = mode => tools.innerHTML = `<div class="wb-mod pill">${infoButton(keyIds(mode))}</div>`;
 const statusEl = document.getElementById('status');
 const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
-const pad = n => String(n).padStart(2, '0');
-const file = params.get('f');
-const link = p => `?f=${encodeURIComponent(p)}`;
-let answered = 0, onKey = null;
+const slug = params.get('topic');
+const examName = slug && params.get('exam');
+const file = examName && `topics/${slug}/exams/${examName}/exam.json`;
+const link = (topic, name) => `?topic=${encodeURIComponent(topic)}&exam=${encodeURIComponent(name)}`;
+const pendingOf = t => t.exams.reduce((n, e) => n + e.pending, 0);
+let answered = 0, onKey = null, topicTitle = slug;
 
 function buildTree(topics) {
   tree.innerHTML = topics.map(t => folder(t.slug + '/', t.exams.length,
-    `<ul>${t.exams.map(e => `<li><a href="${link(e.path)}"${e.path === file ? ' aria-current="page"' : ''}
+    `<ul>${t.exams.map(e => `<li><a href="${link(t.slug, e.name)}"${t.slug === slug && e.name === examName ? ' aria-current="page"' : ''}
         title="${esc(e.title)}"><span class="n">›</span><span>${esc(e.title)}</span></a></li>`).join('')
       || '<li class="empty">(no exams)</li>'}</ul>`,
-    t.exams.some(e => e.path === file), t.title)).join('');
+    t.slug === slug, t.title)).join('');
 }
 
 async function load() {
-  const data = await api('/api/index');
+  const data = await api('/api/exams');
+  topicTitle = data.topics.find(t => t.slug === slug)?.title || slug;
   buildTree(data.topics);
   return data.topics;
 }
@@ -80,30 +86,68 @@ async function index() {
     app.innerHTML = offline(e);
     return;
   }
-  path('~/notes/topics/*/exams');
+  path('~/topics/*/exams');
   app.innerHTML = `
     <div class="sheet">
+    ${crumbs([['exams']])}
     ${promptLine('~/topics', 'ls */exams')}
     <table class="htop">
-      <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">EXAMS</th></tr></thead>
+      <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">EXAMS</th><th class="num">PENDING</th></tr></thead>
       <tbody>${topics.map(l => `
-        <tr>
-          <td class="num">${l.order < 999 ? pad(l.order) : '—'}</td>
-          <td class="wide">${esc(l.title)}<br><span class="sub">${esc(l.subtitle || '')}</span></td>
+        <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
+          <td class="num">${l.order < 1000 ? String(l.order).padStart(3, '0') : '—'}</td>
+          <td class="wide"><a href="?topic=${encodeURIComponent(l.slug)}">${esc(l.title)}</a><br><span class="sub">${esc(l.subtitle || '')}</span></td>
           <td class="type">${esc(l.type)}</td>
           <td class="num${l.exams.length ? '' : ' zero'}">${l.exams.length}</td>
+          <td class="num${pendingOf(l) ? '' : ' zero'}">${pendingOf(l)}</td>
         </tr>${l.exams.map(e => `
         <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
-          <td></td><td class="wide" colspan="3"><span class="sub">└─ </span><a href="${link(e.path)}">${esc(e.title)}</a></td>
-        </tr>`).join('')}`).join('')}${topics.length ? '' : noTopicsRow(4)}</tbody>
+          <td></td><td class="wide" colspan="3"><span class="sub">└─ </span><a href="${link(l.slug, e.name)}">${esc(e.title)}</a></td>
+          <td class="num${e.pending ? '' : ' zero'}">${e.pending}</td>
+        </tr>`).join('')}`).join('')}${topics.length ? '' : noTopicsRow(5)}</tbody>
     </table>
     <div class="tildes"></div></div>`;
+}
+
+async function topic() {
+  let t;
+  try {
+    t = (await load()).find(t => t.slug === slug);
+    if (!t) throw new Error('no such topic: ' + slug);
+  } catch (e) {
+    app.innerHTML = offline(e);
+    return;
+  }
+  document.title = '独学 · ' + t.title;
+  path(`~/topics/${slug}/exams`);
+  info('exam.topic');
+  app.innerHTML = `
+    <div class="sheet">
+    ${crumbs([['exams', 'exam.html'], [t.title]])}
+    ${promptLine('~/topics/' + slug, 'ls exams/')}
+    <h1>${esc(t.title)}</h1>
+    <p class="minor"># ${t.exams.length ? `${t.exams.length} exams · ${pendingOf(t)} attempts pending grading: /slp-grade` : 'no exams yet — ask your agent: /slp-exam'}</p>
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>EXAM</th><th class="num">QUESTIONS</th><th class="num">ATTEMPTS</th><th class="num">PENDING</th></tr></thead>
+      <tbody>${t.exams.map((e, i) => `
+        <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
+          <td class="num">${pad(i + 1)}</td>
+          <td class="wide"><a href="${link(slug, e.name)}">${esc(e.title)}</a><br><span class="sub">exams/${esc(e.name)}/</span></td>
+          <td class="num">${e.questions}</td>
+          <td class="num${e.attempts ? '' : ' zero'}">${e.attempts}</td>
+          <td class="num${e.pending ? '' : ' zero'}">${e.pending}</td>
+        </tr>`).join('')}</tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+  mode('NORMAL');
+  statusEl.textContent = `${t.exams.length} exams · ${pendingOf(t)} pending`;
 }
 
 function header(exam, note, command) {
   const parts = file.split('/');
   return `
     <div class="sheet">
+    ${crumbs([['exams', 'exam.html'], [topicTitle, '?topic=' + encodeURIComponent(slug)], [exam.title || examName]])}
     ${promptLine('~/' + parts.slice(0, -1).join('/'), command + ' ' + parts.at(-1))}
     <h1>${esc(exam.title || 'Exam')}</h1>
     <p class="minor"># ${note}</p>`;
@@ -111,7 +155,7 @@ function header(exam, note, command) {
 
 const leave = () => {
   if (answered && !confirm('leave? answers not saved are lost')) return;
-  location.href = 'exam.html';
+  location.href = file ? '?topic=' + encodeURIComponent(slug) : 'exam.html';
 };
 
 const stemHTML = (q, i) => `<p class="stem"><span class="num">[${pad(i + 1)}]</span><span>${vizText(q.q)}</span></p>`;
@@ -119,12 +163,13 @@ const stemHTML = (q, i) => `<p class="stem"><span class="num">[${pad(i + 1)}]</s
 function take(exam) {
   const questions = shuffle(exam.questions.map((q, i) => ({ ...q, i })));
   document.title = '独学 · ' + (exam.title || 'exam');
-  path('~/notes/' + file);
+  path('~/' + file);
 
   app.innerHTML = header(exam, `${questions.length} questions · graded at the end`, 'exam') + `
     ${questions.map((q, i) => questionHTML(q, i)).join('')}
-    <div class="keys">${key('⏎', 'Grade', 'cta')}${key('Esc', 'Back')}</div>
+    <div class="keys">${key('Esc', 'Back')}${key(keyFor('exam.grade'), 'Finish exam', 'cta')}</div>
     <div class="tildes"></div></div>`;
+  info('exam');
 
   vizPaint(app);
   app.querySelectorAll('.oral').forEach(div => {
@@ -144,18 +189,19 @@ function take(exam) {
   progress();
   app.addEventListener('change', progress);
   app.addEventListener('input', progress);
-  const [gradeBtn, backBtn] = app.querySelectorAll('.keys .key');
+  const [backBtn, gradeBtn] = app.querySelectorAll('.keys .key');
   let grading = false;
   gradeBtn.onclick = () => grading || (grading = true, grade(exam, questions));
   backBtn.onclick = leave;
   onKey = e => {
-    const k = e.key.toLowerCase();
-    if (k === 't' || k === 'r') {
+    const write = pressed(e, 'exam.write');
+    if (write || pressed(e, 'exam.record')) {
+      e.preventDefault();
       const q = e.target.closest?.('.question')
         || [...app.querySelectorAll('.oral')].find(o => o.style.display !== 'none')?.closest('.question');
-      q?.querySelector(k === 't' ? '.write-instead' : '.record')?.click();
+      q?.querySelector(write ? '.write-instead' : '.record')?.click();
     }
-    if (e.key === 'Enter' && !e.target.closest?.('button, .question')) gradeBtn.click();
+    if (pressed(e, 'exam.grade') && !(native(e) && e.target.closest?.('button, .question'))) { e.preventDefault(); gradeBtn.click(); }
   };
 }
 
@@ -171,9 +217,9 @@ function questionHTML(q, i) {
   if (type === 'oral') {
     return `<div class="question">${stem}
       <div class="oral">
-        ${key('R', 'Record', 'record')}
+        ${key(keyFor('exam.record'), 'Record', 'record')}
         <audio class="oral-preview" controls style="display:none"></audio>
-        ${key('T', 'Answer in writing', 'write-instead')}
+        ${key(keyFor('exam.write'), 'Answer in writing', 'write-instead')}
       </div>
       <textarea class="answer oral-text" name="q${i}" rows="4" placeholder="Your answer" aria-label="answer ${i + 1}" style="display:none"></textarea>
     </div>`;
@@ -216,7 +262,7 @@ function recordOral(button, audio) {
     recorder.start();
 
     button.classList.add('recording');
-    statusEl.textContent = 'recording… R to finish';
+    statusEl.textContent = `recording… ${keyFor('exam.record')} to finish`;
     await new Promise(r => (function check() { button.dataset.stop ? r() : setTimeout(check, 200); })());
 
     recorder.stop();
@@ -243,10 +289,8 @@ const blobToBase64 = blob => new Promise((res, rej) => {
   r.readAsDataURL(blob);
 });
 
-const saveAttempt = body => {
-  const [slug, , exam] = file.split('/').slice(1);
-  return api('/api/attempt', JSON.stringify({ slug, exam, ...body })).catch(e => ({ error: e.message }));
-};
+const saveAttempt = answers => api('/api/exams/' + encodeURIComponent(slug), JSON.stringify({ attempt: { exam: examName, answers } }))
+  .catch(e => ({ error: e.message }));
 
 const savedLine = saved => saved.error
   ? `could not save the attempt: ${esc(saved.error)}`
@@ -293,7 +337,7 @@ async function grade(exam, questions) {
   }))).join('');
 
   const pct = totalMC ? Math.round(right / totalMC * 100) : null;
-  const saved = await saveAttempt({ answers });
+  const saved = await saveAttempt(answers);
   if (!saved.error) answered = 0;
 
   app.innerHTML = header(exam, `${questions.length} questions`, 'exam --check') + `
@@ -301,32 +345,33 @@ async function grade(exam, questions) {
     <p class="minor"># ${totalMC ? `${right} of ${totalMC} correct (multiple choice)` : 'no multiple-choice questions'}</p>
     ${detail}
     <p class="minor">${savedLine(saved)}</p>
-    <div class="keys">${key('⏎', 'Retake', 'cta')}${key('Esc', 'Back')}</div>
+    <div class="keys">${key('Esc', 'Back')}${key(keyFor('exam.retake'), 'Retake', 'cta')}</div>
     <div class="tildes"></div></div>`;
+  info('exam.results');
   vizPaint(app);
   mode(pct === null ? 'DONE' : (pct >= 70 ? 'PASS' : 'FAIL'), pct !== null && pct >= 70 ? 'insert' : '');
   statusEl.textContent = totalMC ? `${right}/${totalMC} correct` : 'attempt saved';
-  const [again, back] = app.querySelectorAll('.keys .key');
+  const [back, again] = app.querySelectorAll('.keys .key');
   again.onclick = () => location.reload();
   back.onclick = leave;
-  onKey = e => { if (e.key === 'Enter' && !e.target.closest?.('button')) again.click(); };
+  onKey = e => { if (pressed(e, 'exam.retake') && !(native(e) && e.target.closest?.('button'))) { e.preventDefault(); again.click(); } };
   scrollTo(0, 0);
 }
 
 addEventListener('keydown', e => {
-  if (!file || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!slug || e.repeat) return;
   if (e.target.closest?.('textarea, input[type=text], select')) return;
-  if (e.key === 'Escape') return leave();
+  if (e.key === 'Escape' && !(e.metaKey || e.ctrlKey || e.altKey)) return leave();
   onKey?.(e);
 });
 
 app.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
 
 file
-  ? Promise.all([/^topics\/[^/]+\/exams\/[^/]+\/exam\.json$/.test(file) ? api('/' + encodeURI(file)) : Promise.reject(new Error('not an exam: ' + file)), load()])
+  ? Promise.all([api(`/topics/${encodeURIComponent(slug)}/exams/${encodeURIComponent(examName)}/exam.json`), load()])
       .then(([exam]) => {
         if (!exam?.questions?.length) throw new Error('no questions in ' + file);
         take(exam);
       }).catch(e => app.innerHTML = offline(e))
-  : index();
+  : slug ? topic() : index();
 </script>

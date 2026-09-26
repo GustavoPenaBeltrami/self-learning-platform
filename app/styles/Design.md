@@ -1,7 +1,7 @@
 # 独学 SLP — Design & Brand Reference
 > 独学 (*dokugaku*) means self-study. SLP is a terminal-style study tool: a waybar on top, a file explorer on the left, a vim buffer in the middle, a statusline at the bottom. One person, one topic, and a quiet screen.
 
-**Themes:** `sumi` 墨 (dark, default when the OS is dark) · `kami` 紙 (light, default when the OS is light) · `seed` (dark, generated from one color the user picks)
+**Themes:** `sumi` 墨 (dark, default when the OS is dark) · `kami` 紙 (light, default when the OS is light) · four presets `taiyo` 太陽 (sepia, light), `sakura` 桜 (dark + pink), `umi` 海 (dark + blue), `mori` 森 (dark green + brown) · any number of custom themes
 
 ## Identity
 
@@ -39,7 +39,7 @@ Four Japanese design ideas describe what the product already does. Use them to s
 
 SLP talks like a good terminal: lowercase, short, exact. It says what happened and what to do next, then goes quiet.
 
-- Lowercase labels. Commands and paths as names (`ls -l`, `exam --check`, `~/notes/topics`).
+- Lowercase labels. Commands and paths as names (`ls -l`, `exam --check`, `~/topics`).
 - One fact per line. No exclamation marks, no praise, no emoji in the UI.
 - State is a glyph plus a word: `✓ correct`, `✕ wrong`, `NORMAL`, `INSERT`, `PASS`, `FAIL`.
 
@@ -53,15 +53,15 @@ SLP talks like a good terminal: lowercase, short, exact. It says what happened a
 
 ```
 ┌ waybar ─────────────────────────────────────────────────────────────┐
-│ [独] (1 notes)(2 exams)(3 cards)(4 project)(5 settings) Wed Sep 23 [theme▾]│
+│ [独] (1 notes)(2 exams)(3 cards)(4 project)(5 settings)  Wed Sep 23  [tools]│
 ├──────────────┬──────────────────────────────────────────────────────┤
-│┌ explorer ┐  │   notes ~/topics ❯ ls -l                             │
+│┌ explorer ┐  │   独学 ~/topics ❯ ls -l                               │
 ││ ⌄ topic-a/2│  │   # TOPIC                    TYPE    SECT  RES       │
 ││  1 Intro   │  │   01 Fundamentals of …       book       2    1       │
 ││ ⌄ topic-b/4│  │ ~                                                    │
 │└───────────┘  │ ~                                                    │
 ├──────────────┴──────────────────────────────────────────────────────┤
-│ NORMAL ~/notes/topics      🔍 − 100% +  ↔ − 960px +  utf-8[unix]  All │
+│ NORMAL ~/topics            🔍 − 100% +  ↔ − 960px +  utf-8[unix]  All │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,7 +73,7 @@ SLP talks like a good terminal: lowercase, short, exact. It says what happened a
 
 ## Color
 
-The brand is ink on paper: **sumi 墨** `#0c0c0c` and **kami 紙** `#e6e6e6`, with the grey ramp between them. Brand material uses only this ramp and never takes a hue. In the app, `sumi` is the ramp as below and `kami` is the same ramp inverted; the optional `seed` theme is the one place a hue enters (see Seed theme).
+The brand is ink on paper: **sumi 墨** `#0c0c0c` and **kami 紙** `#e6e6e6`, with the grey ramp between them. Brand material uses only this ramp and never takes a hue. In the app, `sumi` is the ramp as below and `kami` is the same ramp inverted; the presets and custom themes are the one place a hue enters (see Generated themes).
 
 | Step | sumi hex | Token |
 |---|---|---|
@@ -124,17 +124,19 @@ The short names (`--bg`, `--ink`, `--muted`, `--line`, `--accent`, `--good`, `--
 |---|---|---|---|---|
 | `sumi` | Ink. Monochrome dark; every ANSI hue is a grey | `#141414` | `#e6e6e6` | `#d4d4d4` |
 | `kami` | Paper. The sumi ramp inverted; logos use `filter: invert(1)` via `--logo` | `#e6e6e6` | `#0c0c0c` | `#1b1b1b` |
-| `seed` | One color. The ramp tinted with the seed hue, accent = the seed, real ANSI hues | L .19 | L .94 | L .8 |
+| `taiyo` · `sakura` · `umi` · `mori` | Presets built by `generateTheme()` from `#b98a52` light, `#e58fb0`, `#3d7fd9`, `#4f7d4a` dark; `mori` overrides the accent with a brown | generated | generated | generated |
+| custom | Saved palettes from the themes settings page | any | any | any |
 
-Theme selection lives in `theme.js`. The saved `theme` is `""` (auto), `sumi`, `kami` or `seed`. `theme.js` always writes the *effective* theme to `data-theme` on `<html>`: auto resolves to `kami` or `sumi` from `prefers-color-scheme` and follows OS changes live through a `matchMedia` listener. Unknown saved keys (old themes) behave as auto. The waybar selector and the settings page share `THEME_CHOICES` (`auto`, `sumi`, `kami`, `seed`). The choice persists in `settings.json` at the repo root through `/api/settings`; `localStorage.settings` only caches it so the first paint has the right theme. `kami` sets `color-scheme: light`.
+Theme selection lives in `theme.js`. The saved `theme` is `""` (auto), a built-in key or a custom theme name. `theme.js` always writes the *effective* theme to `data-theme` on `<html>`: auto resolves to `kami` or `sumi` from `prefers-color-scheme` and follows OS changes live through a `matchMedia` listener. Unknown saved keys (old themes, a deleted custom one) behave as auto. `sumi` and `kami` are CSS blocks; every other theme is a palette whose 19 colors `theme.js` sets as inline custom properties on `<html>`, plus `--on-accent`, `--logo` and `color-scheme` from its `dark` flag. The statusline selector lists auto, the built-ins, then the custom themes. The choice persists under `theme` in `settings.json` through `/api/settings`; `localStorage.settings` only caches it so the first paint has the right theme.
 
-### Seed theme
+### Generated themes
 
-`seed` is built from one color, `theme_seed` in `settings.json` (`#rrggbb`, picked with the native color input in settings; picking it also switches the theme to `seed`). `theme.js` sets it as `--seed` on `<html>`; the `:root[data-theme="seed"]` block derives every token with CSS relative color syntax (`oklch(from var(--seed) L c h)`):
-- The ramp keeps the seed's hue with its chroma cut to 4-15%, at fixed lightness steps (void .15 → paper .94), so contrast is the same as sumi whatever the seed.
-- The accent is the seed at lightness .8 with chroma capped at .15, so `--on-accent` (void) stays readable on it.
-- The seven ANSI hues are fixed oklch colors at lightness .72-.84, independent of the seed.
-It is a dark theme only. Browsers without relative color syntax (Chrome < 119, Safari < 16.4, Firefox < 128) cannot render it.
+A palette is `{ name, dark, colors }`, `colors` holding `void`…`paper`, `accent` and the seven ANSI names as `#rrggbb`. `generateTheme(hex, dark)` builds one from a single color with plain HSL:
+- The 11 ramp steps keep the color's hue, saturation capped at 30%, at the lightnesses of the sumi greys (void 5% → paper 90%) when dark, or of the kami greys (reversed, background light) when light, so contrast matches the built-ins.
+- The accent is the color with saturation clamped to 35-80%, at 72% lightness on dark, 32% on light.
+- The ANSI hues are fixed hues at 55% saturation, 70% lightness on dark, 36% on light.
+
+The themes settings page generates a palette into 19 color inputs, lets the user change any of them, and saves it to `theme.custom` in `settings.json`. The server checks every custom theme (name `[a-z0-9-]`, up to 24, not a built-in, exact color keys, lowercase hex) and that the active theme exists.
 
 Highlight colors for marks (`PALETTE` in `notes.html`) are fixed hexes stored in the `.md` (`--c:#d8c06a`), so they look the same in every theme and in Obsidian, and the swatches show those real colors. Old notes that stored `var(--ansi-x, #hex)` are converted to the plain hex when opened.
 
@@ -143,7 +145,7 @@ Highlight colors for marks (`PALETTE` in `notes.html`) are fixed hexes stored in
 **JetBrains Mono** 400 and 700 for everything: chrome, body, headings, tables, buttons, and brand material.
 **Noto Sans JP** 700/900 only for kanji in brand material (the name gloss, section marks, a single character on a cover). Never for UI text. In the app it ships as `app/vendor/noto-sans-jp/`, subset to the brand kanji (独学簡素間渋い静寂墨紙, ~3KB per weight), used through `--kanji` on the project page only. New kanji need a new subset.
 
-The note body has a reader-font switch (`mono` default, `serif`, `inter`) that only affects `.doc` text. Headings stay mono. It is saved in `settings.json` like the theme.
+The note body has a reader-font switch (`mono` default, `serif`, `inter`) that only affects `.doc` text. Headings stay mono. It is saved under `global` in `settings.json` like the theme.
 
 | Role | Size | Notes |
 |---|---|---|
@@ -161,7 +163,7 @@ Headings are numbered by CSS counters (`1.`, `1.1`, `1.1.1`) and the numbers are
 `--color-void` bar, 44px tall, three columns (`1fr auto 1fr`).
 - **Left:** the 独 mark (`assets/mark.png`, 20px, inverted on light themes), then the workspace module: pill links `1 notes` / `2 exams` / `3 cards` / `4 project` / `5 settings`. The mark links to `project`. The active one is filled with accent and `--on-accent` text.
 - **Center:** clock, bold `--color-chalk`, `Wed Sep 23   16:30`, 24h, updated every 15s. No decoration.
-- **Right:** tool modules, then the theme `<select>` (`auto`, `sumi`, `kami`, `seed`). Each module is a `--color-graphite` rounded rect (radius 8px, 30px tall) holding 24px-tall borderless buttons (radius 6px, so they nest inside the module) that hover to `--color-iron`. Pressed buttons fill with accent. Color swatches are 12px circles; the pressed one gets a 1.5px outline ring.
+- **Right:** tool modules. Each module is a `--color-graphite` rounded rect (radius 8px, 30px tall) holding 24px-tall borderless buttons (radius 6px, so they nest inside the module) that hover to `--color-iron`. Pressed buttons fill with accent. Color swatches are 12px circles; the pressed one gets a 1.5px outline ring.
 - Tools overflow by horizontal scroll with no scrollbar. They never wrap.
 
 ### Explorer
@@ -169,11 +171,12 @@ Sticky left column, 18rem wide, inside a 1px `--color-slate` frame with an inver
 - The tree is built from native `<details open>` per topic. The summary is `slug/` in `--ansi-blue` with a count on the right and a `›`/`⌄` marker. The current topic's summary is filled with accent.
 - **Notes, current topic:** a `resources/` subfolder (files with size on the right, web links with `↗`, local `path` sources marked `local` and opened through `/api/source`, and a `+ add` row that uploads files to `resources/` or adds a link or path to `topic.json`), then `notes/` with the live, foldable heading index.
 - **Notes, other topics:** their h1 sections as `?topic=slug#id` links, so you can jump between projects without going back to the index.
+- **Cards:** topic › card set › cards. Each set is a nested `<details>` in `--ansi-cyan`, labelled with its note file (`01-methods-and-status-codes.md`) or its custom name, and holds its card fronts as `?topic=slug&set=name&card=id` links. Only the open topic's sets start unfolded. Clicking a card of the set being studied brings it to the front of the session without reloading; the card on screen is `--ansi-yellow`.
 - **Exams:** each topic lists its exam files. The open exam is `--ansi-yellow`.
 - Long names truncate with an ellipsis; the full name is in `title`.
 
 ### Content panel
-- **Prompt line** above the content: `notes ~/path ❯ command`. Host in green bold, path in blue, `❯` in magenta. It says what the view is (`ls -l`, `nvim notes/`, `exam exam.json`, `exam --check`).
+- **Prompt line** above the content: `独学 ~/path ❯ command`. Host is the mark (`--kanji`, the one place the mark is text in the UI) in green bold, path in blue, `❯` in magenta. It says what the view is (`ls -l`, `nvim notes/`, `exam exam.json`, `exam --check`).
 - **Line-number gutter:** every top-level block and every list item gets a CSS counter in `--color-slate`, right-aligned in the left gutter. Figures and margin cards are skipped.
 - **`~` filler:** eight tildes after the content, like an empty vim buffer. This is the product's *ma*; never replace it with content.
 - **Empty state:** when there are no topics, the stacked lockup (200px, 90% opacity) sits centered above the `slp-init` hint, followed by the tildes.
@@ -185,11 +188,11 @@ The topic index for notes, exams and cards. The header row is `--ansi-cyan` with
 Fixed, 24px, `--color-void`, 12px text. Left to right:
 - **Mode block:** `NORMAL` (yellow) or `INSERT` (green), bold `--on-accent` text. Notes switch on editor focus. Exams show `INSERT` once any option is picked, then `PASS` or `FAIL` after grading. Cards show `INSERT` while a card is revealed.
 - **Path** in `--color-chalk`.
-- **Right cluster:** save or progress status, zoom control (magnifier, `−`, numeric %, `+`; 50–250, step 10), width control (`↔`, `−`, numeric px, `+`; 320–2400, step 40), `utf-8[unix]` on `--color-iron`, and scroll position (`Top` / `N%` / `Bottom` / `All`) on green.
+- **Right cluster:** save or progress status, zoom control (magnifier, `−`, numeric %, `+`; 50–250, step 10), width control (`↔`, `−`, numeric px, `+`; 320–2400, step 40), theme (`◐` + `auto`, the built-ins, the custom themes), `utf-8[unix]` on `--color-iron`, and scroll position (`Top` / `N%` / `Bottom` / `All`) on green.
 - Zoom and width persist in `localStorage` (`zoom`, `width`), shared by every page.
 
 ### Keys (htop function-key buttons)
-Buttons are `<kbd>` + label pairs: the key on `--color-void`, the label filled with `--ansi-cyan`, or with accent and bold for the primary action. There is no radius. The key label is a real shortcut: `⏎` triggers the primary key, `Esc` goes back (asking first when answers would be lost). Exams add `R` (record, again to stop) and `T` (answer in writing) on oral questions; cards use `Space` flip, `1` again, `2` good, `A` study all.
+Buttons are `<kbd>` + label pairs: the key on `--color-void`, the label filled with `--ansi-cyan`, or with accent and bold for the primary action. There is no radius. The key label is a real shortcut: `⏎` triggers the primary key, `Esc` goes back (asking first when answers would be lost). Exams add `R` (record, again to stop) and `T` (answer in writing) on oral questions; cards use `Space` flip, `1` again, `2` good, `A` study all. Those are defaults: every action key is rebindable in the shortcuts page (the `shortcuts` section of `settings.json` at the repo root, defaults in `SHORTCUTS` in `shell.js`), so labels always come from `keyFor(id)`. `Esc`, `⌘B`/`⌘I`, `⌘⏎` in the card form and menu arrows stay fixed. Each page with keys puts an ⓘ in the waybar tools whose tip lists them (`infoButton(ids)`; the tip is computed on hover from `data-keys`, and `.tip` is `white-space: pre` for the multi-line list).
 
 ### Exam
 - Question number `[01]` in orange, then the statement.
@@ -197,11 +200,11 @@ Buttons are `<kbd>` + label pairs: the key on `--color-void`, the label filled w
 - Grading shows an htop meter, `Score[|||||||     ]70%`, 40 cells, green at 70% or more and red below. Each option then gets `✓` (green), `✕` + strikethrough (red), or `·` (grey). Explanations are prefixed `//`.
 
 ### Cards
-- `cards.html` (the `3 cards` workspace): htop index of topics with `CARDS`, `DUE` and `UNSURE`; `?topic=<slug>` opens the deck. Cards live in `cards/cards.json`: the agent writes them (`slp-cards`), or you do, by hand, in the app. The app never derives them on its own.
-- Due cards only by default. The card is a literal card: a centered `--color-graphite` tile (14px radius, 520px max) with the question and `NN / MM`; `Space Reveal` sits under it. On hover it lifts (translate + shadow, the one place with a shadow; off under reduced motion). Clicking it or `Space` reveals: the app blurs behind a full-screen layer and the card flips (rotateY, 0.5s) to its back: the question small, the answer, the `// H1 › H2` note link. Three choices under it: `1 Don't know` (back to the end of the deck), `2 Knew it`, `3 Unsure` (sets `flagged: true` in `cards.json` and counts as don't know without repeating it; `/slp-session` goes over flagged cards with the agent). `Esc` or a click outside puts the card back face down. Focus goes to the layer, never to a choice, so a stray `Space` can't grade. Only the first rating per card is saved, in one batch at the end (and on `pagehide`), to `cards/reviews.jsonl`.
-- Actions live in the waybar tools, like the notes toolbar: `new N`, `edit E`, `list L` (pick a card, edit or delete it), `skip S` (next card without revealing), `delete D`, `study all A`, `back Esc`.
+- `cards.html` (the `3 cards` workspace): htop index of topics with `CARDS`, `DUE` and `UNSURE`; `?topic=<slug>` lists the topic's card sets the same way (`⏎ Study due` studies the due cards of every set in one session; `C new set` opens the card form as `new card set · first card`, set name required, suggesting notes that have no set yet, then opens the new set), and `?topic=<slug>&set=<name>` studies one set. A set is one note `.md` with cards, or a custom set (see `formats.md` § Cards). Cards live in `cards/cards.json`: the agent writes them (`slp-cards`), or you do, by hand, in the app. The app never derives them on its own.
+- Due cards only by default. The card is a TUI panel like the explorer: a centered `--color-graphite` tile (no radius, 520px max, 1px `--color-slate` frame) with a `card NN/MM` title notch and the question; `Space Reveal` sits under it. On hover the frame fades to accent (120ms). Clicking it or `Space` reveals: a dimmed full-screen layer covers the app and the card flips (rotateY, 0.5s) to its back (notch `answer`): the question small, the answer, the `// H1 › H2` note link. Three choices under it: `1 Don't know` (back to the end of the deck), `2 Knew it`, `3 Unsure` (sets `flagged: true` in `cards.json` and counts as don't know without repeating it; `/slp-session` goes over flagged cards with the agent). `Esc` or a click outside puts the card back face down. Focus goes to the layer, never to a choice, so a stray `Space` can't grade. Only the first rating per card is saved, in one batch at the end (and on `pagehide`), to `cards/reviews.jsonl`.
+- Actions live in the waybar tools as SVG icon buttons (`svg()` in `shell.js`, shared with notes), grouped in three modules: card (`new`, `edit`, `delete`), deck (`list`, `skip`, `study`), `back`. Hovering one shows the shared `.tip` label with its key, like the notes toolbar: `new N`, `edit E`, `list L` (pick a card, edit or delete it), `skip S` (next card without revealing), `delete D`, `study all A`, `back Esc`.
 - Scheduling is Leitner, derived by the server from `reviews.jsonl`: box = consecutive goods since the last again (max 3), due after 0 / 1 / 3 / 7 days.
-- The form is a modal `<dialog class="card-form">` from `cardForm()` in `shell.js`: front, back, and an optional note with the topic's `H1 › H2` headings as suggestions; `⌘⏎` saves, `Esc` cancels. Manual cards get `"by": "user"`.
+- The form is a modal `<dialog class="card-form">` from `cardForm()` in `shell.js`: set (suggests the notes' h1s and existing custom sets; prefilled with the set being studied, empty = the note's set), front, back, and an optional note with the topic's `H1 › H2` headings as suggestions; `⌘⏎` saves, `Esc` cancels. Manual cards get `"by": "user"`.
 - In notes, the flashcard tool in the waybar opens the same form with the selection as the back and the caret's `H1 › H2` as the note.
 - Empty states: `no cards yet — press N to write one, or ask your agent: /slp-cards`, or `nothing due · next in X` with `A` to study all.
 
@@ -251,13 +254,17 @@ Buttons are `<kbd>` + label pairs: the key on `--color-void`, the label filled w
 
 | File | Owns |
 |---|---|
-| `style.css` | Tokens, the sumi, kami and seed blocks, and shared components (waybar, explorer, tables, statusline, keys, `.float`, `.recording`, viz) |
-| `theme.js` | `THEMES`/`THEME_CHOICES`, settings load/save (`settings`, `saveSettings()`), applies the effective theme, seed and reading font, `themeSelector()`, `pickTheme()`; `api()` (throws with `status` and `data`), `esc()`, `clean()` (sanitizes note HTML into a fragment), `optionTags()` |
-| `shell.js` | `mountShell(page)` injects waybar (with the 独 mark), explorer, panel and statusline; runs the clock, scroll position, zoom, width and the session control. Returns `{ app, tree, tools, path, mode }`. Helpers: `key()`, `promptLine()`, `folder()`, `offline()`, `noTopicsRow()`, `hotkey()` (the dictation shortcut from `dictation_key`), `placeNear()`, `dropMenu()`/`dropdown()`, `cardForm()`/`deleteCard()` |
+| `style.css` | Tokens, the sumi and kami blocks, and shared components (waybar, explorer, tables, statusline, keys, `.float`, `.recording`, viz) |
+| `theme.js` | `THEMES` (built-in palettes), `generateTheme()`, `themePalette()`, `THEME_TOKENS`, settings load/save (`settings`, `saveSettings()`), applies the effective theme and reading font, `themeSelector()`, `pickTheme()`; `api()` (throws with `status` and `data`), `esc()`, `clean()` (sanitizes note HTML into a fragment), `optionTags()` |
+| `shell.js` | `mountShell(page)` injects waybar (with the 独 mark), explorer, panel and statusline; runs the clock, scroll position, zoom, width and the session control. Returns `{ app, tree, tools, path, mode }`. Helpers: `key()`, `promptLine()`, `folder()`, `offline()`, `noTopicsRow()`, `SHORTCUTS`/`shortcut()`/`keyFor()`/`pressed()`/`keySpec()`/`hotkey()`/`infoButton()` (rebindable keys, see settings), `placeNear()`, `dropMenu()`/`dropdown()`, `cardForm()`/`deleteCard()` |
 | `notes.html` | Editor-specific styles and logic: tools, tree index, document |
 | `exam.html` | Exam styles and logic: tree of exams, questions, meter |
 | `cards.html` | Flashcards: topic index with due counts, deck session, ratings batch |
 | `project.html` | The `/project` page: what SLP is, quick start, how it works, AI teacher, your topics, the principles |
-| `settings.html` | The `/settings` page: profile, theme, seed color, ui font, dictation shortcut, voice model, font upload |
+| `settings.html` | Settings menu: one row per section of `settings.json` (global, shortcuts, cards, themes) |
+| `global.html` | Profile, fonts, dictation model: the `global` section |
+| `shortcuts.html` | Rebinds action keys, saved under `shortcuts` (click a key, press the new combo) |
+| `themes.html` | Lists every theme (use, edit, delete custom), and the form that generates and saves a custom one under `theme` |
+| `card-config.html` | Card review steps, saved under `cards`: days since the previous step or since the start, the other column follows |
 | `viz.js` | Mermaid and KaTeX; the Mermaid theme is built from the ramp tokens |
 | `assets/` | `lockup-horizontal.png`, `lockup-stacked.png`, `mark.png` (white on transparent) |

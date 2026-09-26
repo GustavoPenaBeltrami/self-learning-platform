@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>独学 · themes</title>
+<link rel="stylesheet" href="/app/styles/style.css">
+<script src="/app/scripts/theme.js"></script>
+<script src="/app/scripts/shell.js"></script>
+<style>
+  .field { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: .3rem 1rem; padding: var(--spacing-16) 0; }
+  .field + .field { border-top: 1px solid var(--line); }
+  .field label { color: var(--ansi-cyan); }
+  .field .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .field select, .field input, .field button.drop {
+    border: 1px solid var(--line); border-radius: 0; padding: .2rem .4rem;
+    background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
+  }
+  .field input[type=text] { min-width: 0; flex: 0 1 24ch; }
+  .field input[type=color] { width: 3rem; height: 1.8rem; padding: .1rem; cursor: pointer; }
+  .field :is(select, input, button.drop):focus { outline: 1px solid var(--accent); }
+  .field button.drop { display: flex; gap: .5rem; align-items: center; }
+  .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
+  .field .hint::before { content: '// '; color: var(--color-steel); }
+  .colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(11ch, 1fr)); gap: .5rem 1rem; }
+  .colors label { display: flex; flex-direction: column; gap: .2rem; color: var(--muted); font-size: var(--text-caption); }
+  .sw { display: inline-block; width: 1rem; height: 1rem; border: 1px solid var(--line); vertical-align: middle; }
+  .themes-table .on td { color: var(--accent); }
+  .themes-table td:last-child { white-space: nowrap; }
+</style>
+
+<body>
+<script>
+const { app, tree, path } = mountShell('settings');
+const statusEl = document.getElementById('status');
+const run = async (busy, work, done = 'saved') => {
+  statusEl.textContent = busy;
+  try {
+    await work();
+    statusEl.textContent = done;
+    return true;
+  } catch (e) {
+    statusEl.textContent = '✕ ' + e.message;
+    return false;
+  }
+};
+
+tree.innerHTML = configTree('themes.html');
+path('~/self-learning-platform/settings.json › theme');
+
+const SHOWN = ['carbon', 'iron', 'fog', 'paper', 'accent', 'red', 'green', 'blue'];
+const swatches = t => t ? SHOWN.map(k => `<span class="sw" style="background:${esc(t.colors[k])}" title="${k}"></span>`).join('')
+  : '<span class="minor">built into style.css</span>';
+const custom = () => currentSettings().themes || [];
+
+function rows() {
+  const s = currentSettings(), active = themePalette(s.theme) !== undefined ? s.theme : '';
+  const all = [['', null, 'follows the os: kami when light, sumi when dark'], ...Object.keys(THEMES).map(k => [k, 'built-in']), ...custom().map(t => [t.name, 'custom'])];
+  app.querySelector('tbody').innerHTML = all.map(([name, kind, about], i) => `
+    <tr class="${name === active ? 'on' : ''}">
+      <td class="num">${name === active ? '●' : pad(i)}</td>
+      <td class="wide">${esc(name || 'auto')}<br><span class="sub">${esc(about || `${kind} · ${name === 'kami' || themePalette(name)?.dark === false ? 'light' : 'dark'}`)}</span></td>
+      <td>${name ? swatches(themePalette(name)) : ''}</td>
+      <td>${name === active ? '' : `<button type="button" class="reset" data-use="${esc(name)}">use</button>`}
+        ${themePalette(name) ? `<button type="button" class="reset" data-edit="${esc(name)}">edit</button>` : ''}
+        ${kind === 'custom' ? `<button type="button" class="reset" data-del="${esc(name)}">delete</button>` : ''}</td>
+    </tr>`).join('');
+}
+
+function fill(name, t) {
+  document.getElementById('t-name').value = name;
+  document.getElementById('t-dark').value = String(t.dark);
+  for (const k of THEME_TOKENS) document.getElementById('c-' + k).value = t.colors[k];
+}
+
+settings.then(() => {
+  app.innerHTML = `
+    <div class="sheet">
+    ${settingsCrumbs('themes')}
+    ${promptLine('~/self-learning-platform', 'nvim settings.json')}
+    <h1>Themes</h1>
+    <p class="minor"># the colors of the whole app, also picked with ◐ in the statusline. your own themes are saved under "theme" in settings.json at the repo root</p>
+    <table class="htop static themes-table">
+      <thead><tr><th class="num">#</th><th>THEME</th><th>COLORS</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h2>new theme</h2>
+    <p class="minor"># generate a whole theme from one color, then change any color you like. saving a name you already have replaces it</p>
+    <form id="t-form">
+      <div class="field">
+        <label for="t-name">name</label>
+        <span class="row"><input type="text" id="t-name" required pattern="[a-z0-9][a-z0-9\\-]{0,23}" maxlength="24" placeholder="my-theme" autocomplete="off"></span>
+        <p class="hint">lowercase letters, digits and dashes. the built-in names are taken.</p>
+      </div>
+      <div class="field">
+        <label for="t-seed">base color</label>
+        <span class="row"><input type="color" id="t-seed" value="#6f8fbf">
+          <select id="t-dark" aria-label="dark or light"><option value="true">dark</option><option value="false">light</option></select>
+          <button type="button" class="reset" id="t-gen">generate</button></span>
+        <p class="hint">builds the 11 shades from darkest to lightest (reversed on light) in the hue of the color, an accent from the color itself, and the seven terminal colors.</p>
+      </div>
+      <div class="field">
+        <label>colors</label>
+        <span class="colors">${THEME_TOKENS.map(k => `<label>${k}<input type="color" id="c-${k}"></label>`).join('')}</span>
+        <p class="hint">void → paper is background to text. accent marks the active things; the rest are the terminal colors.</p>
+      </div>
+      <div class="field">
+        <span></span>
+        <span class="row"><button type="submit" class="reset">save and use</button></span>
+      </div>
+    </form>
+    <div class="tildes"></div></div>`;
+  app.querySelectorAll('select').forEach(dropdown);
+  fill('', generateTheme('#6f8fbf', true));
+  rows();
+  addEventListener('settings-applied', rows);
+
+  document.getElementById('t-gen').onclick = () =>
+    fill(document.getElementById('t-name').value, generateTheme(document.getElementById('t-seed').value, document.getElementById('t-dark').value === 'true'));
+
+  document.getElementById('t-form').onsubmit = e => {
+    e.preventDefault();
+    const t = { name: document.getElementById('t-name').value.trim(), dark: document.getElementById('t-dark').value === 'true',
+      colors: Object.fromEntries(THEME_TOKENS.map(k => [k, document.getElementById('c-' + k).value])) };
+    const rest = custom().filter(x => x.name !== t.name);
+    run('saving…', () => saveSettings({ themes: [...rest, t], theme: t.name }));
+  };
+
+  app.querySelector('tbody').onclick = e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if ('use' in b.dataset) pickTheme(b.dataset.use);
+    if ('edit' in b.dataset) {
+      const name = b.dataset.edit;
+      fill(custom().some(t => t.name === name) ? name : '', themePalette(name));
+      document.getElementById('t-name').focus();
+    }
+    if ('del' in b.dataset) {
+      const s = currentSettings();
+      run('saving…', () => saveSettings({ themes: custom().filter(t => t.name !== b.dataset.del),
+        ...(s.theme === b.dataset.del ? { theme: '' } : {}) }));
+    }
+  };
+}).catch(e => app.innerHTML = offline(e));
+</script>

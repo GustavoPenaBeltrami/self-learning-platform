@@ -76,7 +76,7 @@ Line breaks are `\n`; LaTeX backslashes are doubled (`\\frac`).
 2. Check: MC has 4 options and `answer` in 0-3, spread; every non-MC question
    has a 3-5 point `rubric`.
 3. Tell the user the path and how to open it: `uv run slp`, then
-   `http://localhost:8321/app/views/exam.html?f=topics/<slug>/exams/<exam>/exam.json`.
+   `http://localhost:8321/app/views/exam.html?topic=<slug>&exam=<exam>`.
 4. Tell them: after sitting it, run `slp-grade` on the attempt. Every attempt
    goes through `slp-grade`, MC-only too: it is what logs the score.
 5. Write nothing else to `progress/`: an exam not yet sat isn't an event.
