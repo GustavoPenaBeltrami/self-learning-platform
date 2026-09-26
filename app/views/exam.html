@@ -39,11 +39,9 @@
 
   .answer { display: block; width: 100%; margin-top: .3rem; padding: .6rem .7rem;
     background: var(--color-graphite); color: var(--ink); border: 1px solid var(--line);
-    border-radius: var(--radius-sm); font: 400 var(--text-body)/1.5 var(--mono); resize: vertical; }
+    border-radius: 0; font: 400 var(--text-body)/1.5 var(--mono); resize: vertical; }
   .oral { margin-top: .3rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
   .oral-preview { height: 2.2rem; }
-  .record.recording { color: var(--bad); animation: pulse .8s ease-in-out infinite alternate; }
-  @keyframes pulse { to { opacity: .35; } }
   .given-answer { margin: .3rem 0 0; color: var(--ink); white-space: pre-wrap; }
   .pending { margin: .3rem 0 0; color: var(--ansi-yellow); }
   .pending::before { content: '// '; color: var(--color-steel); }
@@ -51,25 +49,25 @@
 
 <body>
 <script>
-const { app, tree, tools, path, mode } = mountShell('exams');
+const params = new URLSearchParams(location.search);
+const { app, tree, path, mode } = mountShell('exams');
 const statusEl = document.getElementById('status');
 const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
-const file = new URLSearchParams(location.search).get('f');
+const pad = n => String(n).padStart(2, '0');
+const file = params.get('f');
+const link = p => `?f=${encodeURIComponent(p)}`;
+let answered = 0, onKey = null;
 
 function buildTree(topics) {
-  tree.innerHTML = topics.map(t => {
-    const current = t.exams.some(e => e.path === file);
-    return `<details open${current ? ' class="current"' : ''}>
-      <summary title="${esc(t.title)}"><span class="name">${esc(t.slug)}/</span><span class="count">${t.exams.length}</span></summary>
-      <ul>${t.exams.map(e => `<li><a href="?f=${encodeURIComponent(e.path)}"${e.path === file ? ' aria-current="page"' : ''}
-          title="${esc(e.title)}"><span class="n">›</span><span>${esc(e.title)}</span></a></li>`).join('')
-        || '<li class="empty">(no exams)</li>'}</ul>
-    </details>`;
-  }).join('');
+  tree.innerHTML = topics.map(t => folder(t.slug + '/', t.exams.length,
+    `<ul>${t.exams.map(e => `<li><a href="${link(e.path)}"${e.path === file ? ' aria-current="page"' : ''}
+        title="${esc(e.title)}"><span class="n">›</span><span>${esc(e.title)}</span></a></li>`).join('')
+      || '<li class="empty">(no exams)</li>'}</ul>`,
+    t.exams.some(e => e.path === file), t.title)).join('');
 }
 
 async function load() {
-  const data = await (await fetch('/api/index')).json();
+  const data = await api('/api/index');
   buildTree(data.topics);
   return data.topics;
 }
@@ -78,46 +76,52 @@ async function index() {
   let topics;
   try {
     topics = await load();
-  } catch {
-    app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
-      <p>Open a terminal here and run <code>uv run slp</code>.</p></div>`;
+  } catch (e) {
+    app.innerHTML = offline(e);
     return;
   }
   path('~/notes/topics/*/exams');
   app.innerHTML = `
     <div class="sheet">
-    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/topics</span> <span class="p-sig">❯</span> ls */exams</p>
+    ${promptLine('~/topics', 'ls */exams')}
     <table class="htop">
       <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">EXAMS</th></tr></thead>
       <tbody>${topics.map(l => `
         <tr>
-          <td class="num">${l.order < 999 ? String(l.order).padStart(2, '0') : '—'}</td>
+          <td class="num">${l.order < 999 ? pad(l.order) : '—'}</td>
           <td class="wide">${esc(l.title)}<br><span class="sub">${esc(l.subtitle || '')}</span></td>
           <td class="type">${esc(l.type)}</td>
           <td class="num${l.exams.length ? '' : ' zero'}">${l.exams.length}</td>
         </tr>${l.exams.map(e => `
-        <tr onclick="location.search='?f=${encodeURIComponent(e.path)}'">
-          <td></td><td class="wide" colspan="3"><span class="sub">└─ </span><a href="?f=${encodeURIComponent(e.path)}">${esc(e.title)}</a></td>
-        </tr>`).join('')}`).join('')}${topics.length ? '' : noTopicsRow(3)}</tbody>
+        <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
+          <td></td><td class="wide" colspan="3"><span class="sub">└─ </span><a href="${link(e.path)}">${esc(e.title)}</a></td>
+        </tr>`).join('')}`).join('')}${topics.length ? '' : noTopicsRow(4)}</tbody>
     </table>
     <div class="tildes"></div></div>`;
 }
 
-function header(exam, n, command) {
-  const name = file.split('/').pop();
+function header(exam, note, command) {
+  const parts = file.split('/');
   return `
     <div class="sheet">
-    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/${esc(file.split('/').slice(0, -1).join('/'))}</span> <span class="p-sig">❯</span> ${command} ${esc(name)}</p>
+    ${promptLine('~/' + parts.slice(0, -1).join('/'), command + ' ' + parts.at(-1))}
     <h1>${esc(exam.title || 'Exam')}</h1>
-    <p class="minor"># ${n} questions · graded at the end</p>`;
+    <p class="minor"># ${note}</p>`;
 }
+
+const leave = () => {
+  if (answered && !confirm('leave? answers not saved are lost')) return;
+  location.href = 'exam.html';
+};
+
+const stemHTML = (q, i) => `<p class="stem"><span class="num">[${pad(i + 1)}]</span><span>${vizText(q.q)}</span></p>`;
 
 function take(exam) {
   const questions = shuffle(exam.questions.map((q, i) => ({ ...q, i })));
-  document.title = exam.title || 'Exam';
+  document.title = '独学 · ' + (exam.title || 'exam');
   path('~/notes/' + file);
 
-  app.innerHTML = header(exam, questions.length, 'exam') + `
+  app.innerHTML = header(exam, `${questions.length} questions · graded at the end`, 'exam') + `
     ${questions.map((q, i) => questionHTML(q, i)).join('')}
     <div class="keys">${key('⏎', 'Grade', 'cta')}${key('Esc', 'Back')}</div>
     <div class="tildes"></div></div>`;
@@ -133,21 +137,31 @@ function take(exam) {
     const picked = app.querySelectorAll('input:checked').length;
     const written = [...app.querySelectorAll('textarea.answer')].filter(t => t.value.trim()).length;
     const spoken = [...app.querySelectorAll('.oral-preview')].filter(a => a._blob).length;
-    const n = picked + written + spoken;
-    statusEl.textContent = `${n}/${questions.length} answered`;
-    mode(n ? 'INSERT' : 'NORMAL', n ? 'insert' : '');
+    answered = picked + written + spoken;
+    statusEl.textContent = `${answered}/${questions.length} answered`;
+    mode(answered ? 'INSERT' : 'NORMAL', answered ? 'insert' : '');
   };
   progress();
   app.addEventListener('change', progress);
   app.addEventListener('input', progress);
   const [gradeBtn, backBtn] = app.querySelectorAll('.keys .key');
-  gradeBtn.onclick = () => grade(exam, questions);
-  backBtn.onclick = () => location.href = 'exam.html';
+  let grading = false;
+  gradeBtn.onclick = () => grading || (grading = true, grade(exam, questions));
+  backBtn.onclick = leave;
+  onKey = e => {
+    const k = e.key.toLowerCase();
+    if (k === 't' || k === 'r') {
+      const q = e.target.closest?.('.question')
+        || [...app.querySelectorAll('.oral')].find(o => o.style.display !== 'none')?.closest('.question');
+      q?.querySelector(k === 't' ? '.write-instead' : '.record')?.click();
+    }
+    if (e.key === 'Enter' && !e.target.closest?.('button, .question')) gradeBtn.click();
+  };
 }
 
 function questionHTML(q, i) {
   const type = q.type || 'multiple_choice';
-  const stem = `<p class="stem"><span class="num">[${String(i + 1).padStart(2, '0')}]</span><span>${vizText(q.q)}</span></p>`;
+  const stem = stemHTML(q, i);
   if (type === 'multiple_choice') {
     return `<div class="question">${stem}
       ${q.options.map((o, j) => `
@@ -157,15 +171,15 @@ function questionHTML(q, i) {
   if (type === 'oral') {
     return `<div class="question">${stem}
       <div class="oral">
-        ${key('●', 'Record', 'record')}
+        ${key('R', 'Record', 'record')}
         <audio class="oral-preview" controls style="display:none"></audio>
         ${key('T', 'Answer in writing', 'write-instead')}
       </div>
-      <textarea class="answer oral-text" name="q${i}" rows="4" placeholder="Your answer" style="display:none"></textarea>
+      <textarea class="answer oral-text" name="q${i}" rows="4" placeholder="Your answer" aria-label="answer ${i + 1}" style="display:none"></textarea>
     </div>`;
   }
   return `<div class="question">${stem}
-      <textarea class="answer" name="q${i}" rows="4" placeholder="Your answer"></textarea>
+      <textarea class="answer" name="q${i}" rows="4" placeholder="Your answer" aria-label="answer ${i + 1}"></textarea>
     </div>`;
 }
 
@@ -182,40 +196,44 @@ function meter(pct) {
   return `<div class="meter ${pct >= 70 ? 'good' : 'bad'}"><span class="label">Score</span><span class="cells">[<span class="filled">${'|'.repeat(filled)}</span>${' '.repeat(cells - filled)}]</span><span class="pct">${pct}%</span></div>`;
 }
 
-async function recordOral(button, audio) {
+function recordOral(button, audio) {
   if (button.dataset.recording) { button.dataset.stop = '1'; return; }
-  let mic;
-  try {
-    mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (e) {
-    statusEl.textContent = 'No microphone: ' + e.message;
-    return showText(button.closest('.question'));
-  }
-  const recorder = new MediaRecorder(mic);
-  const chunks = [];
-  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
-  const stopped = new Promise(r => recorder.onstop = r);
-  recorder.start();
-
   button.dataset.recording = '1';
-  button.classList.add('recording');
-  statusEl.textContent = 'Recording… click record to finish';
-  await new Promise(r => (function check() { button.dataset.stop ? r() : setTimeout(check, 200); })());
+  button._done = (async () => {
+    let mic;
+    try {
+      mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      delete button.dataset.recording;
+      delete button.dataset.stop;
+      statusEl.textContent = 'no microphone: ' + e.message;
+      return showText(button.closest('.question'));
+    }
+    const recorder = new MediaRecorder(mic);
+    const chunks = [];
+    recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+    const stopped = new Promise(r => recorder.onstop = r);
+    recorder.start();
 
-  recorder.stop();
-  await stopped;
-  mic.getTracks().forEach(t => t.stop());
-  delete button.dataset.recording;
-  delete button.dataset.stop;
-  button.classList.remove('recording');
+    button.classList.add('recording');
+    statusEl.textContent = 'recording… R to finish';
+    await new Promise(r => (function check() { button.dataset.stop ? r() : setTimeout(check, 200); })());
 
-  const blob = new Blob(chunks, { type: recorder.mimeType });
-  audio._blob = blob;
-  audio._mime = blob.type;
-  audio.src = URL.createObjectURL(blob);
-  audio.style.display = '';
-  statusEl.textContent = 'Recording ready';
-  audio.dispatchEvent(new Event('input', { bubbles: true }));
+    recorder.stop();
+    await stopped;
+    mic.getTracks().forEach(t => t.stop());
+    delete button.dataset.recording;
+    delete button.dataset.stop;
+    button.classList.remove('recording');
+
+    const blob = new Blob(chunks, { type: recorder.mimeType });
+    audio._blob = blob;
+    audio._mime = blob.type;
+    audio.src = URL.createObjectURL(blob);
+    audio.style.display = '';
+    statusEl.textContent = 'recording ready';
+    audio.dispatchEvent(new Event('input', { bubbles: true }));
+  })();
 }
 
 const blobToBase64 = blob => new Promise((res, rej) => {
@@ -225,15 +243,26 @@ const blobToBase64 = blob => new Promise((res, rej) => {
   r.readAsDataURL(blob);
 });
 
+const saveAttempt = body => {
+  const [slug, , exam] = file.split('/').slice(1);
+  return api('/api/attempt', JSON.stringify({ slug, exam, ...body })).catch(e => ({ error: e.message }));
+};
+
+const savedLine = saved => saved.error
+  ? `could not save the attempt: ${esc(saved.error)}`
+  : `run <code>slp-grade</code> on this attempt — saved to <code>${esc(saved.path)}</code>`;
+
 async function grade(exam, questions) {
+  app.querySelectorAll('.record[data-recording]').forEach(b => b.dataset.stop = '1');
+  await Promise.all([...app.querySelectorAll('.record')].map(b => b._done));
   let right = 0, totalMC = 0;
   const answers = [];
   const detail = (await Promise.all(questions.map(async (q, i) => {
     const type = q.type || 'multiple_choice';
-    const stem = `<p class="stem"><span class="num">[${String(i + 1).padStart(2, '0')}]</span><span>${vizText(q.q)}</span></p>`;
+    const stem = stemHTML(q, i);
     if (type === 'multiple_choice') {
       totalMC++;
-      const sel = document.querySelector(`input[name=q${i}]:checked`);
+      const sel = app.querySelector(`input[name=q${i}]:checked`);
       const chosen = sel ? +sel.value : null;
       if (chosen === q.answer) right++;
       answers.push({ i: q.i, type, chosen });
@@ -246,24 +275,16 @@ async function grade(exam, questions) {
         ${q.explanation ? `<p class="why">${vizText(q.explanation)}</p>` : ''}
       </div>`;
     }
-    if (type === 'oral') {
-      const qEl = app.querySelectorAll('.question')[i];
-      const audio = qEl.querySelector('.oral-preview');
-      if (audio._blob) {
-        answers.push({ i: q.i, type, audio: await blobToBase64(audio._blob), mime: audio._mime });
-        return `<div class="question">${stem}
-          <p class="given-answer">(audio recorded)</p>
-          <p class="pending">pending grading</p>
-        </div>`;
-      }
-      const text = qEl.querySelector('.oral-text').value.trim();
-      answers.push({ i: q.i, type, text });
+    const qEl = app.querySelectorAll('.question')[i];
+    const audio = qEl.querySelector('.oral-preview');
+    if (audio?._blob) {
+      answers.push({ i: q.i, type, audio: await blobToBase64(audio._blob), mime: audio._mime });
       return `<div class="question">${stem}
-        <p class="given-answer">${text ? esc(text) : '<em>(no answer)</em>'}</p>
+        <p class="given-answer">(audio recorded)</p>
         <p class="pending">pending grading</p>
       </div>`;
     }
-    const text = document.querySelector(`textarea[name=q${i}]`)?.value.trim() || '';
+    const text = qEl.querySelector('textarea')?.value.trim() || '';
     answers.push({ i: q.i, type, text });
     return `<div class="question">${stem}
       <p class="given-answer">${text ? esc(text) : '<em>(no answer)</em>'}</p>
@@ -272,24 +293,14 @@ async function grade(exam, questions) {
   }))).join('');
 
   const pct = totalMC ? Math.round(right / totalMC * 100) : null;
-  const [slug, , examId] = file.split('/').slice(1);
-  let saved;
-  try {
-    saved = await (await fetch('/api/attempt', {
-      method: 'POST', body: JSON.stringify({ slug, exam: examId, answers })
-    })).json();
-  } catch (e) {
-    saved = { error: e.message };
-  }
-  const footer = saved.error
-    ? `could not save the attempt: ${esc(saved.error)}`
-    : `run <code>slp-grade</code> on this attempt — saved to <code>${esc(saved.path)}</code>`;
+  const saved = await saveAttempt({ answers });
+  if (!saved.error) answered = 0;
 
-  app.innerHTML = header(exam, questions.length, 'exam --check') + `
+  app.innerHTML = header(exam, `${questions.length} questions`, 'exam --check') + `
     ${pct !== null ? meter(pct) : ''}
     <p class="minor"># ${totalMC ? `${right} of ${totalMC} correct (multiple choice)` : 'no multiple-choice questions'}</p>
     ${detail}
-    <p class="minor">${footer}</p>
+    <p class="minor">${savedLine(saved)}</p>
     <div class="keys">${key('⏎', 'Retake', 'cta')}${key('Esc', 'Back')}</div>
     <div class="tildes"></div></div>`;
   vizPaint(app);
@@ -297,18 +308,25 @@ async function grade(exam, questions) {
   statusEl.textContent = totalMC ? `${right}/${totalMC} correct` : 'attempt saved';
   const [again, back] = app.querySelectorAll('.keys .key');
   again.onclick = () => location.reload();
-  back.onclick = () => location.href = 'exam.html';
+  back.onclick = leave;
+  onKey = e => { if (e.key === 'Enter' && !e.target.closest?.('button')) again.click(); };
   scrollTo(0, 0);
 }
 
 addEventListener('keydown', e => {
-  if (!file || e.target.closest?.('textarea, select, button')) return;
-  if (e.key === 'Escape') location.href = 'exam.html';
-  if (e.key === 'Enter') app.querySelector('.key.cta')?.click();
+  if (!file || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest?.('textarea, input[type=text], select')) return;
+  if (e.key === 'Escape') return leave();
+  onKey?.(e);
 });
 
+app.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
+
 file
-  ? Promise.all([fetch('/' + file).then(r => r.json()), load()]).then(([exam]) => take(exam))
-      .catch(e => app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> could not open the exam</p><p class="minor">${esc(e)}</p></div>`)
+  ? Promise.all([/^topics\/[^/]+\/exams\/[^/]+\/exam\.json$/.test(file) ? api('/' + encodeURI(file)) : Promise.reject(new Error('not an exam: ' + file)), load()])
+      .then(([exam]) => {
+        if (!exam?.questions?.length) throw new Error('no questions in ' + file);
+        take(exam);
+      }).catch(e => app.innerHTML = offline(e))
   : index();
 </script>

@@ -1,0 +1,26 @@
+{"id":"2026-09-21T1000","event":"start","at":"2026-09-21T10:00","by":"agent"}
+{"id":"2026-09-21T1000","event":"activity","at":"2026-09-21T10:00","kind":"quiz","by":"agent","detail":"first quiz: methods, status-codes"}
+{"id":"2026-09-21T1000","event":"end","at":"2026-09-21T10:20","by":"agent","outputs":["exams/quiz/exam.json","exams/quiz/attempts/2026-09-21T1000.json","exams/quiz/attempts/2026-09-21T1000.feedback.md","learning.md"],"note":"first quiz: methods L3, status-codes L1"}
+{"id":"2026-09-22T1700","event":"start","at":"2026-09-22T17:00","by":"agent"}
+{"id":"2026-09-22T1700","event":"activity","at":"2026-09-22T17:00","kind":"summary","by":"agent","detail":"MDN overview into unit 01"}
+{"id":"2026-09-22T1700","event":"end","at":"2026-09-22T17:50","by":"agent","outputs":["notes/01-methods-and-status-codes.md","wiki/sources/mdn-http-overview.md","wiki/concepts/idempotency.md","wiki/index.md"],"note":"summarized MDN overview into unit 01"}
+{"id":"2026-09-23T1030","event":"start","at":"2026-09-23T10:30","by":"app"}
+{"id":"2026-09-23T1030","event":"activity","at":"2026-09-23T10:30","kind":"exam","by":"app","detail":"01-methods-and-codes"}
+{"id":"2026-09-23T1030","event":"activity","at":"2026-09-23T10:45","kind":"feedback","by":"agent","detail":"01-methods-and-codes 2026-09-23T1030"}
+{"id":"2026-09-23T1030","event":"end","at":"2026-09-23T11:00","by":"agent","outputs":["exams/01-methods-and-codes/attempts/2026-09-23T1030.json","exams/01-methods-and-codes/attempts/2026-09-23T1030.feedback.md","learning.md"],"note":"sat and graded exam 01: 3/4 MC, 2/3 rubric"}
+{"id":"2026-09-24T1745","event":"start","at":"2026-09-24T17:45","by":"agent"}
+{"id":"2026-09-24T1745","event":"activity","at":"2026-09-24T17:45","kind":"practice","by":"agent","detail":"choose-status-codes"}
+{"id":"2026-09-24T1745","event":"end","at":"2026-09-24T19:30","by":"hook"}
+{"id":"2026-09-24T1745","event":"correct","at":"2026-09-25T08:30","by":"agent","end_at":"2026-09-24T18:00","outputs":["exercises/choose-status-codes/prompt.md","exercises/choose-status-codes/attempts/2026-09-24T1800.md"],"note":"hook closed at 19:30 but the last change was the attempt at 18:00"}
+{"id":"2026-09-25T0830","event":"start","at":"2026-09-25T08:30","by":"agent"}
+{"id":"2026-09-25T0830","event":"activity","at":"2026-09-25T08:32","kind":"cards","by":"agent","detail":"6 cards from unit 01 notes"}
+{"id":"2026-09-25T0830","event":"end","at":"2026-09-25T08:40","by":"agent","outputs":["cards/cards.json"],"note":"6 cards from unit 01 notes"}
+{"id":"2026-09-25T0900","event":"start","at":"2026-09-25T09:00","by":"app"}
+{"id":"2026-09-25T0900","event":"activity","at":"2026-09-25T09:04","kind":"cards","by":"app","detail":"6 reviewed, 2 again"}
+{"id":"2026-09-25T0900","event":"end","at":"2026-09-25T09:04","by":"idle"}
+{"id":"2026-09-25T0900","event":"correct","at":"2026-09-26T10:10","by":"agent","end_at":"2026-09-25T09:04","outputs":["cards/reviews.jsonl"],"note":"checked"}
+{"id":"2026-09-26T0930","event":"start","at":"2026-09-26T09:30","by":"app"}
+{"id":"2026-09-26T0930","event":"activity","at":"2026-09-26T09:32","kind":"cards","by":"app","detail":"3 reviewed, 0 again"}
+{"id":"2026-09-26T0930","event":"activity","at":"2026-09-26T09:40","kind":"reading","by":"app","detail":"notes/01-methods-and-status-codes.md"}
+{"id":"2026-09-26T0930","event":"end","at":"2026-09-26T10:05","by":"app"}
+{"id":"2026-09-26T0930","event":"correct","at":"2026-09-26T10:10","by":"agent","end_at":"2026-09-26T09:55","outputs":["cards/reviews.jsonl","notes/01-methods-and-status-codes.md"],"note":"stopped at 10:05, last note change 09:55; wiki studied from unit 01 notes"}

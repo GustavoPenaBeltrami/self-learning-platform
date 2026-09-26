@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>独学 · cards</title>
+<link rel="stylesheet" href="/app/styles/style.css">
+<script src="/app/scripts/theme.js"></script>
+<script src="/app/scripts/viz.js"></script>
+<script src="/app/scripts/shell.js"></script>
+<style>
+  .card { padding: var(--spacing-16) 0 var(--spacing-24); }
+  .card + .card { border-top: 1px dashed var(--line); }
+  .front { display: flex; gap: .8rem; margin: 0 0 .7rem; }
+  .front .num { color: var(--ansi-orange); flex: none; }
+  .back { padding-left: 3.4rem; margin-top: .7rem; }
+  .back p { margin: 0; }
+  .source { margin: .5rem 0 0 3.4rem; color: var(--muted); }
+  .source::before { content: '// '; color: var(--color-steel); }
+  .source a { color: var(--ansi-cyan); }
+  .flag { color: var(--ansi-yellow); margin-left: .6rem; }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: var(--spacing-24); padding: var(--spacing-32) 0 var(--spacing-16); }
+  .fcard { width: min(520px, 100%); min-height: 300px; display: flex; flex-direction: column; justify-content: center; gap: 1rem;
+    padding: 2rem; background: var(--color-graphite); color: var(--ink); border: 1px solid var(--color-slate); border-radius: 14px;
+    font: inherit; font-size: 18px; line-height: 1.5; text-align: center; cursor: pointer; }
+  .fcard .flag { margin: 0; font-size: 13px; }
+  .fc-num { font-size: 12px; color: var(--muted); }
+  .fc-a { font-size: 18px; }
+  .fcard .source { margin: 0; font-size: 13px; }
+  .reveal-layer { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--spacing-24); padding: 16px; perspective: 1400px;
+    background: color-mix(in srgb, var(--color-void) 45%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .reveal-layer .keys { margin: 0; justify-content: center; }
+  .stage + .keys { margin-top: 0; justify-content: center; }
+  .flipper { display: grid; padding: 0; transform-style: preserve-3d; cursor: default; }
+  .flipper.flipped { transform: rotateY(180deg); }
+  .flipper .face { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; gap: .9rem; padding: 2rem;
+    border-radius: inherit; background: var(--color-graphite); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+  .flipper .back { transform: rotateY(180deg); }
+  .flipper .back .fc-q { font-size: 13px; color: var(--muted); }
+  @media (prefers-reduced-motion: no-preference) {
+    .stage .fcard { transition: transform .2s ease, box-shadow .2s ease; }
+    .stage .fcard:hover, .stage .fcard:focus-visible { transform: translateY(-8px) rotate(-.4deg);
+      box-shadow: 0 18px 36px color-mix(in srgb, var(--color-void) 70%, transparent); }
+    .flipper { transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+  }
+</style>
+
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const { app, tree, tools, path, mode } = mountShell('cards');
+const statusEl = document.getElementById('status');
+const slug = params.get('topic');
+const INTERVALS = [0, 1, 3, 7];
+const pad = n => String(n).padStart(2, '0');
+const headingId = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
+const deckUrl = () => '/api/cards/' + encodeURIComponent(slug);
+let pending = [], onKey = null, deck;
+
+function buildTree(topics) {
+  tree.innerHTML = topics.map(t => folder(t.slug + '/', t.cards,
+    `<ul><li><a href="?topic=${encodeURIComponent(t.slug)}"${t.slug === slug ? ' aria-current="page"' : ''}>
+      <span class="n">›</span><span>${t.cards ? `${t.due} due` : '(no cards)'}</span></a></li></ul>`,
+    t.slug === slug, t.title)).join('');
+}
+
+const load = async () => {
+  const data = await api('/api/cards');
+  buildTree(data.topics);
+  return data.topics;
+};
+
+async function index() {
+  let topics;
+  try {
+    topics = await load();
+  } catch (e) {
+    app.innerHTML = offline(e);
+    return;
+  }
+  path('~/notes/topics/*/cards');
+  app.innerHTML = `
+    <div class="sheet">
+    ${promptLine('~/topics', 'ls */cards')}
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>TOPIC</th><th class="num">CARDS</th><th class="num">DUE</th><th class="num">UNSURE</th></tr></thead>
+      <tbody>${topics.map(l => `
+        <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
+          <td class="num">${l.order < 999 ? pad(l.order) : '—'}</td>
+          <td class="wide"><a href="?topic=${encodeURIComponent(l.slug)}">${esc(l.title)}</a><br><span class="sub">${esc(l.subtitle || '')}</span></td>
+          <td class="num${l.cards ? '' : ' zero'}">${l.cards}</td>
+          <td class="num${l.due ? '' : ' zero'}">${l.due}</td>
+          <td class="num${l.flagged ? '' : ' zero'}">${l.flagged}</td>
+        </tr>`).join('')}${topics.length ? '' : noTopicsRow(5)}</tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+}
+
+const flush = () => {
+  if (!pending.length) return Promise.resolve();
+  const batch = pending;
+  pending = [];
+  return api(deckUrl(), JSON.stringify({ reviews: batch })).catch(e => {
+    pending = batch.concat(pending);
+    throw e;
+  });
+};
+
+addEventListener('pagehide', () => {
+  if (pending.length) fetch(deckUrl(), { method: 'POST', body: JSON.stringify({ reviews: pending }), keepalive: true });
+});
+
+const leave = () => {
+  if (pending.length && !confirm('leave the session? the ratings so far are saved')) return;
+  location.href = 'cards.html';
+};
+
+function nextIn(cards) {
+  const soon = Math.min(...cards.filter(c => c.last).map(c => new Date(c.last).getTime() + INTERVALS[c.box] * 864e5));
+  const hours = Math.max(1, Math.round((soon - Date.now()) / 36e5));
+  return !isFinite(soon) ? '—' : hours < 48 ? hours + 'h' : Math.round(hours / 24) + 'd';
+}
+
+
+const KEYNAME = { Space: ' ', '⏎': 'Enter' };
+const keysHTML = defs => `<div class="keys">${defs.map(([k, t, c]) => key(k, t, c)).join('')}</div>`;
+
+function toolbar(bar) {
+  tools.innerHTML = bar.length ? `<div class="wb-mod pill">${bar.map(([k, t]) =>
+    `<button type="button" title="${esc(t)} · ${esc(k)}" aria-label="${esc(t)}">${esc(t.toLowerCase())}</button>`).join('')}</div>` : '';
+  tools.querySelectorAll('button').forEach((b, i) => {
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = bar[i][3];
+  });
+}
+
+function wire(defs, bar = [], root = app) {
+  const buttons = root.querySelectorAll('.keys .key');
+  defs.forEach((d, i) => buttons[i].onclick = d[3]);
+  toolbar(bar);
+  const all = defs.concat(bar);
+  onKey = e => {
+    const pressed = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const d = all.find(([k]) => k !== 'Esc' && (KEYNAME[k] || k.toLowerCase()) === pressed);
+    if (!d || (pressed === ' ' || pressed === 'Enter') && e.target.closest?.('button, a')) return;
+    e.preventDefault();
+    d[3]();
+  };
+}
+
+function header(note, command) {
+  return `
+    <div class="sheet">
+    ${promptLine('~/topics/' + slug, command)}
+    <h1>${esc(deck.title)}</h1>
+    <p class="minor"># ${note}</p>`;
+}
+
+const sourceHTML = c => {
+  const parts = (c.note || '').split('›').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  const href = `notes.html?topic=${encodeURIComponent(slug)}#${headingId(parts.at(-1))}`;
+  return `<p class="source"><a href="${esc(href)}">${esc(c.note)}</a></p>`;
+};
+
+const flagHTML = c => c.flagged ? '<span class="flag" title="unsure: go over it with your agent">? unsure</span>' : '';
+const cardHTML = (c, i, open) => `<div class="card">
+  <p class="front"><span class="num">[${pad(i + 1)}]</span><span>${vizText(c.front)}${flagHTML(c)}</span></p>
+  <div class="back"${open ? '' : ' hidden'}><p>${vizText(c.back)}</p>${sourceHTML(c)}</div>
+</div>`;
+
+const reloadList = () => api(deckUrl()).then(r => { deck = r; list(); });
+const newCard = then => cardForm(slug).then(r => r && then(r));
+const page = (note, command, body, defs, bar = []) => {
+  app.innerHTML = header(note, command) + body + (defs.length ? keysHTML(defs) : '') + '<div class="tildes"></div></div>';
+  vizPaint(app);
+  wire(defs, bar);
+};
+const BACK = ['Esc', 'Back', '', () => leave()];
+
+function empty() {
+  const none = !deck.cards.length;
+  const add = ['N', 'New card', none ? 'cta' : '', () => newCard(r => { deck = r; study(false); })];
+  page(none ? 'no cards yet — press N to write one, or ask your agent: /slp-cards' : `nothing due · next in ${nextIn(deck.cards)}`,
+    'ls cards/', '', none ? [add] : [['A', 'Study all', 'cta', () => study(true)]],
+    none ? [BACK] : [add, ['L', 'List', '', list], BACK]);
+  mode('NORMAL');
+  statusEl.textContent = none ? 'no cards' : `${deck.cards.length} cards · 0 due`;
+}
+
+function list() {
+  page(`${deck.cards.length} cards · ${deck.cards.filter(c => c.due).length} due · click a card to edit it`, 'ls -l cards/', `
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>FRONT</th><th class="num">BOX</th><th>DUE</th><th>UNSURE</th><th></th></tr></thead>
+      <tbody>${deck.cards.map((c, i) => `
+        <tr data-i="${i}">
+          <td class="num">${pad(i + 1)}</td>
+          <td class="wide">${vizText(c.front)}<br><span class="sub">${esc(c.note || '')}</span></td>
+          <td class="num">${c.box}</td>
+          <td class="${c.due ? '' : 'zero'}">${c.due ? 'now' : 'later'}</td>
+          <td class="${c.flagged ? '' : 'zero'}">${c.flagged ? '?' : '—'}</td>
+          <td><a href="#" data-del aria-label="delete card">✕</a></td>
+        </tr>`).join('')}</tbody>
+    </table>`, [], [['N', 'New card', '', () => newCard(r => { deck = r; list(); })],
+      ['S', 'Study due', '', () => study(false)], ['A', 'Study all', '', () => study(true)], BACK]);
+  mode('NORMAL');
+  statusEl.textContent = `${deck.cards.length} cards`;
+  app.querySelector('tbody').onclick = e => {
+    const row = e.target.closest('tr[data-i]');
+    if (!row) return;
+    e.preventDefault();
+    const card = deck.cards[row.dataset.i];
+    (e.target.closest('[data-del]') ? deleteCard(slug, card) : cardForm(slug, card)).then(r => { if (r) { deck = r; list(); } });
+  };
+}
+
+function study(all) {
+  let queue = deck.cards.filter(c => all || c.due);
+  if (!queue.length) return empty();
+  let total = queue.length, done = 0;
+  const rated = new Map();
+  const again = () => [...rated.values()].filter(r => r === 'again').length;
+  const unsureCount = () => deck.cards.filter(c => c.flagged && rated.has(c.id)).length;
+
+  const show = () => {
+    closeLayer();
+    const c = queue[0];
+    page(`${total} cards${all ? ' · all' : ' due'} · answer it to yourself, then reveal`, 'cards ' + (all ? '--all' : '--due'), `
+      <div class="stage">
+        <button type="button" class="fcard" id="fcard" aria-label="Reveal the answer">
+          <span class="fc-num">${pad(done + 1)} / ${pad(total)}</span>
+          <span class="fc-q">${vizText(c.front)}</span>${flagHTML(c)}
+        </button>
+      </div>`,
+      [['Space', 'Reveal', 'cta', reveal]],
+      [['N', 'New', '', add], ['E', 'Edit', '', edit], ['L', 'List', '', toList], ['S', 'Skip', '', skip],
+       ['D', 'Delete', '', remove], ...(all || rated.size ? [] : [['A', 'Study all', '', () => study(true)]]), BACK]);
+    app.querySelector('#fcard').onclick = reveal;
+    statusEl.textContent = `${done}/${total} · didn't know ${again()}`;
+    mode('NORMAL');
+  };
+  const reveal = () => {
+    const c = queue[0];
+    closeLayer();
+    layer = document.createElement('div');
+    layer.className = 'reveal-layer';
+    layer.setAttribute('aria-label', 'answer · 1 don\'t know, 2 knew it, 3 unsure, esc back');
+    layer.innerHTML = `
+      <div class="fcard flipper" role="dialog" aria-label="Answer">
+        <div class="face front"><span class="fc-q">${vizText(c.front)}</span></div>
+        <div class="face back"><span class="fc-q">${vizText(c.front)}</span><span class="fc-a">${vizText(c.back)}</span>${sourceHTML(c)}</div>
+      </div>
+      ${keysHTML(choices)}`;
+    document.body.append(layer);
+    backToCard = show;
+    layer.onclick = e => { if (e.target === layer) show(); };
+    vizPaint(layer);
+    requestAnimationFrame(() => requestAnimationFrame(() => layer?.querySelector('.flipper').classList.add('flipped')));
+    wire(choices, [], layer);
+    layer.tabIndex = -1;
+    layer.focus();
+    mode('INSERT', 'insert');
+  };
+  const rate = recall => {
+    const card = queue.shift();
+    if (!rated.has(card.id)) {
+      rated.set(card.id, recall);
+      pending.push({ id: card.id, recall });
+    }
+    recall === 'again' ? queue.push(card) : done++;
+    queue.length ? show() : finish();
+  };
+  const unsure = () => {
+    const card = queue[0];
+    const mark = card.flagged ? Promise.resolve(deck)
+      : api(deckUrl(), JSON.stringify({ flag: { id: card.id, flagged: true } }));
+    mark.then(r => {
+      deck = r;
+      card.flagged = true;
+      if (!rated.has(card.id)) {
+        rated.set(card.id, 'again');
+        pending.push({ id: card.id, recall: 'again' });
+      }
+      queue.shift();
+      done++;
+      queue.length ? show() : finish();
+    }).catch(e => statusEl.textContent = '✕ ' + e.message);
+  };
+  const choices = [['1', "Don't know", '', () => rate('again')], ['2', 'Knew it', 'cta', () => rate('good')],
+                   ['3', 'Unsure', '', unsure]];
+  const skip = () => { queue.push(queue.shift()); show(); };
+  const add = () => newCard(r => {
+    const card = r.cards.find(c => !deck.cards.some(o => o.id === c.id));
+    deck = r;
+    if (card) { queue.push(card); total++; }
+    show();
+  });
+  const edit = () => cardForm(slug, queue[0]).then(r => {
+    if (!r) return;
+    deck = r;
+    Object.assign(queue[0], r.cards.find(c => c.id === queue[0].id));
+    show();
+  });
+  const remove = () => deleteCard(slug, queue[0]).then(r => {
+    if (!r) return;
+    const id = queue.shift().id;
+    deck = r;
+    queue = queue.filter(c => c.id !== id);
+    pending = pending.filter(p => p.id !== id);
+    rated.delete(id);
+    total--;
+    queue.length ? show() : finish();
+  });
+  const toList = () => flush().catch(() => {}).then(reloadList);
+  const finish = async () => {
+    closeLayer();
+    onKey = null;
+    let saved;
+    try {
+      const r = await flush();
+      saved = `saved · ${r ? r.due : 0} still due`;
+    } catch (e) {
+      saved = 'could not save the ratings: ' + esc(e.message);
+    }
+    const missed = deck.cards.filter(c => rated.get(c.id) === 'again');
+    const flagged = missed.filter(c => c.flagged).length;
+    page(`${total} cards · knew ${total - missed.length} · didn't know ${missed.length - flagged} · unsure ${flagged}`, 'cards --check',
+      missed.map((c, i) => cardHTML(c, i, true)).join('')
+        + (flagged ? '<p class="minor"># cards marked unsure wait for your agent: /slp-session offers to go over them</p>' : '')
+        + `<p class="minor"># ${saved}</p>`,
+      [['⏎', 'Again', 'cta', () => location.reload()]], [['L', 'List', '', reloadList], BACK]);
+    mode('DONE');
+    statusEl.textContent = `didn't know ${missed.length - flagged} · unsure ${flagged}`;
+    scrollTo(0, 0);
+  };
+  show();
+}
+
+let layer = null, backToCard = null;
+function closeLayer() {
+  layer?.remove();
+  layer = null;
+}
+
+addEventListener('keydown', e => {
+  if (!slug || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest?.('textarea, input, select, dialog')) return;
+  if (e.key === 'Escape' && layer) return backToCard();
+  if (e.key === 'Escape') return leave();
+  onKey?.(e);
+});
+
+app.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
+
+slug
+  ? Promise.all([api(deckUrl()), load()]).then(([d]) => {
+      deck = d;
+      document.title = '独学 · ' + deck.title;
+      path(`~/notes/topics/${slug}/cards`);
+      study(false);
+    }).catch(e => app.innerHTML = offline(e))
+  : index();
+</script>

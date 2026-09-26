@@ -1,0 +1,62 @@
+{
+  "title": "Example — HTTP basics: quiz",
+  "kind": "quiz",
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "thread": "methods",
+      "level": 1,
+      "q": "Which method reads a resource without changing it?",
+      "options": ["POST", "GET", "PUT", "DELETE"],
+      "answer": 1,
+      "explanation": "GET is safe: it doesn't change server state. POST creates or triggers, PUT replaces, DELETE removes."
+    },
+    {
+      "type": "multiple_choice",
+      "thread": "methods",
+      "level": 3,
+      "q": "A client times out and resends the same request. With which method is the resend harmless by definition?",
+      "options": ["POST", "PATCH that appends an item", "PUT", "POST with the same body"],
+      "answer": 2,
+      "explanation": "PUT is idempotent: replacing the resource twice leaves the same state. POST may create a second resource, with or without the same body. A PATCH that appends adds the item again."
+    },
+    {
+      "type": "multiple_choice",
+      "thread": "methods",
+      "level": 5,
+      "q": "A payments API must create a charge with POST, and clients retry on timeouts. What prevents a double charge?",
+      "options": ["The client sends an idempotency key and the server replays the first result for it", "The client switches the retry to PUT", "The server rejects any second POST from the same client", "The client waits longer before retrying"],
+      "answer": 0,
+      "explanation": "An idempotency key lets the server recognise a retry and return the stored result. Switching to PUT changes the semantics, blocking every second POST rejects legitimate charges, and waiting longer doesn't remove duplicates."
+    },
+    {
+      "type": "multiple_choice",
+      "thread": "status-codes",
+      "level": 1,
+      "q": "Which status range means the request succeeded?",
+      "options": ["4xx", "3xx", "5xx", "2xx"],
+      "answer": 3,
+      "explanation": "2xx is success. 3xx redirects, 4xx blames the client, 5xx blames the server."
+    },
+    {
+      "type": "multiple_choice",
+      "thread": "status-codes",
+      "level": 3,
+      "q": "The server is overloaded and can't handle requests for a while. Which code fits?",
+      "options": ["404", "503", "400", "302"],
+      "answer": 1,
+      "explanation": "503 signals a temporary failure on the server's side. 404 and 400 blame the client; 302 is a redirect."
+    },
+    {
+      "type": "open",
+      "thread": "status-codes",
+      "level": 5,
+      "q": "A gateway forwards a request and the upstream service never answers. Which code should the gateway return, and why not 500 or 503?",
+      "rubric": [
+        "Names 504 Gateway Timeout",
+        "Explains that the failure is upstream, not in the gateway itself (so not 500)",
+        "Explains that 503 means the gateway itself is unavailable, not that an upstream timed out"
+      ]
+    }
+  ]
+}

@@ -24,6 +24,21 @@
   const token = name => getComputedStyle(document.documentElement)
     .getPropertyValue(name).trim();
 
+  let probe, pixel;
+  const color = name => {
+    if (!probe) {
+      probe = document.documentElement.appendChild(document.createElement('i'));
+      probe.hidden = true;
+      pixel = Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
+    }
+    probe.style.color = `var(${name})`;
+    pixel.clearRect(0, 0, 1, 1);
+    pixel.fillStyle = getComputedStyle(probe).color;
+    pixel.fillRect(0, 0, 1, 1);
+    const [r, g, b] = pixel.getImageData(0, 0, 1, 1).data;
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
   const mermaidTheme = () => ({
     startOnLoad: false,
     securityLevel: 'strict',
@@ -32,18 +47,18 @@
       darkMode: isDark(),
       fontFamily: token('--mono') || 'ui-monospace, monospace',
       fontSize: token('--text-body') || '14px',
-      background: token('--color-void'),
-      mainBkg: token('--color-graphite'),
-      primaryColor: token('--color-graphite'),
-      primaryTextColor: token('--color-paper'),
-      primaryBorderColor: token('--color-slate'),
-      secondaryColor: token('--color-carbon'),
-      tertiaryColor: token('--color-carbon'),
-      lineColor: token('--color-pewter'),
-      textColor: token('--color-paper'),
-      noteBkgColor: token('--color-carbon'),
-      noteTextColor: token('--color-fog'),
-      noteBorderColor: token('--color-iron'),
+      background: color('--color-void'),
+      mainBkg: color('--color-graphite'),
+      primaryColor: color('--color-graphite'),
+      primaryTextColor: color('--color-paper'),
+      primaryBorderColor: color('--color-slate'),
+      secondaryColor: color('--color-carbon'),
+      tertiaryColor: color('--color-carbon'),
+      lineColor: color('--color-pewter'),
+      textColor: color('--color-paper'),
+      noteBkgColor: color('--color-carbon'),
+      noteTextColor: color('--color-fog'),
+      noteBorderColor: color('--color-iron'),
     },
   });
 
@@ -102,8 +117,7 @@
     return out.join('');
   }
 
-  new MutationObserver(() => paintAll())
-    .observe(document.documentElement, { attributeFilter: ['data-theme'] });
+  addEventListener('theme-changed', () => paintAll());
 
   Object.assign(window, { vizPaint: paintAll, vizBlock: block, vizText: withBlocks });
 })();

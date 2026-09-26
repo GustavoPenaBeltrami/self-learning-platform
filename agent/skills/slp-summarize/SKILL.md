@@ -1,54 +1,74 @@
 ---
 name: slp-summarize
-description: Summarizes a text (pasted, attached, or from the topic's resources/) and appends it to a note in topics/*/notes/*.md, in the topic's configured notes language unless the user asks for another. Use when the user says "summarize this", "/slp-summarize", "add this summary to the note", or pastes/attaches a fragment of a book/article to condense.
+description: Summarizes study material (pasted, attached, or from a topic's resources/ or sources) into a note in topics/*/notes/, in the topic's notes language unless the user asks for another, and files the source into the topic's wiki. Use when the user says "summarize this", "/slp-summarize", "add this summary to the note", or pastes or attaches a fragment of a book or article to condense.
 ---
 
 # Summarize
 
-Summarizes technical text and appends it to an existing notes file (`topics/<topic>/notes/*.md`), following the same format those notes already use.
+Condenses material into the topic's notes, in the format those notes use, and
+records the source in the topic's wiki.
 
 ## Required data (ask together if missing)
 
-1. **Source**: where the text comes from —
-   - **pasted**: it comes in the message.
-   - **attached**: a PDF/image the user attached — read it with `Read`.
-   - **`resources/`**: a file already saved in `topics/<topic>/resources/` — ask which one if they don't say.
-   - **local path**: a `path` source from the topic's `topic.json` `links`. If the file doesn't exist, say so in one line and ask for another source.
-2. **Destination**: which topic and which file in `notes/` (e.g. `topics/example/notes/01-methods-and-codes.md`). If the user is already working on a note in the conversation, use that one without asking again.
-3. **Summary level** (if they don't say, use `medium`):
-   - **compact**: very compact, just bullets with the key idea of each concept. No elaboration, no examples unless essential.
-   - **medium** (default): shorter than the original but with enough explanation to understand the concept without reading the source text. Includes the most important examples.
-   - **extensive**: developed, close to full study notes. Keeps nuances, most of the examples and the original's distinctions, but it's still a summary (not a translation).
-4. **Output language**: an explicit request from the user ("summarize it in English") wins; otherwise default to `language.notes` from `topic.json`. If the topic has no `language` set, ask once (and not again in the same session).
+1. **Source**:
+   - **pasted**: in the message.
+   - **attached**: a PDF or image; read it with `Read`.
+   - **`resources/`**: a file in `topics/<topic>/resources/` (uploads from the
+     app land there); ask which if they don't say.
+   - **local path**: a `path` entry of `topic.json` `links`. Missing file: say
+     so in one line and ask for another source.
+2. **Destination**: topic and note (e.g.
+   `topics/example/notes/01-methods-and-status-codes.md`). The note being
+   worked on in this conversation, if any. **No note fits**: create
+   `notes/NN-<slug of its h1>.md` (next free `NN`) with a single `# ` title.
+3. **Level** (default `medium`):
+   - **compact**: bullets with the key idea of each concept; examples only if
+     essential.
+   - **medium**: shorter than the original but understandable without it;
+     the most important examples.
+   - **extensive**: close to full study notes; keeps nuances, most examples
+     and distinctions. Still a summary, not a translation.
+4. **Language**: an explicit request wins; else `language.notes`; no
+   `language` set: ask once.
 
-If you already have the data (from the conversation context or because the user gave it), don't ask: summarize directly.
+Data already given in the conversation: don't ask, summarize.
 
-## Before writing
+Log a `summary` activity ([slp-session §Activity](../slp-session/SKILL.md#activity)).
 
-Look at how the destination note is structured (and if needed, `app/server/text.py` / `app/server/server.py` to understand the general convention of `topics/*/notes/`):
+## Note format
 
-- Each `.md` in `notes/` starts with a `# ` (h1, the note's title) — that h1 is what the editor uses to split the file into sections when saving from the UI. Don't add a second h1.
-- Topics within the note go as `##`; subtopics, as `###`.
-- Lists with `- ` (dash + space), one idea per item.
-- Normal paragraphs for prose explanation.
-- Raw HTML (`<img>`, `<mark>`, etc.) is left as is if it already exists in the note; don't invent new markup.
-- A ```` ```mermaid ```` or ```` ```math ```` fence is rendered in `notes.html`. Use it only if the
-  original text describes a structure or a formula that is better understood
-  drawn, never as decoration.
+[formats.md § Notes](../../reference/formats.md#notes): one `# ` per file
+(don't add a second), `##` topics, `###` subtopics, `- ` lists, one idea per
+item, no nested lists (the app flattens them), prose paragraphs, GFM tables
+allowed. Leave existing raw HTML and HTML entities (`&#42;`, `&lt;`) as they
+are and add no new markup. A mermaid or math fence only when the text describes a structure or
+formula better understood drawn.
 
 ## Summary rules
 
-- Write in the output language (above), naturally, in study-notes style — not a literal translation, explain the idea.
-- Important technical terms are kept in their original language if it differs from the output language (with their explanation if needed), e.g. *technical breadth*, *trade-off*, *coupling*.
-- Don't add information that isn't in the original text.
-- Don't add a conclusion or repeat concepts already stated.
-- If the text has examples, keep the most important ones (more at the `extensive` level, fewer at `compact`).
-- If part of the text is already covered in the note (redundant with something summarized before), don't duplicate it: integrate it or say you're merging it instead of repeating it.
+- Write naturally in the output language, study-notes style, not a literal
+  translation.
+- Keep important technical terms in their original language when it differs
+  (*trade-off*, *coupling*), explained if needed.
+- Nothing that isn't in the source. No conclusion, no repetition.
+- Keep the most important examples (more at `extensive`, fewer at `compact`).
+- Already covered in the note: merge it and say so, don't duplicate.
 
 ## How to add it
 
-Append the summary at the **end** of the destination file, as new section(s) (`##`/`###` depending on the level of detail of the text given — a text with its own subheadings in another language gets its own translated subheadings). Use Edit (append at the end of the file), don't rewrite what's already there unless the user explicitly asks to restructure an existing part.
+Append at the **end** of the note as new `##`/`###` sections (a source with
+its own subheadings gets them translated). Use Edit to append; don't rewrite
+existing parts unless asked.
 
 ## After writing
 
-Report in 1-2 lines which heading(s) were added and in which file. Don't repeat the full summary in the chat if it's already written in the file.
+1. **Wiki ingest** ([formats.md § Wiki](../../reference/formats.md#wiki)):
+   write or update `wiki/sources/<kebab>.md` (`type: Source`: what the source
+   covers and the concepts it touches), upsert the `wiki/concepts/` pages it
+   touches with footnote citations, add the open session's `id` to each
+   Concept's `studied`, and update `wiki/index.md`.
+2. `progress/status.md` → **Summary written:** yes (for the current unit).
+3. Report in 1-2 lines which headings were added to which note. Don't repeat
+   the summary in the chat.
+4. Ask whether this finished the unit; if yes, run
+   [slp-session §Unit done](../slp-session/SKILL.md#unit-done).

@@ -1,138 +1,82 @@
 ---
 name: slp-grade
-description: Grades an exam or exercise attempt — checks each rubric or prompt point, writes the feedback next to the attempt, updates learning.md and the topic's progress. Use when the user says "grade this attempt", "how did I do", "grade my exercise", "/slp-grade", or after taking an exam with non-MC questions in exam.html or submitting an exercise from slp-exercises.
+description: Grades any exam, quiz or exercise attempt in topics/ — recomputes multiple-choice scores, checks each rubric or prompt criterion, writes the feedback file next to the attempt, and updates learning.md and the topic's progress log. Use when the user says "grade this attempt", "how did I do", "grade my exercise", "/slp-grade", or after sitting any exam or quiz in the app or submitting an exercise.
 ---
 
 # Grade
 
-An attempt without feedback is practice in the dark. This skill closes the loop:
-it compares what was submitted against what was asked, says what's missing (not "it's wrong"), and
-leaves everything recorded so `slp-review` and the next session can use it.
+An attempt without feedback is practice in the dark. This skill closes the
+loop for **every** attempt, MC-only ones included: it is the only writer of
+the `## Exams` and `## Exercises` rows of `log.md` (and `## Quizzes` for a quiz sat in the app). Formats:
+[formats.md](../../reference/formats.md) (§ Attempts, § Feedback,
+§ progress/log.md).
 
-## Which attempt to grade
+## 1. Which attempt
 
-An attempt is **pending** when `attempts/<date>.<ext>` exists without its
-companion `attempts/<date>.md`. `<date>` is exactly `YYYY-MM-DDTHHmm`: files
-named `<date>-p<i>.<ext>` are the audio of an exam attempt, not attempts. If the user doesn't say which one, look in
-`topics/*/exams/*/attempts/` and `topics/*/exercises/*/attempts/`; if there's
-only one, grade that one; if there are several, ask with `AskUserQuestion`.
+Pending = `attempts/<date>.<ext>` with no `<date>.feedback.md`. Files
+`<date>-p<i>.<ext>` are exam audio, not attempts. If the user doesn't say
+which, look in `topics/*/exams/*/attempts/` and `topics/*/exercises/*/attempts/`:
+one pending, grade it; several, ask with `AskUserQuestion`.
 
-## Language
+Log a `feedback` activity ([slp-session §Activity](../slp-session/SKILL.md#activity)).
 
-Feedback (the `attempts/<date>.md` file) is written in `topic.json` →
-`language.exams` by default. An explicit request from the user ("give me the
-feedback in Spanish") overrides that default for that output. Chat with the user
-in the language the user writes in.
+Language: feedback is written in `language.exams` unless the user asks for
+another.
 
-## Two sources, one mechanism
+## 2. Grade
 
-The only thing that changes is what you compare against.
+**Exam attempt**: read the attempt, its `exam.json` and the relevant notes.
+Each answer's `i` is the question's position in `exam.json`.
 
-**Exam attempt** — read `exams/<slug>/attempts/<date>.json` (raw),
-`exams/<slug>/exam.json` (questions and rubrics) and the relevant `notes/*.md`.
-Each answer's `i` is the 0-based position of its question in `exam.json`
-(not the shuffled order the student saw), and its `type` is copied from that question.
-- `multiple_choice`: already graded by the client; recompute the score
-  comparing `chosen` with `answer` and list the missed ones with their `explanation`.
-- `open`, `practical`: check the answer against **each point**
-  of the `rubric`. Paraphrasing counts; touching the word without the concept doesn't.
-- `oral`: if the answer comes with `text` (the student used the written fallback),
-  grade it the same as `open`. If it comes with `audio` (a file name in
-  `attempts/`), that's the source of truth — you can't listen to the file
-  directly, so transcribe it with the same engine the server uses,
-  in the exam's language (`topic.json` → `language.exams`, or the language the
-  exam was actually written in if the user overrode it):
+- `multiple_choice`: recompute: correct when `chosen == answer`. List misses
+  with the question's `explanation`.
+- `open`, `practical`: check the answer against **each** rubric point.
+  Paraphrase counts; the word without the concept doesn't.
+- `oral` with `text`: as `open`. With `audio`: transcribe it, in the exam's
+  language (`lang` optional, auto-detected if omitted), and grade the
+  transcription. Don't touch the audio; say that pronunciation isn't assessed.
 
   ```bash
-  uv run slp transcribe \
-      topics/<slug>/exams/<exam>/attempts/<audio-file> [lang]
+  uv run slp transcribe topics/<slug>/exams/<exam>/attempts/<audio-file> [lang]
   ```
 
-  `lang` is optional; if omitted, the engine auto-detects the language.
-  Grade the transcription against the `rubric` the same as a written answer.
-  Don't touch the audio. Make clear in the feedback that the transcription doesn't assess
-  pronunciation or prosody, only content.
+**Exercise attempt**: read `prompt.md`, the artifact and the notes it rests
+on. The prompt's conditions are the criteria: judge whether the artifact
+**uses** the concept, not whether it mentions it. An ADR that doesn't weigh
+trade-offs fails even with the right words. Format `teach` is graded like an
+`oral` answer.
 
-**Exercise attempt** — read `exercises/<slug>/prompt.md`, the artifact
-(`exercises/<slug>/attempts/<date>.<ext>`) and the notes it rests on. There's
-no rubric: derive the criteria from the prompt and assess whether the artifact **uses**
-the concept, not whether it "touches on the topic". An ADR that doesn't weigh trade-offs against
-each other doesn't pass even if it mentions the right words. Format *teach*: it's
-graded the same as an `oral` answer.
+**Facts**: before judging a factual answer, read the `Source choice` entries
+in the Record and grade against the version that was taught. Anything you'd
+mark correct that isn't in the notes, `resources/` or a `path` source, and you
+doubt at all: verify it with `researcher`. Conflicts with no entry: resolve
+them per [sources.md](../../reference/sources.md) and record the choice.
 
-Before judging a factual answer, read the `Source choice` entries in the
-Record of the topic's `learning.md` (format in `slp-teach`, Record rule 5).
-If one covers the claim, grade against the version that was taught, even if
-another source says otherwise: the student shouldn't lose points for learning
-what they were taught.
+## 3. Write
 
-If something you're about to mark as correct isn't in the notes, in
-`resources/` or in a local `path` source from `topic.json` (a missing path:
-warn and continue), and you have even the slightest doubt, verify it with the `researcher`
-subagent before marking it. If sources disagree and no entry covers the claim,
-resolve it the same way `slp-teach` does (topic material wins unless outdated
-with respect to the Mission), without flagging it in the chat, and record the
-choice in the Record.
+1. **Feedback** `attempts/<date>.feedback.md`, format in
+   [formats.md § Feedback](../../reference/formats.md#feedback):
+   `[NN]` = `i + 1`; score line with the same numbers as the log row; ✓/✗
+   per point, each ✗ with what's missing and the note heading that covers it
+   (or "no note covers it yet: a gap in the notes, not in the student"). A ✗
+   on a fact cites the source of the correct version.
+2. **learning.md**: a Record entry only for a misconception (what they
+   believed and what is true) or a non-trivial demonstration. In exercises a
+   misconception that survived into an artifact counts double. Getting the
+   expected right isn't recorded.
+3. **log.md**, one row at the end of the matching table:
+   - unit exam → `## Exams`: `| date | exam | MC c/t | Rubric met/total | attempts/<date>.feedback.md |`;
+     also fill `Exam (score)` of that unit's `## Reading` row if it's `—`.
+   - exercise → `## Exercises`: `| date | exercise | format | criteria met/total | attempts/<date>.feedback.md |`.
+   - quiz (`exams/quiz/`) → `## Quizzes` as in
+     [slp-quiz §4](../slp-quiz/SKILL.md#4-write), the edges read from its
+     `thread`/`level` fields.
+4. **status.md**: only if something about the present changed (next exam,
+   immediate pending item).
 
-## What you write
+Dates `YYYY-MM-DD`. Missing data: ask once, all together. Don't invent grades.
 
-**1. `attempts/<date>.md`**, next to the attempt, same format for exams and
-exercises:
+## 4. Wrap-up
 
-```md
-# Attempt — <slug> — YYYY-MM-DD HH:MM
-
-**MC score:** 4/5 · **Open/oral rubric:** 2 of 3 questions with full feedback
-
-## [02] Open — topic vs queue trade-offs
-✓ Mentioned extensibility and coupling.
-✗ Didn't mention the security problem (wiretap). See `notes/02-....md#analyzing-trade-offs`.
-Feedback: on the right track, but the complete answer needs the security side to be defensible in a real review.
-
-## What to improve
-- Review the topics/queues security section before the next attempt.
-```
-
-- ✓/✗ per point, each ✗ with what's missing and the note section that covers it.
-- For exercises, the score line is `**Prompt criteria:** N of M`.
-- If no note covers it, say so: it's a gap in the notes, not in the student.
-- A ✗ on a factual point cites the source of the correct version, the same one
-  the `Source choice` entry names when there is one.
-
-**2. The topic's `learning.md`** — same Record rules as
-`slp-teach`: what goes in is whatever reveals a **misconception** (what they
-believed and what it actually is) or a non-trivial demonstration of understanding. In exercises
-it counts double: a misconception that survives all the way to producing an artifact
-is more serious than one that only shows up in a short answer. Getting the
-expected right isn't recorded.
-
-**3. The topic's progress** — see below.
-
-## Progress
-
-You write to `topics/<topic>/progress/` when grading, never before (an exam built
-but not taken isn't recorded).
-
-- **`log.md`**: one row at the end of the matching table; if the section doesn't
-  exist, create it. Don't delete old rows.
-
-  ```md
-  ## Exams
-  | Date | Exam | MC | Rubric | Attempt |
-  ## Exercises
-  | Date | Exercise | Format | Criteria | Attempt |
-  ```
-
-  If the exam corresponds to a `## Reading` row, also fill in its
-  `Exam (score)` column. If it was a review (`topics/review/`), record which topics
-  were included: that moves the clock of those units, not that of the "review" topic.
-- **`status.md`**: it's rewritten, not accumulated. Only touch it if something about the
-  present changed (next exam, immediate pending item). Don't dress up the status.
-- Date always `YYYY-MM-DD`, never relative. If a piece of data is missing, ask
-  once and all together. Don't invent grades or dates.
-
-## Wrap-up in the chat
-
-Three or four lines: score or criteria met, the weakest point, and **a single**
-concrete recommendation of what to reinforce before the next attempt (the right
-skill: `slp-teach`, `slp-exercises` or `slp-review`).
+Three or four lines: score or criteria met, the weakest point, and **one**
+recommendation (`slp-teach`, `slp-exercises`, or `slp-cards` to keep it).

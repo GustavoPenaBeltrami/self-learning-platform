@@ -1,6 +1,6 @@
 # Exercise — Pick the status code
 
-**Format:** apply · **Topic:** HTTP basics · **Rests on:** notes/01-methods-and-status-codes.md#status-codes
+**Format:** apply · **Unit:** 01 · **Rests on:** Methods and status codes › Status codes
 
 An orders API receives these four requests. For each one, give the status code the response should carry and one sentence on why, naming who caused the outcome: client or server.
 

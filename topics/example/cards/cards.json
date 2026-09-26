@@ -1,0 +1,46 @@
+[
+  {
+    "id": "get-safe-idempotent",
+    "front": "What two properties does GET have?",
+    "back": "It is safe (only reads) and idempotent.",
+    "note": "Methods and status codes › Methods"
+  },
+  {
+    "id": "post-not-idempotent",
+    "front": "Is POST idempotent?",
+    "back": "No: it creates something or triggers an action, so repeating it can repeat the effect.",
+    "note": "Methods and status codes › Methods",
+    "flagged": true
+  },
+  {
+    "id": "put-idempotent",
+    "front": "Why is PUT idempotent?",
+    "back": "It replaces the whole resource, so repeating it leaves the same state.",
+    "note": "Methods and status codes › Methods"
+  },
+  {
+    "id": "delete-idempotent",
+    "front": "Is DELETE idempotent?",
+    "back": "Yes: deleting twice leaves the resource just as deleted.",
+    "note": "Methods and status codes › Methods"
+  },
+  {
+    "id": "status-3xx",
+    "front": "What does a 3xx status code mean?",
+    "back": "Redirection, e.g. **301 Moved Permanently**.",
+    "note": "Methods and status codes › Status codes"
+  },
+  {
+    "id": "status-4xx-vs-5xx",
+    "front": "4xx or 5xx: how do you tell them apart?",
+    "back": "By who caused the outcome: 4xx blames the client, 5xx the server.",
+    "note": "Methods and status codes › Status codes"
+  },
+  {
+    "id": "status-503",
+    "front": "What does 503 mean?",
+    "back": "Service Unavailable: the server can't handle the request right now.",
+    "note": "Methods and status codes › Status codes",
+    "by": "user"
+  }
+]

@@ -14,8 +14,8 @@ _Avoid_: read-only
 
 ## Record
 
-### 0002 — Mixed up 404 and 503 under load — corrected
+### 0002 — 2026-09-23 — Mixed up 404 and 503 under load — corrected
 Answered 404 for an overloaded server. Was reading the code by the symptom ("not found") instead of by who caused the failure. Corrected in the 2026-09-23 exam feedback. Check it again with 502 and 504.
 
-### 0001 — Declared prior knowledge: GET and POST
-Uses GET and POST daily in frontend code. Had never reasoned about idempotency. Level check: 3 questions, edge at PUT vs POST.
+### 0001 — 2026-09-21 — Declared prior knowledge: GET and POST
+Uses GET and POST daily in frontend code. Had never reasoned about idempotency. Quiz (`exams/quiz/attempts/2026-09-21T1000.feedback.md`): methods L3, status-codes L1.

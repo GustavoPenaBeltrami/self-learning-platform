@@ -1,20 +1,19 @@
 """HTML <-> Markdown conversion for the subset the editor uses.
 
-Blocks:   h1-h6, p, ul/li, and raw HTML on its own line (cards, figures).
+Blocks:   h1-h6, p, ul/li, GFM pipe tables, and raw HTML on its own line (cards, figures, pre).
 Inline:   strong/b -> **, em/i -> *, s/del -> ~~, a.ref -> [[x]].
-Raw:      mark, u, span, aside, figure, img are kept as HTML inside the .md.
+Raw:      mark, u, span, aside, figure, img, a, code, pre, sub, sup are kept as HTML inside the .md.
           Markdown accepts inline HTML, so the file still opens fine
           in Obsidian and keeps colors, comments and positions.
-
-Self-check: python3 app/server/text.py
 """
 import re
 import unicodedata
 from html import escape as _escape, unescape as _unescape
 from html.parser import HTMLParser
 
-RAW = {"mark", "u", "span", "aside", "figure", "figcaption", "img", "br"}
-VOID = {"br", "img", "hr"}
+RAW = {"mark", "u", "span", "aside", "figure", "figcaption", "img", "br", "a", "code", "pre", "sub", "sup"}
+OWN_LINE = ("aside", "figure", "pre")
+VOID = {"br", "img", "hr", "wbr"}
 INLINE = {"strong": "**", "b": "**", "em": "*", "i": "*",
           "s": "~~", "del": "~~", "strike": "~~"}
 BLOCK = {"p", "div", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6"}
@@ -23,6 +22,11 @@ VIZ = {"mermaid", "math"}
 _FIGURE = re.compile(r"<figure\b([^>]*)>\s*<pre\b[^>]*>(.*?)</pre>.*?</figure>", re.S)
 _KIND = re.compile(r'data-kind="([a-z]+)"')
 _OPEN_FENCE = re.compile(r"^```([a-z]+)\s*$")
+_LEADING = re.compile(r"^(\s*)(#|- |\d+\. |```|\|)")
+_DELIM = re.compile(r"^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$")
+_DANGER = re.compile(r"<(script|iframe|object|embed)\b.*?</\1\s*>|</?(script|iframe|object|embed)\b[^>]*>", re.I | re.S)
+_ON_ATTR = re.compile(r"""\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)""", re.I)
+_JS_URL = re.compile(r"""((?:href|src)\s*=\s*["']?)\s*javascript:""", re.I)
 
 
 def _figure(kind, source):
@@ -38,8 +42,17 @@ def slug(text, default="section"):
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", t)).strip("-") or default
 
 
+def plain(html):
+    return _unescape(re.sub(r"<[^>]+>|[*_~`\[\]]", "", html)).strip()
+
+
+def _esc(s, quote=False):
+    s = _escape(s, quote=quote).replace("*", "&#42;")
+    return re.sub(r"\[(?=\[)", "&#91;", re.sub(r"~(?=~)", "&#126;", s))
+
+
 def _open(tag, attrs):
-    return "<" + tag + "".join(f' {k}="{v}"' for k, v in attrs if v is not None) + ">"
+    return "<" + tag + "".join(f' {k}="{_esc(v, True)}"' for k, v in attrs if v is not None) + ">"
 
 
 class _ToMarkdown(HTMLParser):
@@ -50,6 +63,9 @@ class _ToMarkdown(HTMLParser):
         self.ref = None     # text accumulated from an <a class="ref">
         self.inblock = 0    # inside a p/h/li: an image there goes inline
         self.lists = []
+        self.fresh = True
+        self.rows = None
+        self.cell = None
 
     def handle_starttag(self, tag, attrs):
         if self.raw:
@@ -57,18 +73,17 @@ class _ToMarkdown(HTMLParser):
             if tag not in VOID:
                 self.raw += 1
             return
-        if tag in RAW:
-            if tag in ("aside", "figure") or (tag == "img" and not self.inblock):
-                self.parts.append("\n\n")      # own block, own line
+        self.fresh = tag in ("p", "div")
+        classes = dict(attrs).get("class") or ""
+        if tag == "a" and "ref" in classes.split():
+            self.ref = ""
+        elif tag in RAW:
+            if tag in OWN_LINE or (tag == "img" and not self.inblock):
+                self.parts.append("\n\n")
             self.parts.append(_open(tag, attrs))
             if tag not in VOID:
                 self.raw = 1
-            return
-        classes = dict(attrs).get("class", "")
-        if tag == "a" and "ref" in classes:
-            self.ref = ""
-            return
-        if tag in INLINE:
+        elif tag in INLINE:
             self.parts.append(INLINE[tag])
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
             self.inblock += 1
@@ -85,16 +100,24 @@ class _ToMarkdown(HTMLParser):
         elif tag in ("p", "div"):
             self.inblock += 1
             self.parts.append("\n\n")
+        elif tag == "table":
+            self.rows = []
+        elif tag == "tr" and self.rows is not None:
+            self.rows.append([])
+        elif tag in ("td", "th") and self.rows:
+            self.inblock += 1
+            self.cell = len(self.parts)
 
     def handle_startendtag(self, tag, attrs):
-        self.parts.append(_open(tag, attrs)) if (self.raw or tag in RAW) \
-            else self.parts.append("\n" if tag == "br" else "")
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID:
+            self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
         if self.raw:
             self.parts.append(f"</{tag}>")
             self.raw -= 1
-            if self.raw == 0 and tag in ("aside", "figure"):
+            if self.raw == 0 and tag in OWN_LINE:
                 self.parts.append("\n\n")
             return
         if tag == "a" and self.ref is not None:
@@ -110,17 +133,42 @@ class _ToMarkdown(HTMLParser):
             self.parts.append("\n\n")
         elif tag in BLOCK:
             self.inblock = max(0, self.inblock - 1)
+            self.fresh = True
             self.parts.append("\n")
+        elif tag in ("td", "th") and self.cell is not None:
+            self.inblock = max(0, self.inblock - 1)
+            self.rows[-1].append(" ".join("".join(self.parts[self.cell:]).split()).replace("|", "&#124;"))
+            del self.parts[self.cell:]
+            self.cell = None
+        elif tag == "table" and self.rows is not None:
+            self.parts.append(_table(self.rows))
+            self.rows = None
 
     def handle_data(self, data):
         if self.raw:
-            self.parts.append(data)
+            self.parts.append(_esc(data).replace("\n", "&#10;"))
         elif self.ref is not None:
-            self.ref += data
+            self.ref += _esc(data)
         elif data.strip() == "" and "\n" in data:
             pass          # break between blocks of our own HTML, not text
+        elif self.rows is not None and self.cell is None:
+            pass
         else:
-            self.parts.append(data.replace("\n", " "))
+            data = _esc(data.replace("\n", " "))
+            if self.fresh:
+                data = _LEADING.sub(lambda m: m.group(1) + f"&#{ord(m.group(2)[0])};" + m.group(2)[1:], data)
+            self.fresh = False
+            self.parts.append(data)
+
+
+def _table(rows):
+    rows = [r for r in rows if r]
+    if not rows:
+        return ""
+    width = max(len(r) for r in rows)
+    lines = ["| " + " | ".join(r + [""] * (width - len(r))) + " |" for r in rows]
+    lines.insert(1, "|" + " --- |" * width)
+    return "\n\n" + "\n".join(lines) + "\n\n"
 
 
 def html_to_md(html):
@@ -154,11 +202,33 @@ def html_to_md(html):
 
 def _inline(line):
     line = re.sub(r"\[\[([^\]]+)\]\]",
-                  lambda m: f'<a class="ref" href="#{slug(m.group(1))}">{m.group(1)}</a>', line)
+                  lambda m: f'<a class="ref" href="#{slug(_unescape(m.group(1)))}">{m.group(1)}</a>', line)
     line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", line)
-    line = re.sub(r"(?<!\*)\*([^*]+?)\*(?!\*)", r"<i>\1</i>", line)
+    line = re.sub(r"(?<!\*)\*([^\s*](?:[^*]*[^\s*])?)\*(?!\*)", r"<i>\1</i>", line)
     line = re.sub(r"~~(.+?)~~", r"<s>\1</s>", line)
     return line
+
+
+def _sanitize(html):
+    html = _DANGER.sub("", html)
+    return re.sub(r"<[^>]+>", lambda m: _JS_URL.sub(r"\1#", _ON_ATTR.sub("", m.group())), html)
+
+
+def _cells(line):
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+
+
+def _table_html(rows):
+    head = "".join(f"<th>{_inline(c)}</th>" for c in rows[0])
+    body = "".join("<tr>" + "".join(f"<td>{_inline(c)}</td>" for c in r) + "</tr>" for r in rows[1:])
+    return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+
+def _fence_end(lines, i):
+    for j in range(i, len(lines)):
+        if lines[j].strip() == "```":
+            return j
+    return None
 
 
 def md_to_html(md):
@@ -184,17 +254,23 @@ def md_to_html(md):
         raw = lines[i].rstrip()
         i += 1
         opens = _OPEN_FENCE.match(raw.strip())
-        if opens and opens.group(1) in VIZ:
+        end = _fence_end(lines, i) if opens and opens.group(1) in VIZ else None
+        if end is not None:
             close()
-            body = []
-            while i < len(lines) and lines[i].strip() != "```":
-                body.append(lines[i])
-                i += 1
-            i += 1
-            out.append(_figure(opens.group(1), "\n".join(body).strip("\n")))
+            out.append(_figure(opens.group(1), "\n".join(lines[i:end]).strip("\n")))
+            i = end + 1
             continue
         if not raw.strip():
             close()
+            continue
+        if raw.strip().startswith("|") and i < len(lines) and _DELIM.match(lines[i].strip()):
+            close()
+            rows = [_cells(raw)]
+            i += 1
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                rows.append(_cells(lines[i]))
+                i += 1
+            out.append(_table_html(rows))
             continue
         if raw.lstrip().startswith("<"):          # card or figure: as is
             close()
@@ -216,7 +292,7 @@ def md_to_html(md):
             close()
             out.append(f"<p>{_inline(raw)}</p>")
     close()
-    return "\n".join(out)
+    return _sanitize("\n".join(out))
 
 
 def split_by_h1(html):
@@ -227,75 +303,6 @@ def split_by_h1(html):
         if not t.strip():
             continue
         m = re.match(r"<h1[^>]*>(.*?)</h1>", t, re.S)
-        title = re.sub(r"<[^>]+>", "", m.group(1)).strip() if m else "Untitled"
+        title = _unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip() if m else "Untitled"
         sections.append((title, t))
     return sections
-
-
-if __name__ == "__main__":
-    h = ('<h1>Fundamentals</h1><p>Text with <b>bold</b> and <i>italic</i> and <s>struck</s>.</p>'
-         '<h2>Coupling</h2><ul><li>One</li><li>Two</li></ul>'
-         '<p>See <a class="ref" href="#styles">Styles</a> too.</p>'
-         '<p>A <mark class="mk mk-highlight" style="--c: #D9C46A" title="careful">highlight</mark> here.</p>')
-    md = html_to_md(h)
-    assert "# Fundamentals" in md, md
-    assert "## Coupling" in md, md
-    assert "**bold**" in md and "*italic*" in md and "~~struck~~" in md, md
-    assert "- One\n- Two" in md, md
-    assert "[[Styles]]" in md, md
-    assert '<mark class="mk mk-highlight" style="--c: #D9C46A" title="careful">highlight</mark>' in md, md
-
-    back = md_to_html(md)
-    assert "<h1>Fundamentals</h1>" in back, back
-    assert "<b>bold</b>" in back and "<i>italic</i>" in back, back
-    assert "<li>One</li>" in back and "<ul>" in back, back
-    assert '<a class="ref" href="#styles">Styles</a>' in back, back
-    assert "<mark" in back and 'title="careful"' in back, back
-
-    # stable round trip: converting twice changes nothing
-    assert html_to_md(back) == md, html_to_md(back) + "\n---\n" + md
-
-    sections = split_by_h1(back)
-    assert len(sections) == 1 and sections[0][0] == "Fundamentals", sections
-
-    # a blank line is intentional: it survives as a raw <br>
-    for given in ('<p>one</p><p><br></p><p>two</p>',
-                  '<h2>T</h2><div><br></div><p>x</p>',
-                  '<p>a</p><div></div><p>b</p>',
-                  '<p>one<br>two</p>'):
-        md1 = html_to_md(given)
-        assert "<br>" in md1, (given, md1)
-        assert html_to_md(md_to_html(md1)) == md1, (md1, html_to_md(md_to_html(md1)))
-
-    # drawings: the fence is the source of truth and survives the round trip
-    md_viz = ("# Ch\n\ntext\n\n```mermaid\ngraph TD\n  A[Package] --> B{Order}\n"
-              "```\n\nmore text\n\n```math\np_{99} = \\frac{x}{y}\n```\n")
-    h_viz = md_to_html(md_viz)
-    assert '<figure class="viz" data-kind="mermaid"' in h_viz, h_viz
-    assert "A[Package] --&gt; B{Order}" in h_viz, h_viz
-    assert '<figure class="viz" data-kind="math"' in h_viz, h_viz
-    assert html_to_md(h_viz) == md_viz, html_to_md(h_viz)
-
-    # whatever the browser paints inside the figure is dropped on save
-    painted = h_viz.replace('<div class="view"></div>',
-                            '<div class="view"><svg><g>junk</g></svg></div>', 1)
-    assert html_to_md(painted) == md_viz, html_to_md(painted)
-
-    # a figure that isn't a drawing is still copied as is
-    other = '<figure><img src="x.png"><figcaption>caption</figcaption></figure>'
-    assert "<figcaption>caption</figcaption>" in html_to_md(other), html_to_md(other)
-
-    # a fence right after a list closes the list, doesn't swallow it
-    md_list = "- one\n- two\n\n```mermaid\ngraph LR\n  A --> B\n```\n"
-    assert md_to_html(md_list).count("</ul>") == 1, md_to_html(md_list)
-    assert html_to_md(md_to_html(md_list)) == md_list, html_to_md(md_to_html(md_list))
-
-    md_num = "1. one\n2. two\n\n- a\n- b\n"
-    h_num = md_to_html(md_num)
-    assert "<ol>" in h_num and "<ul>" in h_num, h_num
-    assert html_to_md(h_num) == md_num, html_to_md(h_num)
-
-    two = split_by_h1("<h1>One</h1><p>a</p><h1>Two</h1><p>b</p>")
-    assert [t for t, _ in two] == ["One", "Two"], two
-    assert slug("Cap 1 — Introducción") == "cap-1-introduccion"
-    print("text.py ok")

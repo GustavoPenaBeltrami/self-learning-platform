@@ -34,7 +34,7 @@ Either way, the rest of this skill configures whichever agent is running it.
 
 You know which tool you are. If you're not sure (or the user is going to use
 another one), ask with `AskUserQuestion`. Then look up in that tool's
-**current** documentation — not from memory, it changes often — three things:
+**current** documentation — not from memory, it changes often — four things:
 
 1. Which instructions file it reads when opening the repo (`AGENTS.md`,
    `CLAUDE.md`, `GEMINI.md`, a rules folder…).
@@ -42,15 +42,16 @@ another one), ask with `AskUserQuestion`. Then look up in that tool's
    folder.
 3. Whether it supports subagents defined in files, and in which folder and
    format.
+4. Whether it has session start/end hooks (step 2b).
 
 Starting point, to be verified:
 
-| Tool | Instructions | Skills | Subagents |
-|---|---|---|---|
-| Claude Code | `CLAUDE.md` (with `@AGENTS.md` inside) | `.claude/skills/` | `.claude/agents/` |
-| Codex | `AGENTS.md` | `.agents/skills/` | — |
-| Gemini CLI | `GEMINI.md` or `contextFileName: AGENTS.md` | `.gemini/skills/` | — |
-| Others (Antigravity, Cline, Cursor, opencode) | Usually read `AGENTS.md` or a rules folder | See their docs | See their docs |
+| Tool | Instructions | Skills | Subagents | Hooks |
+|---|---|---|---|---|
+| Claude Code | `CLAUDE.md` (with `@AGENTS.md` inside) | `.claude/skills/` | `.claude/agents/` | `.claude/settings.local.json` |
+| Codex | `AGENTS.md` | `.agents/skills/` | — | verify |
+| Gemini CLI | `GEMINI.md` or `contextFileName: AGENTS.md` | `.gemini/skills/` | — | verify |
+| Others (Antigravity, Cline, Cursor, opencode) | Usually read `AGENTS.md` or a rules folder | See their docs | See their docs | verify |
 
 Ollama isn't an agent: it runs the model behind one of these. Configure the
 agent, not Ollama. For opencode, start Ollama with
@@ -73,32 +74,56 @@ and put this in `opencode.json`:
 Warn the user that a small local model may not be able to
 sustain long skills like `slp-teach`.
 
-## 2. Expose, in this order of preference
+## 2. Expose
 
-1. **Nothing to do** — the tool reads `AGENTS.md` and that's enough to load
-   the skills by hand (see `AGENTS.md`). If it doesn't support native skills,
-   stop here.
-2. **Symlink** — the tool supports `SKILL.md`: link its folder to the
-   source, so it never drifts out of sync.
-   ```sh
-   mkdir -p .claude && ln -s ../agent/skills .claude/skills && ln -s ../agent/agents .claude/agents
-   ```
-   If the subagent format differs (different frontmatter), link only the
-   skills and leave the agents for step 3.
-3. **Conversion** — only for what doesn't fit with a symlink. Generate the
-   files in the native format from `agent/`, one per skill or agent. Put a
-   line at the top of each generated file saying which file it comes from, and
-   tell the user that if they edit `agent/` they have to run this skill again.
-4. **Instructions** — if the tool doesn't read `AGENTS.md`, create its
-   instructions file with a single line that imports it or says "Read
-   `AGENTS.md`".
+Decide with what step 1 found; several can apply:
+
+- The tool supports `SKILL.md` natively → **symlink** its folders to the
+  source, so they never drift:
+  ```sh
+  mkdir -p .claude && ln -s ../agent/skills .claude/skills && ln -s ../agent/agents .claude/agents
+  ```
+  If its subagent format differs (other frontmatter), link only the skills.
+- Skills or subagents exist but in another format → **convert**: generate
+  one native file per skill or agent from `agent/`, with a first line naming
+  the source file, and tell the user to rerun this skill after editing
+  `agent/`.
+- The tool doesn't read `AGENTS.md` → also create its instructions file with
+  one line that imports `AGENTS.md` or says "Read `AGENTS.md`".
+- The tool has neither skills nor subagents → nothing to expose: `AGENTS.md`
+  already tells it to read each `SKILL.md` by hand.
 
 Never edit `agent/`, `AGENTS.md` or anything versioned to adapt it to your
 tool: the tool-name translation is already in `AGENTS.md`.
 
+## 2b. Hooks (optional)
+
+Hooks only sharpen the session log: the app records sessions on its own and
+closes idle ones, and `slp-session` validates them. Offer them with `AskUserQuestion`; skip if the
+user declines or the tool has no lifecycle hooks.
+
+- **Claude Code**: write `.claude/settings.local.json` (merge if it exists):
+
+  ```json
+  {
+    "hooks": {
+      "SessionStart": [{ "hooks": [{ "type": "command", "command": "uv run slp sessions" }] }],
+      "SessionEnd": [{ "hooks": [{ "type": "command", "command": "uv run slp sessions close", "timeout": 10 }] }]
+    }
+  }
+  ```
+
+  `uv run slp sessions` closes idle sessions and prints the open ones;
+  Claude Code adds that output to your context. `uv run slp sessions close`
+  ends every open session with `"by": "hook"` when the agent exits; the next
+  `slp-session` corrects that end if the work had stopped earlier.
+- **Other tools** (Codex, Gemini CLI, opencode, …): check their current docs
+  for session start/end hooks or plugins. If they exist, run the same two
+  commands; if not, skip.
+
 ## 3. Ignore what you created, for this user only
 
-Add each path you created to `.git/info/exclude` (not to `.gitignore`: the
+Add each path you created (including `.claude/settings.local.json`) to `.git/info/exclude` (not to `.gitignore`: the
 repo is shared by people with other agents). Check it isn't already there.
 
 ```sh
@@ -108,10 +133,12 @@ git status --short           # nothing new must show up
 
 ## 4. Verify
 
-- Your tool lists `slp-session` (or, at level 1, you can read
+- Your tool lists `slp-session` (or, with nothing exposed, you can read
   `agent/skills/slp-session/SKILL.md`).
+- With hooks: `uv run slp sessions` runs and exits 0.
 - `git status --short` shows nothing that wasn't there before.
 
-Close with a three-line summary: which level you used, which paths you
-created, and "start with `slp-session`". If the tool needs a restart to see
-the skills, say so.
+Close with a short summary: what you exposed and how, which paths you
+created, whether hooks are on, and "Next: `/slp-init` to create your first
+topic, then `slp-session` at the start of each study session." If the tool
+needs a restart to see the skills, say so.

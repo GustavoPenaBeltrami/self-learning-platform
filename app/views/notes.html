@@ -8,8 +8,6 @@
 <script src="/app/scripts/viz.js"></script>
 <script src="/app/scripts/shell.js"></script>
 <style>
-  .page { max-width: calc(var(--width) + 2 * var(--gutter)); margin: 0 auto; padding: var(--spacing-24) var(--gutter) 0; }
-
   :root[data-font="serif"] { --reading-font: var(--serif); }
   :root[data-font="inter"] { --reading-font: Inter, "SF Pro Text", -apple-system, "Helvetica Neue", sans-serif; }
   :root[data-font="mono"]  { --reading-font: var(--code); }
@@ -59,9 +57,6 @@
 
   .ref { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
 
-  .bubble, .mark-menu, .tip {
-    position: fixed; background: var(--color-void); border: 1px solid var(--color-slate); border-radius: 0;
-  }
   .bubble {
     z-index: 60; max-width: 24rem; max-height: 14rem; overflow: hidden; padding: .7rem .9rem;
     font: 400 13px/1.6 var(--mono); color: var(--ink);
@@ -82,7 +77,7 @@
   .mark-menu input[type="range"] { width: 8rem; accent-color: var(--accent); padding: 0 .4rem; }
   .mark-menu .readout { font: 400 12px/1 var(--mono); color: var(--muted); min-width: 2.4rem; text-align: right; }
   .mark-menu input[type="text"] {
-    border: 0; background: none; color: var(--ink); outline: 0;
+    border: 0; background: none; color: var(--ink);
     font: 400 12px/1 var(--mono); width: 12rem; padding: .35rem .5rem;
   }
   .mark-menu input::placeholder { color: var(--muted); }
@@ -91,7 +86,7 @@
     position: absolute; z-index: 10; width: 14rem; margin: 0;
     background: var(--bg); border: 1px solid var(--accent); border-radius: 0;
     font: 400 13px/1.6 var(--mono);
-    opacity: .55; transition: opacity .15s ease;
+    opacity: .55; transition: opacity .12s ease;
   }
   .card:hover, .card:focus-within, .card.dragging { opacity: 1; }
   .card .card-body { padding: .7rem .8rem .5rem; outline: 0; min-height: 2.4rem; }
@@ -120,19 +115,19 @@
     z-index: 80; pointer-events: none; padding: .25rem .5rem;
     font: 400 12px/1.4 var(--mono); color: var(--ink); white-space: nowrap;
   }
-  .pill button.recording { color: var(--bad); animation: pulse .8s ease-in-out infinite alternate; }
-  @keyframes pulse { to { opacity: .35; } }
   .provisional { color: var(--muted); }
 
   .tree .fold {
     flex: 0 0 1rem; padding: 0; border: 0; background: none; cursor: pointer;
-    color: var(--muted); font: 400 13px/1 var(--mono); transition: transform .15s;
+    color: var(--muted); font: 400 13px/1 var(--mono);
   }
   .tree .fold:hover { color: var(--accent); }
   .tree .fold[aria-expanded="true"] { transform: rotate(90deg); }
   .tree a.n2 { padding-left: 1rem; } .tree a.n3 { padding-left: 2rem; }
   .tree #index a.n1 { color: var(--ansi-blue); }
   .tree .nothing { color: var(--color-steel); padding: 0 .3rem; margin: 0; }
+  .tree button.add { flex: 1; text-align: left; border: 0; padding: .02rem .3rem; background: none; color: var(--muted); font: inherit; }
+  .tree button.add:hover, .tree button.add.active { background: var(--color-iron); color: var(--ink); }
 
   @media (max-width: 1280px) {
     .card { position: static !important; width: auto; margin: 1rem 0; }
@@ -141,28 +136,23 @@
 
 <body>
 <script>
-/* Highlight and card palette. Edit this array and the whole app changes. */
 const PALETTE = { yellow: '#d8c06a', green: '#8fbf7f', red: '#d67a6a', blue: '#5a9be0', magenta: '#a88cc4', cyan: '#66b8c4', orange: '#d08a4c' };
-const COLORS = Object.entries(PALETTE).map(([n, hex]) => `var(--ansi-${n}, ${hex})`);
-const THEMED = Object.fromEntries(Object.values(PALETTE).map((hex, i) => [hex, COLORS[i]]));
-const themeColors = root => root.querySelectorAll('[style*="--c"]').forEach(el => {
-  const c = THEMED[el.style.getPropertyValue('--c').trim().toLowerCase()];
-  if (c) el.style.setProperty('--c', c);
+const COLORS = Object.values(PALETTE);
+const NAMES = Object.keys(PALETTE);
+const fixedColors = root => root.querySelectorAll('[style*="--c"]').forEach(el => {
+  const hex = /var\(--ansi-\w+,\s*(#[0-9a-f]{3,8})\s*\)/i.exec(el.style.getPropertyValue('--c'))?.[1];
+  if (hex) el.style.setProperty('--c', hex);
 });
 
-/* Icons. viewBox 20x20, 1.5 stroke, they inherit the button color. */
 const ICON = {
-  back:      '<path d="M9 4.5 3.5 10 9 15.5"/><path d="M3.5 10h13"/>',
   highlight: '<path d="M3.5 16.5h13"/><path d="M6.5 13.5 12.5 3.5l3.5 2.2-6 10.3z"/><path d="M6.5 13.5 10 15.7"/>',
   underline: '<path d="M6 3v5.5a4 4 0 0 0 8 0V3"/><path d="M4.5 16.8h11"/>',
   strike:    '<path d="M3.5 10h13"/><path d="M13.5 5.6a3.4 2.7 0 0 0-6.2 1.1c0 1.6 1.7 2.2 3.2 2.6"/><path d="M7 13.4a3.4 2.7 0 0 0 6.4-.6"/>',
   reference: '<path d="M8.6 11.4a3.2 3.2 0 0 0 4.5 0l2.6-2.6a3.2 3.2 0 0 0-4.5-4.5l-.9.9"/><path d="M11.4 8.6a3.2 3.2 0 0 0-4.5 0L4.3 11.2a3.2 3.2 0 0 0 4.5 4.5l.9-.9"/>',
   note:      '<path d="M4 3.5h12v8.5l-3.5 4H4z"/><path d="M16 12h-3.5v4"/>',
+  flashcard: '<rect x="2.5" y="6" width="12" height="9" rx="1"/><path d="M5.5 6V3.5h12v9H14.5"/>',
   voice:     '<rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0"/><path d="M10 15v2.5"/>',
   image:     '<rect x="3" y="4" width="14" height="12" rx="1.5"/><circle cx="7.3" cy="8" r="1.2"/><path d="M3.6 14.2 8 10l3 2.8 2.2-2 3.2 3"/>',
-  sun:       '<circle cx="10" cy="10" r="3.3"/><path d="M10 2.2v1.9M10 15.9v1.9M2.2 10h1.9M15.9 10h1.9M4.6 4.6l1.3 1.3M14.1 14.1l1.3 1.3M15.4 4.6l-1.3 1.3M5.9 14.1l-1.3 1.3"/>',
-  moon:      '<path d="M16.3 11.8A6.6 6.6 0 0 1 8.2 3.7a6.6 6.6 0 1 0 8.1 8.1z"/>',
-  comment:   '<path d="M3.5 4h13v8.5h-8L4.5 16v-3.5h-1z"/>',
   remove:    '<path d="M5 5l10 10M15 5 5 15"/>',
   diagram:   '<rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="1.8" y="13.5" width="5.4" height="4" rx="1"/><rect x="12.8" y="13.5" width="5.4" height="4" rx="1"/><path d="M10 6.5v3M4.5 13.5v-2.5h11v2.5"/>',
   formula:   '<path d="M14.6 4.2H6.4l4.6 5.8-4.6 5.8h8.2"/>',
@@ -171,66 +161,67 @@ const svg = (n, t = 16) => `<svg viewBox="0 0 20 20" width="${t}" height="${t}" 
   stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
 
 const { app, tree, tools, path, mode } = mountShell('notes');
-addEventListener('settings-applied', e => {
+const statusEl = document.getElementById('status');
+let dictateKey = 'ctrl+m', isDictate = hotkey(dictateKey);
+const applySettings = s => {
   const fontSel = document.getElementById('font');
-  if (fontSel) fontSel.value = e.detail.font || 'mono';
-});
+  if (fontSel) fontSel.value = s.font || 'mono';
+  dictateKey = s.dictation_key || 'ctrl+m';
+  isDictate = hotkey(dictateKey);
+  const voice = document.getElementById('voice');
+  if (voice) voice.setAttribute('aria-label', voice.dataset.tip = 'Dictate · ' + dictateKey);
+};
+settings.then(applySettings);
+addEventListener('settings-applied', e => applySettings(e.detail));
 const zoom = () => parseFloat(app.style.zoom) || 1;
 const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
 
-let color = COLORS[0], doc, titleEl, subtitle, index, topic, lastRange;
+let color = COLORS[0], doc, titleEl, subtitle, index, topic, lastRange, stamp;
 
-/* ---------- topic menu ---------- */
-async function loadTopics() {
-  return (await (await fetch('/api/topics')).json()).topics;
-}
+const loadTopics = async () => (await api('/api/topics')).topics;
 
 function buildTree(topics, current) {
-  tree.innerHTML = topics.map(t => `<details open${t.slug === current ? ' class="current"' : ''}>
-    <summary title="${esc(t.title)}"><span class="name">${esc(t.slug)}/</span><span class="count">${t.sections}</span></summary>
-    ${t.slug === current ? '<div id="resources"></div><div id="index"></div>'
+  tree.innerHTML = topics.map(t => folder(t.slug + '/', t.sections,
+    t.slug === current ? '<div id="resources"></div><div id="index"></div>'
       : `<ol>${t.index.map((h, i) => `<li><a href="?topic=${encodeURIComponent(t.slug)}#${slug(h)}">
           <span class="n">${i + 1}</span><span>${esc(h)}</span></a></li>`).join('')
-        || '<li class="empty">(empty)</li>'}</ol>`}
-  </details>`).join('');
+        || '<li class="empty">(empty)</li>'}</ol>`,
+    t.slug === current, t.title)).join('');
 }
 
 async function menu() {
   let topics;
   try {
     topics = await loadTopics();
-  } catch {
-    app.innerHTML = `<div class="sheet"><p class="prompt"><span class="p-sig">✕</span> server not running</p>
-      <p>Open a terminal in the folder and run <code>uv run slp</code>.</p></div>`;
+  } catch (e) {
+    app.innerHTML = offline(e);
     return;
   }
   buildTree(topics, null);
   path('~/notes/topics');
   app.innerHTML = `
     <div class="sheet">
-    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/topics</span> <span class="p-sig">❯</span> ls -l</p>
+    ${promptLine('~/topics', 'ls -l')}
     <table class="htop">
       <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">SECT</th><th class="num">RES</th></tr></thead>
       <tbody>${topics.map(l => `
-        <tr onclick="location.search='?topic=${encodeURIComponent(l.slug)}'">
+        <tr onclick="event.target.closest('a') || this.querySelector('a').click()">
           <td class="num">${l.order < 999 ? String(l.order).padStart(2, '0') : '—'}</td>
           <td class="wide"><a href="?topic=${encodeURIComponent(l.slug)}">${esc(l.title)}</a><br><span class="sub">${esc(l.subtitle || '')}</span></td>
           <td class="type">${esc(l.type)}</td>
           <td class="num${l.sections ? '' : ' zero'}">${l.sections}</td>
           <td class="num${l.resources ? '' : ' zero'}">${l.resources}</td>
-        </tr>`).join('')}${topics.length ? '' : noTopicsRow(4)}</tbody>
+        </tr>`).join('')}${topics.length ? '' : noTopicsRow(5)}</tbody>
     </table>
     <div class="tildes"></div></div>`;
 }
 
-/* ---------- notebook ---------- */
 async function openTopic(name) {
-  const [t, topics] = await Promise.all([
-    fetch('/api/topic/' + encodeURIComponent(name)).then(r => r.json()), loadTopics()]);
+  const [t, topics] = await Promise.all([api('/api/topic/' + encodeURIComponent(name)), loadTopics()]);
   topic = t;
-  if (topic.error) throw new Error(topic.error);
-  document.title = topic.title;
+  stamp = t.stamp;
+  document.title = '独学 · ' + topic.title;
   buildTree(topics, topic.slug);
   path(`~/notes/topics/${topic.slug}/notes`);
 
@@ -249,8 +240,8 @@ async function openTopic(name) {
       <button data-cmd="italic" data-tip="Italic · ⌘I" style="font-style:italic">I</button>
     </div>
     <div class="wb-mod pill">
-      ${COLORS.map((c, i) => `<button class="swatch" style="--c:${c};background:${c}"
-        data-color="${c}" aria-pressed="${i === 0}" data-tip="${Object.keys(PALETTE)[i]}"></button>`).join('')}
+      ${COLORS.map((c, i) => `<button class="swatch" style="--c:${c}"
+        data-color="${c}" aria-pressed="${i === 0}" data-tip="${NAMES[i]}"></button>`).join('')}
       <button data-mark="mk-highlight" data-tip="Highlight">${svg('highlight')}</button>
       <button data-mark="mk-underline" data-tip="Underline">${svg('underline')}</button>
       <button data-mark="mk-strike" data-tip="Strikethrough">${svg('strike')}</button>
@@ -258,17 +249,18 @@ async function openTopic(name) {
     <div class="wb-mod pill">
       <button id="reference" data-tip="Reference to a section · or type [[name]]">${svg('reference')}</button>
       <button id="card" data-tip="Margin note">${svg('note')}</button>
+      <button id="flashcard" data-tip="Flashcard · the selection becomes the back">${svg('flashcard')}</button>
       <button id="image" data-tip="Image · you can also paste or drop it">${svg('image')}</button>
       <input type="file" id="image-file" accept="image/*" hidden>
       <button id="diagram" data-tip="Diagram · Mermaid">${svg('diagram')}</button>
       <button id="formula" data-tip="Formula · LaTeX">${svg('formula')}</button>
-      <button id="voice" data-tip="Dictate · ⌃M to start and stop">${svg('voice')}</button>
+      <button id="voice" data-tip="Dictate · ${esc(dictateKey)}">${svg('voice')}</button>
     </div>`;
+  tools.querySelectorAll('[data-tip]').forEach(b => b.setAttribute('aria-label', b.dataset.tip));
   app.innerHTML = `
-
-    <div class="page">
+    <div class="sheet">
       <header class="cover">
-        <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/topics/${esc(topic.slug)}</span> <span class="p-sig">❯</span> nvim notes/</p>
+        ${promptLine('~/topics/' + topic.slug, 'nvim notes/')}
         <h1 id="title" contenteditable>${esc(topic.title)}</h1>
         <p id="subtitle" contenteditable>${esc(topic.subtitle || '')}</p>
       </header>
@@ -281,12 +273,14 @@ async function openTopic(name) {
   subtitle = document.getElementById('subtitle');
   index = document.getElementById('index');
   buildResources();
-  doc.innerHTML = topic.html || '';
+  doc.replaceChildren(clean(topic.html || ''));
   vizPaint(doc);
-  themeColors(doc);
+  fixedColors(doc);
   placeCards();
   buildIndex();
   if (location.hash) goTo(decodeURIComponent(location.hash.slice(1)));
+  const kept = (() => { try { return localStorage.getItem(keptKey()); } catch { return null; } })();
+  if (kept !== null) offerKept(kept);
 
   doc.addEventListener('focusin', () => mode('INSERT', 'insert'));
   doc.addEventListener('focusout', () => mode('NORMAL'));
@@ -318,23 +312,27 @@ async function openTopic(name) {
   });
   addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeMenu(); closeBubble(); closeTip(); }
-    // ⌘M never arrives: macOS uses it to minimize before the browser sees it
-    if (e.ctrlKey && e.code === 'KeyM') { e.preventDefault(); dictate(document.getElementById('voice')); }
+    if (isDictate(e)) { e.preventDefault(); dictate(document.getElementById('voice')); }
   });
+  document.addEventListener('mousedown', e => {
+    if (menu2 && !menu2.contains(e.target) && !active?.contains(e.target)) closeMenu();
+  });
+  addEventListener('scroll', () => { closeMenu(); closeBubble(); }, { passive: true });
+  addEventListener('beforeunload', leaving);
+  addEventListener('pagehide', leaving);
 
   document.getElementById('block').onchange = e => {
     restore();
     applyBlock(e.target.value);
     buildIndex(); save();
   };
-  // mousedown on the bar would move focus out of the editable and execCommand
-  // would stop applying. Cancelling it keeps the caret and selection.
   tools.querySelectorAll('button').forEach(b => b.onmousedown = e => e.preventDefault());
   tools.addEventListener('click', closeTip);
-  tools.addEventListener('mouseover', e => {
+  tools.addEventListener('focusout', closeTip);
+  ['mouseover', 'focusin'].forEach(type => tools.addEventListener(type, e => {
     const el = e.target.closest('[data-tip]');
     if (el) showTip(el);
-  });
+  }));
   tools.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => {
     // ponytail: execCommand for bold/italic only. Deprecated but works in
     // every current browser and avoids writing a whole editor.
@@ -347,6 +345,11 @@ async function openTopic(name) {
   tools.querySelectorAll('[data-mark]').forEach(b => b.onclick = () => mark(b.dataset.mark));
   document.getElementById('reference').onclick = e => referenceMenu(e.currentTarget);
   document.getElementById('card').onclick = () => { createCard({}); save(); };
+  document.getElementById('flashcard').onclick = () => {
+    const node = lastRange && doc.contains(lastRange.startContainer) ? lastRange.startContainer : null;
+    cardForm(topic.slug, { back: node ? lastRange.toString().trim() : '', note: headingPath(node) })
+      .then(r => { if (r) statusEl.textContent = `card saved · ${r.cards.length} in cards/`; });
+  };
   const imageBtn = document.getElementById('image'), imageFile = document.getElementById('image-file');
   imageBtn.onclick = e => dropMenu(imageBtn, [
     ['inline', svg('image', 14) + 'embedded in text'],
@@ -359,11 +362,11 @@ async function openTopic(name) {
   document.getElementById('voice').onclick = e => dictate(e.currentTarget);
   doc.addEventListener('paste', e => {
     const dt = e.clipboardData;
-    // a screenshot arrives in `items`, a file from Finder in `files`
     const f = [...(dt.files || [])].find(x => x.type.startsWith('image/'))
       || [...(dt.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/'))
            .map(i => i.getAsFile())[0];
-    if (f) { e.preventDefault(); insertImage(f); }
+    e.preventDefault();
+    f ? insertImage(f) : document.execCommand('insertText', false, dt.getData('text/plain'));
   });
   doc.addEventListener('dragover', e => e.preventDefault());
   doc.addEventListener('drop', e => {
@@ -372,22 +375,20 @@ async function openTopic(name) {
   });
 }
 
+const upload = file => api(topicUrl() + '/img', file).then(r => r.src);
+const uploadFailed = e => statusEl.textContent = 'image not saved: ' + e.message;
+
 function imageCard(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => { createCard({ img: reader.result }); save(); };
-  reader.readAsDataURL(file);
+  if (file) upload(file).then(src => { createCard({ img: src }); save(); }, uploadFailed);
 }
 
 function insertImage(file) {
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
+  upload(file).then(src => {
     restore();
-    document.execCommand('insertHTML', false, `<img class="inline" src="${reader.result}" alt="">`);
+    document.execCommand('insertHTML', false, `<img class="inline" src="${esc(src)}" alt="">`);
     save();
-  };
-  reader.readAsDataURL(file);
+  }, uploadFailed);
 }
 
 /* ---------- dictation ---------- */
@@ -410,7 +411,7 @@ async function dictate(button) {
   try {
     mic = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (e) {
-    return status.textContent = 'No microphone: ' + e.message;
+    return status.textContent = 'no microphone: ' + e.message;
   }
   const d = dictation = { chunks: [], length: 0, done: false };
   const ctx = new AudioContext({ sampleRate: RATE });
@@ -431,7 +432,7 @@ async function dictate(button) {
   const sel = getSelection();
   sel.rangeCount ? sel.getRangeAt(0).insertNode(span) : doc.append(span);
   button.classList.add('recording');
-  status.textContent = 'Listening… click the microphone to finish';
+  status.textContent = `listening… ${dictateKey} or the mic to finish`;
 
   const lang = topic.language?.notes;
   const voiceUrl = '/api/voice' + (lang ? '?lang=' + encodeURIComponent(lang) : '');
@@ -449,9 +450,9 @@ async function dictate(button) {
       const n = d.chunks.length, audio = new Float32Array(d.length);
       d.chunks.reduce((o, t) => (audio.set(t, o), o + t.length), 0);
       sent = audio.length;
-      const r = await (await fetch(voiceUrl, { method: 'POST', body: audio })).json();
-      if (r.fallback) throw new Error('no local dictation model, ' + osDictation());
-      if (r.error) throw new Error(r.error);
+      const r = await api(voiceUrl, audio).catch(e => {
+        throw e.data?.fallback ? new Error('no local dictation model, ' + osDictation()) : e;
+      });
 
       if (done) { if (r.text) span.before(r.text + ' '); break; }
       const segs = r.segments;
@@ -476,8 +477,7 @@ async function dictate(button) {
     button.classList.remove('recording');
     buildIndex();
   }
-  // ponytail: on error don't save so the message isn't overwritten; committed text is saved on the next keystroke
-  error ? status.textContent = 'Not transcribed: ' + error.message : save();
+  save().then(() => { if (error) status.textContent = 'not transcribed: ' + error.message; });
 }
 
 /* ---------- selection ---------- */
@@ -487,6 +487,15 @@ document.addEventListener('selectionchange', () => {
   lastRange = sel.getRangeAt(0);
   document.getElementById('block').value = currentBlock();
 });
+
+function headingPath(node) {
+  let h1 = '', h2 = '';
+  for (const h of doc.querySelectorAll('h1, h2')) {
+    if (!node || !(h === node || h.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+    h.tagName === 'H1' ? (h1 = h.textContent.trim(), h2 = '') : (h2 = h.textContent.trim());
+  }
+  return [h1, h2].filter(Boolean).join(' › ');
+}
 
 function restore() {
   doc.focus();
@@ -521,6 +530,7 @@ function mark(cls) {
 }
 
 /* ---------- blocks: heading, paragraph, list ---------- */
+// ponytail: applyBlock, wrap, autoRef and card deletes edit the DOM directly and skip the browser undo stack; add an own history if ⌘Z after them matters
 /* No execCommand('formatBlock'): it doesn't apply to loose text inside the
    contenteditable, which is exactly the case of an empty document. */
 const BLOCKS = 'h1,h2,h3,h4,h5,h6,p,li,blockquote';
@@ -668,20 +678,16 @@ function goTo(id) {
   headings().find(h => h.id === id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/* ---------- reading bubbles ---------- */
 let bubble;
 const closeBubble = () => { bubble?.remove(); bubble = null; };
 
 function showBubble(anchor, html, broken) {
   closeBubble();
   bubble = document.createElement('div');
-  bubble.className = 'bubble' + (broken ? ' broken' : '');
+  bubble.className = 'bubble float' + (broken ? ' broken' : '');
   bubble.innerHTML = html;
   document.body.appendChild(bubble);
-  const c = anchor.getBoundingClientRect();
-  bubble.style.left = Math.max(8, Math.min(c.left, innerWidth - bubble.offsetWidth - 16)) + 'px';
-  bubble.style.top = (c.bottom + 8 + bubble.offsetHeight > innerHeight
-    ? c.top - bubble.offsetHeight - 8 : c.bottom + 8) + 'px';
+  placeNear(bubble, anchor);
   const leave = () => { closeBubble(); anchor.removeEventListener('mouseleave', leave); };
   anchor.addEventListener('mouseleave', leave);
 }
@@ -705,7 +711,6 @@ function refBubble(a) {
     esc(body.slice(0, 420) || 'Empty section.') + (body.length > 420 ? '…' : ''));
 }
 
-/* ---------- floating menus: mark, image, reference ---------- */
 let menu2, active;
 
 function closeMenu() {
@@ -721,14 +726,10 @@ function openMenu(anchor, html) {
   active = anchor;
   anchor.classList.add('active');
   menu2 = document.createElement('div');
-  menu2.className = 'mark-menu';
+  menu2.className = 'mark-menu float';
   menu2.innerHTML = html;
   document.body.appendChild(menu2);
-  const c = anchor.getBoundingClientRect();
-  menu2.style.left = Math.max(8, Math.min(c.left, innerWidth - menu2.offsetWidth - 16)) + 'px';
-  menu2.style.top = (c.bottom + 8 + menu2.offsetHeight > innerHeight
-    ? c.top - menu2.offsetHeight - 8 : c.bottom + 8) + 'px';
-  // don't steal focus from the editor, except in fields where you type or pick
+  placeNear(menu2, anchor);
   menu2.onmousedown = e => { if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) e.preventDefault(); };
   return menu2;
 }
@@ -737,10 +738,10 @@ function markMenu(markEl) {
   const current = markEl.style.getPropertyValue('--c').trim();
   const m = openMenu(markEl,
     COLORS.map((c, i) => `<button class="swatch" data-color="${c}" style="background:${c}"
-        aria-pressed="${c === current}" data-tip="${Object.keys(PALETTE)[i]}"></button>`).join('')
+        aria-pressed="${c.toLowerCase() === current.toLowerCase()}" aria-label="${NAMES[i]}"></button>`).join('')
     + '<span class="sep"></span>'
-    + `<input type="text" id="mark-comment" placeholder="Comment…" value="${esc(markEl.dataset.comment || '')}">`
-    + `<button data-action="remove" data-tip="Remove the mark">${svg('remove', 14)}</button>`);
+    + `<input type="text" id="mark-comment" placeholder="Comment…" aria-label="comment" value="${esc(markEl.dataset.comment || '')}">`
+    + `<button data-action="remove" aria-label="remove the mark">${svg('remove', 14)}</button>`);
 
   m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => {
     markEl.style.setProperty('--c', b.dataset.color);
@@ -779,8 +780,8 @@ function insertViz(kind) {
 function vizMenu(fig) {
   const source = fig.querySelector('.src');
   const m = openMenu(fig,
-    `<textarea class="editor-viz" spellcheck="false">${esc(source.textContent)}</textarea>`
-    + `<button data-action="remove" data-tip="Delete the drawing">${svg('remove', 14)}</button>`);
+    `<textarea class="editor-viz" spellcheck="false" aria-label="${fig.dataset.kind === 'math' ? 'latex' : 'mermaid'} source">${esc(source.textContent)}</textarea>`
+    + `<button data-action="remove" aria-label="delete the drawing">${svg('remove', 14)}</button>`);
 
   const field = m.querySelector('textarea');
   field.focus();
@@ -801,9 +802,9 @@ function vizMenu(fig) {
 function imageMenu(img) {
   const width = parseInt(img.style.width) || 100;
   const m = openMenu(img,
-    `<input type="range" min="20" max="100" step="5" value="${width}">`
+    `<input type="range" min="20" max="100" step="5" value="${width}" aria-label="image width">`
     + `<span class="readout">${width}%</span><span class="sep"></span>`
-    + `<button data-action="remove" data-tip="Delete the image">${svg('remove', 14)}</button>`);
+    + `<button data-action="remove" aria-label="delete the image">${svg('remove', 14)}</button>`);
 
   const slider = m.querySelector('input');
   const readout = m.querySelector('.readout');
@@ -824,7 +825,7 @@ function referenceMenu(button) {
   if (!list.length) return openMenu(button,
     '<span class="readout" style="min-width:0">No sections to point to yet.</span>');
 
-  const m = openMenu(button, `<select id="ref-target" size="1">
+  const m = openMenu(button, `<select id="ref-target" size="1" aria-label="section">
       ${list.map(h => `<option value="${h.id}">${' '.repeat((h.level - 1) * 3)}${esc(h.number)} ${esc(h.text)}</option>`).join('')}
     </select>`);
   const sel = m.querySelector('select');
@@ -852,7 +853,6 @@ function insertRef(id, text) {
   save();
 }
 
-/* ---------- hover help on the bar ---------- */
 let tip;
 const closeTip = () => { tip?.remove(); tip = null; };
 
@@ -860,42 +860,93 @@ function showTip(el) {
   closeTip();
   if (el.getAttribute('aria-expanded') === 'true') return;
   tip = document.createElement('div');
-  tip.className = 'tip';
+  tip.className = 'tip float';
   tip.textContent = el.dataset.tip;
-  el.removeAttribute('title');   // the native one would duplicate this same text
+  el.removeAttribute('title');
   document.body.appendChild(tip);
-  const c = el.getBoundingClientRect();
-  tip.style.left = Math.max(8, Math.min(c.left + c.width / 2 - tip.offsetWidth / 2,
-    innerWidth - tip.offsetWidth - 8)) + 'px';
-  tip.style.top = c.bottom + 6 + 'px';
+  placeNear(tip, el, 6, true);
   el.addEventListener('mouseleave', closeTip, { once: true });
 }
 
-/* ---------- resources: files in resources/ and links from topic.json ---------- */
 function buildResources() {
   const box = document.getElementById('resources');
+  const source = '/api/source?topic=' + encodeURIComponent(topic.slug) + '&i=';
   const rows = [
     ...(topic.resources || []).map(r =>
-      `<li><a href="${r.path}" target="_blank" title="${esc(r.name)}"><span>${esc(r.name)}</span><span class="size">${r.kb} KB</span></a></li>`),
-    ...(topic.links || []).map(e => e.url
-      ? `<li><a href="${esc(e.url)}" target="_blank" title="${esc(e.url)}"><span>${esc(e.title)}</span><span class="size">↗</span></a></li>`
-      : `<li><a title="${esc(e.path)}"><span>${esc(e.title)}</span><span class="size">local</span></a></li>`),
+      `<li><a href="${esc(r.path)}" target="_blank" title="${esc(r.name)}"><span>${esc(r.name)}</span><span class="size">${r.kb} KB</span></a></li>`),
+    ...(topic.links || []).map((e, i) => e.url && /^https?:\/\//i.test(e.url)
+      ? `<li><a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer" title="${esc(e.url)}"><span>${esc(e.title)}</span><span class="size">↗</span></a></li>`
+      : e.path ? `<li><a href="${source + i}" target="_blank" title="${esc(e.path)}"><span>${esc(e.title)}</span><span class="size">local</span></a></li>` : ''),
   ];
-  box.innerHTML = rows.length ? `<div class="folder">resources/</div><ul>${rows.join('')}</ul>` : '';
+  box.innerHTML = `<div class="folder">resources/</div><ul>${rows.join('')}<li><button class="add" aria-label="add a resource">+ add</button></li></ul>`;
+  box.querySelector('.add').onclick = e => addMenu(e.currentTarget);
 }
 
-/* ---------- index ---------- */
-/* Headings with their computed numbering. Used by the index and the
-   reference picker, so the numbering is computed in one place. */
+function addMenu(button) {
+  const m = openMenu(button, `<button data-action="file">file…</button><span class="sep"></span>`
+    + '<input type="text" id="add-link" placeholder="url or ~/path/to/file" aria-label="link or path">');
+  const input = m.querySelector('#add-link');
+  input.focus();
+  m.querySelector('[data-action="file"]').onclick = () => {
+    const pick = Object.assign(document.createElement('input'), { type: 'file', multiple: true });
+    pick.onchange = () => { closeMenu(); uploadResources([...pick.files]); };
+    pick.click();
+  };
+  input.onkeydown = e => {
+    if (e.key !== 'Enter' || !input.value.trim()) return;
+    e.preventDefault();
+    addLink(input.value.trim());
+    closeMenu();
+  };
+}
+
+async function refreshResources() {
+  const t = await api(topicUrl()).catch(() => null);
+  if (!t) return;
+  topic.resources = t.resources;
+  topic.links = t.links;
+  buildResources();
+}
+
+async function uploadResources(files) {
+  for (const f of files) {
+    statusEl.textContent = `uploading ${f.name}…`;
+    try {
+      await api(`${topicUrl()}/resource?name=${encodeURIComponent(f.name)}`, f);
+    } catch (e) {
+      statusEl.textContent = `✕ ${f.name}: ${e.message}`;
+      return refreshResources();
+    }
+  }
+  statusEl.textContent = files.length ? 'uploaded' : '';
+  refreshResources();
+}
+
+function addLink(value) {
+  const title = decodeURIComponent(value.replace(/[?#].*$/, '').split(/[\\/]/).filter(Boolean).pop() || value);
+  const entry = { title, [/^https?:\/\//i.test(value) ? 'url' : 'path']: value };
+  queue(async () => {
+    try {
+      await api(topicUrl(), JSON.stringify({ links: [...(topic.links || []), entry] }));
+      statusEl.textContent = 'added ' + title;
+      await refreshResources();
+    } catch (e) {
+      statusEl.textContent = 'not added: ' + e.message;
+    }
+  });
+}
+
 function headingList() {
-  const n = [0, 0, 0];
+  const n = [0, 0, 0], seen = {};
   return headings().map(h => {
     const level = +h.tagName[1];
     if (level <= 3) {
       n[level - 1]++;
       for (let i = level; i < 3; i++) n[i] = 0;
     }
-    h.id = slug(h.textContent);
+    const base = slug(h.textContent);
+    seen[base] = (seen[base] || 0) + 1;
+    h.id = seen[base] > 1 ? `${base}-${seen[base]}` : base;
     return { id: h.id, level, text: h.textContent, number: level <= 3 ? n.slice(0, level).join('.') : '' };
   });
 }
@@ -937,7 +988,7 @@ function createCard({ x, y, body = '', img = null, caption = '' }) {
   el.dataset.x = x ?? doc.offsetWidth + 32;
   el.dataset.y = y ?? Math.max(0, Math.round(scrollY / zoom() + 100 - doc.offsetTop));
   el.innerHTML = handle(img)
-    + (img ? `<img src="${img}" alt=""><figcaption contenteditable>${esc(caption)}</figcaption>`
+    + (img ? `<img src="${esc(img)}" alt=""><figcaption contenteditable>${esc(caption)}</figcaption>`
            : `<div class="card-body" contenteditable>${body}</div>`);
   doc.appendChild(el);
   activateCard(el);
@@ -1003,35 +1054,83 @@ function snapshot() {
   return copy.innerHTML;
 }
 
-let pending;
+const topicUrl = () => '/api/topic/' + encodeURIComponent(topic.slug);
+const keptKey = () => 'unsaved:' + topic.slug;
+let pending = null, inflight = 0, conflict = false, saving = Promise.resolve(), waiters = [];
+const queue = fn => (saving = saving.then(fn).catch(() => {}));
+const payload = () => JSON.stringify({
+  title: titleEl.textContent.trim(), subtitle: subtitle.textContent.trim(), html: snapshot(), stamp,
+});
+
 function save() {
   clearTimeout(pending);
-  const status = document.getElementById('status');
-  status.textContent = 'saving…';
-  pending = setTimeout(async () => {
-    try {
-      const r = await (await fetch('/api/topic/' + encodeURIComponent(topic.slug), {
-        method: 'POST',
-        body: JSON.stringify({
-          title: titleEl.textContent.trim(),
-          subtitle: subtitle.textContent.trim(),
-          html: snapshot()
-        })
-      })).json();
-      if (r.error) throw new Error(r.error);
-      const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      status.textContent = `${time} · ${r.sections.length} ${r.sections.length === 1 ? 'section' : 'sections'}`;
-    } catch (e) {
-      status.textContent = 'Not saved: ' + e.message;
-    }
-  }, 900);
+  if (!conflict) statusEl.textContent = 'saving…';
+  pending = setTimeout(flush, 900);
+  return new Promise(r => waiters.push(r));
 }
 
-/* Starts at the end: openTopic() uses the `let` variables above. */
+function flush() {
+  clearTimeout(pending);
+  pending = null;
+  const done = waiters.splice(0);
+  queue(send).then(() => done.forEach(r => r()));
+}
+
+async function send() {
+  if (conflict) return keep();
+  inflight++;
+  try {
+    const r = await api(topicUrl(), payload());
+    stamp = r.stamp;
+    const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    statusEl.textContent = `${time} · ${r.sections.length} ${r.sections.length === 1 ? 'section' : 'sections'}`;
+  } catch (e) {
+    if (e.status === 409) { conflict = true; keep(); }
+    else statusEl.textContent = 'not saved: ' + e.message;
+  } finally {
+    inflight--;
+  }
+}
+
+function keep() {
+  try { localStorage.setItem(keptKey(), snapshot()); } catch {}
+  statusEl.innerHTML = '✕ notes changed on disk, your version is kept <button type="button">reload</button>';
+  statusEl.querySelector('button').onclick = () => location.reload();
+}
+
+function offerKept(kept) {
+  statusEl.innerHTML = 'unsaved version from before a reload <button type="button">restore</button><button type="button">discard</button>';
+  const [restoreBtn, discardBtn] = statusEl.querySelectorAll('button');
+  const drop = () => { try { localStorage.removeItem(keptKey()); } catch {} statusEl.textContent = ''; };
+  restoreBtn.onclick = () => {
+    drop();
+    doc.replaceChildren(clean(kept));
+    vizPaint(doc);
+    placeCards();
+    buildIndex();
+    save();
+  };
+  discardBtn.onclick = drop;
+}
+
+function leaving(e) {
+  if (!pending) {
+    if (inflight && e.type === 'beforeunload') e.preventDefault();
+    return;
+  }
+  clearTimeout(pending);
+  pending = null;
+  if (conflict) return keep();
+  const body = payload();
+  if (!inflight && new Blob([body]).size < 60000) return fetch(topicUrl(), { method: 'POST', body, keepalive: true });
+  pending = setTimeout(flush, 0);
+  if (e.type === 'beforeunload') e.preventDefault();
+}
+
 const topicSlug = new URLSearchParams(location.search).get('topic');
 topicSlug
   ? openTopic(topicSlug).catch(e => app.innerHTML =
-      `<div class="sheet"><h1>Could not open the topic</h1><p class="minor">${esc(e.message)}</p>
-       <p><a href="notes.html">Back</a></p></div>`)
+      `<div class="sheet"><h1>could not open the topic</h1><p class="minor">${esc(e.message)}</p>
+       <p><a href="notes.html">back</a></p></div>`)
   : menu();
 </script>

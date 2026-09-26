@@ -16,7 +16,6 @@
   .sec { font-size: 15px; color: var(--ink); margin: var(--spacing-64) 0 var(--spacing-16); scroll-margin-top: calc(var(--bar-h) + 1rem); }
   .sec::before { content: '## '; color: var(--color-steel); }
   .lead { color: var(--color-chalk); max-width: 62ch; }
-  .htop tbody tr { cursor: default; }
   .htop code { color: inherit; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
   .grid > div { background: var(--bg); padding: var(--spacing-24) var(--spacing-24) var(--spacing-24); display: grid; gap: .6rem; align-content: start; }
@@ -33,16 +32,17 @@
 const { app, tree, path } = mountShell('project');
 path('~/notes/README.md');
 
-const SECTIONS = [['name', 'name'], ['windows', 'three windows'], ['loop', 'the loop'], ['pieces', 'pieces'], ['principles', 'principles']];
-tree.innerHTML = `<details open class="current"><summary><span class="name">notes/</span><span class="count">${SECTIONS.length}</span></summary>
-  <ol>${SECTIONS.map(([id, label], i) => `<li><a href="#${id}"><span class="n">${i + 1}</span><span>${label}</span></a></li>`).join('')}</ol></details>`;
+const DOCS = 'https://selflearningplatform.github.io/docs/';
+const SECTIONS = [['name', 'name'], ['start', 'quick start'], ['how', 'how it works'], ['teacher', 'ai teacher'], ['topics', 'your topics'], ['principles', 'principles']];
+tree.innerHTML = folder('notes/', SECTIONS.length,
+  `<ol>${SECTIONS.map(([id, label], i) => `<li><a href="#${id}"><span class="n">${i + 1}</span><span>${label}</span></a></li>`).join('')}</ol>`, true);
 
 const rows = list => list.map(r => `<tr>${r.map((c, i) => `<td${i === r.length - 1 ? ' class="wide"' : ''}>${c}</td>`).join('')}</tr>`).join('');
-const table = (head, list) => `<table class="htop"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows(list)}</tbody></table>`;
+const table = (head, list) => `<table class="htop static"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows(list)}</tbody></table>`;
 
 app.innerHTML = `
   <div class="sheet">
-  <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/notes</span> <span class="p-sig">❯</span> cat README.md</p>
+  ${promptLine('~/notes', 'cat README.md')}
   <img class="brand lockup" src="/app/assets/lockup-horizontal.png" alt="独学 Self Learning Platform">
   <p class="tagline">an agent-powered hub for self-learners</p>
 
@@ -52,36 +52,51 @@ app.innerHTML = `
     <div><b>学</b><span>gaku · learning</span></div>
   </div>
   <p class="lead">独学 (dokugaku) is the Japanese word for self-study. SLP, the Self Learning Platform, is built for exactly that: one person, one topic, and the discipline to keep going. The agent teaches, quizzes and grades. The learning stays yours.</p>
-  <p class="lead">Everything you study is a topic: a book, a certification, a tool's docs, a course. SLP builds the full loop around it (preparation, practice, feedback, spaced review) and keeps it all as Markdown and JSON on your disk. No database, no account, no cloud.</p>
+  <p class="lead">Everything you study is a topic: a book, a certification, a tool's docs, a course. SLP builds preparation, practice, feedback and spaced review around it, and keeps it all as Markdown and JSON on your disk. No database, no account, no cloud.</p>
 
-  <h2 class="sec" id="windows">three windows</h2>
-  ${table(['#', 'WINDOW', 'USE'], [
-    ['1', 'material', 'the pdf, the course, the docs. whatever you are studying'],
-    ['2', 'app', 'this notebook and exam simulator at <code>localhost:8321</code>'],
-    ['3', 'agent', 'open at the repo root. teaches, builds exams, grades'],
+  <h2 class="sec" id="start">quick start</h2>
+  ${table(['#', 'STEP', 'HOW'], [
+    ['1', 'set up the agent', 'open your agent at the repo root: <code>Read AGENTS.md, then read agent/skills/slp-setup/SKILL.md and follow it.</code>'],
+    ['2', 'create a topic', '<code>/slp-init</code>. the agent interviews you and checks your level'],
+    ['3', 'study', '<code>/slp-session</code> at the start of every session. it tells you what is pending'],
   ])}
+  <p class="minor">// recommended setup: your material, this app and your agent side by side</p>
 
-  <h2 class="sec" id="loop">the loop</h2>
-  ${table(['COMMAND', 'STEP', 'WHAT IT DOES'], [
-    ['<code>/slp-init</code>', 'setup', 'interviews you, creates the topic, checks your level'],
-    ['<code>/slp-session</code>', 'plan', "what's pending today across every topic, and what to do"],
-    ['<code>/slp-teach</code>', 'prepare', 'teaches until it is understood, not memorized'],
-    ['<code>/slp-summarize</code>', 'prepare', 'summarizes material into the topic notes'],
-    ['<code>/slp-exam</code>', 'practice', 'builds an exam you sit in <code>2 exams</code>'],
-    ['<code>/slp-exercises</code>', 'practice', 'an applied exercise: code, an adr, a critique'],
-    ['<code>/slp-grade</code>', 'feedback', 'grades the attempt against a rubric'],
-    ['<code>/slp-review</code>', 'review', 'spaced, interleaved leitner review so it does not fade'],
-  ])}
-  <p class="minor">// everything they produce lands in topics/&lt;slug&gt;/ and shows up here on its own</p>
-
-  <h2 class="sec" id="pieces">pieces</h2>
+  <h2 class="sec" id="how">how it works</h2>
   ${table(['PATH', 'PIECE', 'ROLE'], [
-    ['<code>agent/skills/</code>', 'skills', 'the method: teach, build exams and exercises, grade, review'],
+    ['<code>agent/skills/</code>', 'skills', 'the method: teach, build exams, exercises and cards, grade, quiz'],
     ['<code>agent/agents/</code>', 'agents', 'a researcher that verifies before stating, a teacher per topic'],
-    ['<code>topics/&lt;slug&gt;/</code>', 'filesystem', 'notes in markdown, exams in json, attempts and progress'],
-    ['<code>app/</code>', 'app', 'local notebook and exam simulator, dictation, mermaid, latex'],
+    ['<code>topics/&lt;slug&gt;/</code>', 'filesystem', 'your study as markdown and json. no database'],
+    ['<code>app/</code>', 'app', 'notebook, exams and cards, with dictation, mermaid and latex. tracks your sessions'],
+  ])}
+  <p class="minor">// core: the app. notes, exams and cards are plain markdown and json you can write by hand. agent layer: teaching, grading, sessions and the wiki, on any model you plug in</p>
+
+  <h2 class="sec" id="teacher">ai teacher</h2>
+  ${table(['SKILL', 'STEP', 'WHAT IT DOES'], [
+    ['<code>/slp-setup</code>', 'setup', 'exposes the skills and agents to your agent'],
+    ['<code>/slp-init</code>', 'setup', 'creates a topic and runs the first quiz'],
+    ['<code>/slp-session</code>', 'plan', "what's pending today, and what to do"],
+    ['<code>/slp-summarize</code>', 'prepare', 'summarizes material into the topic notes'],
+    ['<code>/slp-teach</code>', 'prepare', 'teaches until it is understood, not memorized'],
+    ['<code>/slp-exercises</code>', 'practice', 'an applied exercise: code, an adr, a critique'],
+    ['<code>/slp-exam</code>', 'practice', 'builds an exam you sit in <code>2 exams</code>'],
+    ['<code>/slp-grade</code>', 'feedback', 'grades the attempt against a rubric'],
+    ['<code>/slp-cards</code>', 'review', 'flashcards from your notes, studied in <code>3 cards</code>'],
+    ['<code>/slp-quiz</code>', 'check', 'ping-pong quiz of your level, repeatable'],
   ])}
   <p class="minor">// any agent works: skills use SKILL.md, AGENTS.md explains the project</p>
+
+  <h2 class="sec" id="topics">your topics</h2>
+  ${table(['PATH', 'WHAT IT HOLDS'], [
+    ['<code>topic.json</code>', 'goals, languages, sources, routine'],
+    ['<code>learning.md</code>', 'mission, glossary, your mistakes'],
+    ['<code>notes/</code>', 'what you see in <code>1 notes</code>, one file per heading'],
+    ['<code>exams/ exercises/</code>', 'what you sit in <code>2 exams</code>, attempts and feedback'],
+    ['<code>cards/</code>', 'what you study in <code>3 cards</code>, and your reviews'],
+    ['<code>wiki/</code>', "the agent's map of the subject and what you studied"],
+    ['<code>progress/</code>', 'status, log and sessions'],
+  ])}
+  <p class="minor">// your topics are git-ignored. to keep them: git remote set-url origin &lt;your-repo&gt;</p>
 
   <h2 class="sec" id="principles">principles</h2>
   <div class="grid">
@@ -90,5 +105,6 @@ app.innerHTML = `
     <div><span class="k">渋い</span><strong>shibui<span>quiet beauty</span></strong><p>Understated. Nothing is decorated for its own sake.</p><span class="rule">hierarchy by lightness, not size</span></div>
     <div><span class="k">静寂</span><strong>seijaku<span>calm</span></strong><p>The interface stays silent while you study.</p><span class="rule">chrome lives in two bars</span></div>
   </div>
+  <p class="minor">// full documentation: <a href="${DOCS}overview">selflearningplatform.github.io/docs</a></p>
   <div class="tildes"></div></div>`;
 </script>

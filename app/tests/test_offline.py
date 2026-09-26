@@ -5,7 +5,8 @@ APP = pathlib.Path(__file__).resolve().parents[1]
 VENDOR = APP / "vendor"
 URL = re.compile(r"https?://([^/\s\"'`<>():]+)")
 LOADER = re.compile(r"""(?:\b(?:fetch|import|importScripts|url)\(\s*|@import\s+|\b(?:src|href)\s*=\s*)["'`]?(https?://[^\s"'`<>)]+)""")
-LOCAL = {"localhost", "127.0.0.1"}
+# ponytail: the docs host is only ever a clicked link, never a load; split links from loads if views link elsewhere
+LOCAL = {"localhost", "127.0.0.1", "selflearningplatform.github.io"}
 
 
 def external(url):

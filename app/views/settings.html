@@ -16,6 +16,7 @@
     background: var(--color-graphite); color: var(--ink); font: 400 13px/1.5 var(--mono);
   }
   .field input[type=text] { min-width: 0; flex: 1 1 24ch; }
+  .field input[type=color] { width: 4rem; height: 1.8rem; padding: .1rem; cursor: pointer; }
   .field :is(select, input, button.drop):focus { outline: 1px solid var(--accent); }
   .field button.drop { display: flex; gap: .5rem; align-items: center; }
   .field .hint { grid-column: 2; margin: 0; color: var(--muted); }
@@ -45,40 +46,45 @@ const field = (key, control, hint, id = 'set-' + key) => `
   </div>`;
 const select = (key, choices, value) => `<select id="set-${key}" data-key="${key}">${optionTags(choices, value)}</select>`;
 
-tree.innerHTML = `<details open class="current"><summary><span class="name">notes/</span><span class="count">1</span></summary>
-  <ul><li><a href="settings.html" aria-current="page"><span class="n">›</span><span>settings.json</span></a></li></ul></details>`;
+tree.innerHTML = folder('notes/', 1, '<ul><li><a href="settings.html" aria-current="page"><span class="n">›</span><span>settings.json</span></a></li></ul>', true);
 path('~/notes/settings.json');
 
 Promise.all([settings, fontChoices, api('/api/voice-models').catch(() => ({}))]).then(([s, fonts, sizes]) => {
-  const models = [['', 'default (turbo on Apple Silicon, small on CPU)'],
+  const models = [['', 'default (turbo on apple silicon, small on cpu)'],
     ...Object.entries(sizes).map(([k, m]) => [k, `${k} · ${m.disk} disk · ${m.ram} RAM`])];
   const isPath = s.voice_model && !(s.voice_model in sizes);
   if (isPath) models.push([s.voice_model, s.voice_model]);
   app.innerHTML = `
     <div class="sheet">
-    <p class="prompt"><span class="p-host">notes</span> <span class="p-dir">~/notes</span> <span class="p-sig">❯</span> nvim settings.json</p>
+    ${promptLine('~/notes', 'nvim settings.json')}
     <h1>Settings</h1>
     <p class="minor"># saved to settings.json at the repo root, on every change</p>
     ${field('profile', select('profile', [['auto', 'auto (recommended)'], ['online', 'online'], ['offline', 'offline']], s.profile),
-      `auto picks online when the server finds a connection at start, offline otherwise (now: ${s.active_profile || 'unknown'}). Online: paid agent, web lookups, models fetched when missing. Offline: everything on this machine, nothing is fetched.`)}
-    ${field('theme', select('theme', [['', 'auto (follows the OS)'], ...Object.entries(THEMES)], s.theme ?? ''), 'Colors of the whole app.')}
-    ${field('ui_font', select('ui_font', fonts, s.ui_font ?? 'mono'), 'Font of the whole app: bars, menus, pages. The note body has its own font, picked in the notes toolbar. If you need it bigger/smaller play with the zoom in your browser')}
-    ${field('voice_model', select('voice_model', models, s.voice_model ?? '') + key('⏎', 'download', 'voice-dl'),
-      'Dictation model. Bigger is more accurate and slower. download saves the selected size to models/, so it works offline. A size that is not downloaded is fetched on first use when online, and falls back to the OS dictation when offline.')}
+      `auto picks online when the server finds a connection at start, offline otherwise (now: ${esc(s.active_profile || 'unknown')}). online: paid agent, web lookups, models fetched when missing. offline: everything on this machine, nothing is fetched.`)}
+    ${field('theme', select('theme', THEME_CHOICES, THEMES[s.theme] ? s.theme : ''), 'colors of the whole app. auto follows the os: sumi when dark, kami when light.')}
+    ${field('theme_seed', `<input type="color" id="set-theme_seed" data-key="theme_seed" value="${esc(s.theme_seed || '#6f8fbf')}">`,
+      'one color for the seed theme; the app derives the ramp and accent from it. picking one switches the theme to seed.')}
+    ${field('ui_font', select('ui_font', fonts, s.ui_font ?? 'mono'), 'font of the whole app: bars, menus, pages. the note body has its own font, picked in the notes toolbar. size: use the zoom in the statusline.')}
+    ${field('dictation_key', `<input type="text" id="set-dictation_key" data-key="dictation_key" value="${esc(s.dictation_key || 'ctrl+m')}" spellcheck="false">`,
+      'shortcut that starts and stops dictation in notes, e.g. ctrl+m or alt+shift+d. meta (⌘) letters are taken by macos.')}
+    ${field('voice_model', select('voice_model', models, s.voice_model ?? '') + '<button type="button" class="voice-dl">download</button>',
+      'dictation model. bigger is more accurate and slower. download saves the selected size to models/, so it works offline. a size not downloaded is fetched on first use when online, and falls back to the os dictation when offline.')}
     ${field('model path', `<input type="text" id="model-path" placeholder="/path/to/a/whisper/model" value="${isPath ? esc(s.voice_model) : ''}">` + key('⏎', 'use path', 'voice-path'),
-      'A model folder you already have (MLX for Apple Silicon, CTranslate2 elsewhere). Used as-is, never downloaded.', 'model-path')}
+      'a model folder you already have (mlx on apple silicon, ctranslate2 elsewhere). used as-is, never downloaded.', 'model-path')}
     ${field('upload font', '<input type="file" id="font-file" accept=".woff2,.ttf,.otf">',
-      'A .woff2, .ttf or .otf file, stored in fonts/ as a lowercase name with dashes for spaces. A font with the same name is refused.', 'font-file')}
+      'a .woff2, .ttf or .otf file, stored in fonts/ as a lowercase name with dashes for spaces. a font with the same name is refused.', 'font-file')}
     <div class="tildes"></div></div>`;
 
-  app.querySelectorAll('[data-key]').forEach(sel => sel.onchange = () =>
-    run('saving…', () => saveSettings({ [sel.dataset.key]: sel.value })));
+  app.querySelectorAll('[data-key]').forEach(el => el.onchange = () =>
+    run('saving…', () => saveSettings(el.dataset.key === 'theme_seed' ? { theme_seed: el.value, theme: 'seed' } : { [el.dataset.key]: el.value.trim() })));
   app.querySelectorAll('select').forEach(dropdown);
+  addEventListener('settings-applied', e => {
+    document.getElementById('set-theme').value = THEMES[e.detail.theme] ? e.detail.theme : '';
+  });
 
   const modelSel = document.getElementById('set-voice_model');
-  const download = () => run('downloading…', () => api('/api/voice-model/download', JSON.stringify({ size: modelSel.value })))
+  app.querySelector('.voice-dl').onclick = () => run('downloading…', () => api('/api/voice-model/download', JSON.stringify({ size: modelSel.value })))
     .then(ok => ok && location.reload());
-  app.querySelector('.voice-dl').onclick = download;
 
   const pathInput = document.getElementById('model-path');
   const usePath = () => run('saving…', () => saveSettings({ voice_model: pathInput.value.trim() }))
@@ -86,8 +92,9 @@ Promise.all([settings, fontChoices, api('/api/voice-models').catch(() => ({}))])
   app.querySelector('.voice-path').onclick = usePath;
   pathInput.onkeydown = e => { if (e.key === 'Enter') usePath(); };
 
-  document.getElementById('font-file').onchange = e =>
-    run('uploading…', () => api('/api/font?name=' + encodeURIComponent(e.target.files[0].name), e.target.files[0]))
-      .then(ok => ok && location.reload());
+  document.getElementById('font-file').onchange = e => {
+    const f = e.target.files[0];
+    if (f) run('uploading…', () => api('/api/font?name=' + encodeURIComponent(f.name), f)).then(ok => ok && location.reload());
+  };
 });
 </script>
