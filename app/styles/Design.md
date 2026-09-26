@@ -138,7 +138,7 @@ A palette is `{ name, dark, colors }`, `colors` holding `void`…`paper`, `accen
 
 The themes settings page generates a palette into 19 color inputs, lets the user change any of them, and saves it to `theme.custom` in `settings.json`. The server checks every custom theme (name `[a-z0-9-]`, up to 24, not a built-in, exact color keys, lowercase hex) and that the active theme exists.
 
-Highlight colors for marks (`PALETTE` in `notes.html`) are fixed hexes stored in the `.md` (`--c:#d8c06a`), so they look the same in every theme and in Obsidian, and the swatches show those real colors. Old notes that stored `var(--ansi-x, #hex)` are converted to the plain hex when opened.
+Highlight colors for marks (`PALETTE` in `notes.html`) are fixed hexes, plus the user's own hexes from `global.mark_colors` in `settings.json`. Every mark color is stored in the `.md` as a hex (`--c:#d8c06a`), so they look the same in every theme and in Obsidian, and the swatches show those real colors. Old notes that stored `var(--ansi-x, #hex)` are converted to the plain hex when opened.
 
 ## Typography
 

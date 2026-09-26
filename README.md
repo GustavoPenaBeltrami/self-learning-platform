@@ -18,13 +18,23 @@
 
 SLP is a self-hosted study environment you fully own: it runs on your machine, needs no subscription, and works with any agent and any model, local or paid.
 
-Reading is not learning. You learn when you express the material again and again, with someone pointing out your mistakes. SLP gives you that someone: an agent that teaches, quizzes, grades and brings your mistakes back before you forget them, plus a local app to take notes and sit exams.
+Full documentation: [selflearningplatform.github.io/docs](https://selflearningplatform.github.io/docs/overview), also as [`llms.txt`](https://selflearningplatform.github.io/llms.txt). Each section below is a short version of a docs section.
 
-**Full documentation: [selflearningplatform.github.io/docs](https://selflearningplatform.github.io/docs/overview)** · also as [`llms.txt`](https://selflearningplatform.github.io/llms.txt)
+## Introduction
 
-## Quick start
+### [Overview](https://selflearningplatform.github.io/docs/overview)
 
-You only need [uv](https://docs.astral.sh/uv/). It fetches Python and the packages.
+Reading is not learning. You learn when you express the material again and again, with someone pointing out your mistakes. SLP gives you that someone: an agent that teaches, quizzes, grades and brings your mistakes back before you forget them, plus a local app to take notes, sit exams and study cards.
+
+SLP has two layers. The core is the app and your files: notes, exams, cards and session tracking. It works without an agent or a model, and every file is plain JSON or Markdown you can write by hand. The agent layer is optional: skills that teach, grade, give feedback and keep your progress and the wiki, on whatever model you plug in.
+
+### [Prerequisites](https://selflearningplatform.github.io/docs/prerequisites)
+
+Required: [uv](https://docs.astral.sh/uv/), which installs Python and the packages, and an internet connection the first time you run the app.
+
+Recommended: [Claude Code](https://claude.com/claude-code) as the agent (any agent works), [VS Code](https://code.visualstudio.com/) to read the topic files and run the agent, [GitHub](https://github.com/) to keep your topics in a private repo, and [git](https://git-scm.com/) to clone this one.
+
+### [Installation](https://selflearningplatform.github.io/docs/install)
 
 ```sh
 curl -LsSf https://astral.sh/uv/install.sh | sh    # Windows: see the installation docs
@@ -33,86 +43,78 @@ cd self-learning-platform
 uv run slp
 ```
 
-Then open your agent ([Claude Code](https://claude.com/claude-code) recommended, any works) at the repo root:
+Recommended setup: your material, the app and the agent side by side.
+
+### [Getting started](https://selflearningplatform.github.io/docs/getting-started)
+
+Open your agent at the repo root and send:
 
 ```
 Read AGENTS.md, then read agent/skills/slp-setup/SKILL.md and follow it.
 ```
 
-1. `/slp-init`: create a topic. The agent interviews you and checks your level
-2. `/slp-session`: start every study session here. It tells you what's pending, makes sense of the sessions the app recorded and shows what's missing when you finish a unit
+Then run `/slp-init` to create a topic. The agent interviews you and checks your level. Start every study session with `/slp-session`: it tells you what's pending and hands off to the right skill.
 
-Recommended setup: three windows side by side, your material, the app and the agent. More in [installation](https://selflearningplatform.github.io/docs/install) and [getting started](https://selflearningplatform.github.io/docs/getting-started).
+## [AI teacher](https://selflearningplatform.github.io/docs/ai-teacher)
 
-## How it works
-
-```
-self-learning-platform/
-├── AGENTS.md    # read by any agent
-├── agent/
-│   ├── skills/     # the method: slp-*/SKILL.md
-│   ├── agents/     # researcher, teacher-<slug> personas
-│   └── reference/  # shared file formats, source rules, question rules
-├── app/         # local notebook and exam simulator
-└── topics/      # your study, as Markdown and JSON. No database
-```
-
-- **core**: the app, your notes, exams, cards and session tracking. Works without an agent or a model, and every file is plain JSON or Markdown you can write by hand
-- **agent layer** (optional): skills that guide the process and bring the judgment (teaching, grading, feedback, progress, the wiki), on whatever model you plug in
-
-## AI teacher
+The agent plays the teacher. It explains from what you already know, grades against a rubric and writes down your mistakes so they come back. The method lives in [skills](https://selflearningplatform.github.io/docs/skills) in the Agent Skills format, so they work with Claude Code, Codex, Gemini CLI, Cursor, opencode and others, on a cloud model or a local one via Ollama. `slp-setup` and `slp-init` are manual: they run only when you call them.
 
 | Skill | Step | What it does |
 |---|---|---|
-| [`/slp-setup`](https://selflearningplatform.github.io/docs/slp-setup) | setup | Exposes the skills and agents to your agent |
-| [`/slp-init`](https://selflearningplatform.github.io/docs/slp-init) | setup | Creates a topic and checks your level |
-| [`/slp-session`](https://selflearningplatform.github.io/docs/slp-session) | plan | What's pending today; validates recorded sessions and feeds the wiki |
-| [`/slp-quiz`](agent/skills/slp-quiz/SKILL.md) | control | Repeatable level quiz: the same bank, ping-pong in the chat |
+| [`/slp-session`](https://selflearningplatform.github.io/docs/slp-session) | plan | What's pending today. Validates the sessions the app recorded and feeds the wiki |
+| [`/slp-setup`](https://selflearningplatform.github.io/docs/slp-setup) | setup, manual | Exposes the skills and agents to your agent |
+| [`/slp-init`](https://selflearningplatform.github.io/docs/slp-init) | setup, manual | Creates a topic and checks your level |
 | [`/slp-summarize`](https://selflearningplatform.github.io/docs/slp-summarize) | prepare | Summarizes material into the topic's notes and wiki |
-| [`/slp-teach`](https://selflearningplatform.github.io/docs/slp-teach) | prepare | Teaches until it's understood, not memorized, and writes the note and wiki |
+| [`/slp-teach`](https://selflearningplatform.github.io/docs/slp-teach) | prepare | Teaches until you understand, and writes the note and the wiki |
 | [`/slp-exercises`](https://selflearningplatform.github.io/docs/slp-exercises) | practice | An applied exercise: code, an ADR, a critique |
 | [`/slp-exam`](https://selflearningplatform.github.io/docs/slp-exam) | practice | Builds an exam you sit in the app |
-| [`/slp-grade`](https://selflearningplatform.github.io/docs/slp-grade) | feedback | Grades the attempt against a rubric |
-| [`/slp-cards`](agent/skills/slp-cards/SKILL.md) | review | Flashcards from your notes, studied in the app |
+| [`/slp-grade`](https://selflearningplatform.github.io/docs/slp-grade) | feedback | Grades an attempt against a rubric |
+| [`/slp-quiz`](https://selflearningplatform.github.io/docs/slp-quiz) | control | A repeatable level quiz in the chat, from the same bank each time |
+| [`/slp-cards`](https://selflearningplatform.github.io/docs/slp-cards) | review | Flashcards from your notes, studied in the app |
 
-Study sessions are tracked by the app behind the scenes: any activity in a topic opens one, 30 idle minutes close it, and the statusline has a start/stop control. Each session is a time block with a list of activities (reading, teaching, cards, exam…) in `progress/sessions.jsonl`. At the next `slp-session` the agent validates it: fixes an end that doesn't match your last activity and turns the notes you wrote into progress. Each topic also keeps a **wiki**: the agent's map of concepts, dependencies and sources in the [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf), with which concepts you studied and when. File formats: [`agent/reference/formats.md`](agent/reference/formats.md).
+The [researcher](https://selflearningplatform.github.io/docs/researcher) agent verifies facts with sources, and each topic can have a [teacher-\<slug>](https://selflearningplatform.github.io/docs/teacher) persona the agent adopts while teaching. [Profiles](https://selflearningplatform.github.io/docs/profiles) set whether the agent layer and dictation run online or offline.
 
-Skills use the Agent Skills format, so they work with Claude Code, Codex, Gemini CLI, Cursor, opencode and others, with a cloud model or a local one via Ollama. See [skills](https://selflearningplatform.github.io/docs/skills) and [profiles](https://selflearningplatform.github.io/docs/profiles).
-
-## Visual interface
+## [Visual interface](https://selflearningplatform.github.io/docs/deploy)
 
 `uv run slp` serves the app at `http://localhost:8321`, local only.
 
-- **[notes](https://selflearningplatform.github.io/docs/editor)**: a notebook per topic, saved as Markdown as you type. Tables, Mermaid, LaTeX and images. Upload sources to the topic and open local `path` sources from the app
-- **[exams](https://selflearningplatform.github.io/docs/exam-app)**: sit exams built by the agent: multiple choice, open, practical and oral
-- **cards** (`3 cards` tab): study flashcards from your notes, one concept each, written by `/slp-cards` or by hand (`N` in the cards view, or select text in a note). Answer to yourself, click the card to reveal it, then "knew it", "don't know" or **unsure**: unsure cards wait for `/slp-session` to go over them with you. Leitner scheduling shows only the due ones, with growing waits (set in settings → cards) until a card counts as learned
-- **[dictation](https://selflearningplatform.github.io/docs/dictation)**: speak your notes or oral answers. Runs locally with Whisper, on a key you choose (`ctrl+m` by default)
-- **[settings](https://selflearningplatform.github.io/docs/settings)**: profile, fonts, and themes: six built in, or your own, generated from one color and tweaked color by color. Plus slash commands and keyboard [shortcuts](https://selflearningplatform.github.io/docs/shortcuts)
+- [notes](https://selflearningplatform.github.io/docs/editor): a notebook per topic, saved as Markdown as you type, with tables, Mermaid, LaTeX and images. You can upload sources and open local ones from here
+- [exams](https://selflearningplatform.github.io/docs/exam-app): sit the exams the agent builds: multiple choice, open, practical and oral
+- [cards](https://selflearningplatform.github.io/docs/cards-app): study flashcards with Leitner scheduling. Mark a card unsure and `/slp-session` goes over it with you
+- [settings](https://selflearningplatform.github.io/docs/settings): profile, fonts, and themes, built in or generated from one color
+- [dictation](https://selflearningplatform.github.io/docs/dictation): speak your notes or oral answers, transcribed locally with Whisper
+- [shortcuts](https://selflearningplatform.github.io/docs/shortcuts): keyboard shortcuts for every view, dictation key included
 
-## Your topics
+The app also records your study sessions: any activity in a topic opens one and 30 idle minutes close it.
 
-Everything you study is a topic, and everything a topic holds is plain files you own:
+## [Filesystem](https://selflearningplatform.github.io/docs/topics)
+
+Everything you study is a topic, and a topic is plain files you own. There is no database.
 
 ```
 topics/<slug>/
 ├── topic.json    # goals, languages, sources, routine
 ├── learning.md   # mission, glossary, your mistakes
-├── notes/  cards/  exams/  exercises/  resources/
-├── wiki/         # the agent's map of the subject (OKF)
-└── progress/     # status, log, sessions.jsonl
+├── notes/  exams/  exercises/  cards/  resources/
+├── wiki/         # the agent's map of the subject
+└── progress/     # status.md, log.md, sessions.jsonl
 ```
 
-Your topics are git-ignored; `topics/example/` shows the shape. To keep them, point the repo at your own: `git remote set-url origin <your-repo>`. See [filesystem](https://selflearningplatform.github.io/docs/topics).
+Pages per file and folder: [topic.json](https://selflearningplatform.github.io/docs/topic-json), [learning.md](https://selflearningplatform.github.io/docs/learning-md), [notes/](https://selflearningplatform.github.io/docs/notes), [exams/](https://selflearningplatform.github.io/docs/exams), [exercises/](https://selflearningplatform.github.io/docs/exercises), [cards/](https://selflearningplatform.github.io/docs/cards), [wiki/](https://selflearningplatform.github.io/docs/wiki), [progress/](https://selflearningplatform.github.io/docs/progress), [settings.json](https://selflearningplatform.github.io/docs/settings-json), [agent/](https://selflearningplatform.github.io/docs/agent-dir).
 
-## Roadmap
+Your topics are git-ignored and `topics/example/` shows the shape. To keep them, point the repo at your own: `git remote set-url origin <your-repo>`.
 
-Study time from the session log in the app, wiki linting, and more agents and local models tested. See the [roadmap](https://selflearningplatform.github.io/docs/roadmap).
+## Project
 
-## Contributing
+### [Contributing](https://selflearningplatform.github.io/docs/contributing)
 
-Contributions are welcome: fork, branch, pull request. Skills are edited in `agent/skills/`, never inside an agent's own folder. Bugs and ideas: [open an issue](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues/new).
+Contributions are welcome: fork, branch, pull request. Edit skills in `agent/skills/`, never inside an agent's own folder. For bugs and ideas, [open an issue](https://github.com/GustavoPenaBeltrami/self-learning-platform/issues/new).
 
 Thanks to [amosblomqvist/learn](https://github.com/amosblomqvist/learn) for the method behind `slp-teach` and to [Matt Pocock](https://github.com/mattpocock) for per-topic memory.
+
+### [Roadmap](https://selflearningplatform.github.io/docs/roadmap)
+
+Still pending: testing `slp-setup` on more agents, native dictation on Windows ARM, and keeping nested lists when notes are saved.
 
 ## License
 
