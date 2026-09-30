@@ -1,4 +1,4 @@
-import base64, datetime, hashlib, json, mimetypes, os, pathlib, re, time, urllib.parse
+import base64, datetime, hashlib, json, mimetypes, os, pathlib, re, shutil, time, urllib.parse
 
 import text
 
@@ -90,6 +90,9 @@ SHORTCUTS = {
     "exam.record": ("r", "exam"),
     "exam.write": ("t", "exam"),
     "exam.retake": ("enter", "exam.results"),
+    "exercise.submit": ("meta+enter", "exercise"),
+    "exercise.image": ("ctrl+i", "exercise"),
+    "exercise.again": ("enter", "exercise.done"),
     "cards.due": ("enter", "cards.sets cards.list"),
     "cards.all": ("a", "cards.sets cards.empty cards.list cards.study"),
     "cards.newset": ("c", "cards.sets"),
@@ -277,7 +280,8 @@ def meta(d):
             "type": saved.get("type", "book"),
             "order": order,
             "links": saved.get("links", []),
-            "language": saved.get("language", {})}
+            "language": saved.get("language", {}),
+            **{k: saved[k] for k in EDITABLE if k in saved and k not in ("title", "subtitle", "type", "order", "links", "language")}}
 
 
 def topic_url(d, *parts):
@@ -315,7 +319,7 @@ def sort_topics(items):
 
 
 IMG_TYPES = {"png": ".png", "jpeg": ".jpg", "jpg": ".jpg", "gif": ".gif", "webp": ".webp", "avif": ".avif"}
-IMG_UPLOAD = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
+IMG_UPLOAD = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp", "image/avif": ".avif"}
 IMG_NAME = re.compile(r"^[0-9a-f]{16}\.[a-z]+$")
 IMG_GRACE = 600   # ponytail: unreferenced images younger than 10 min survive gc, so an upload racing a stale autosave isn't lost
 
@@ -340,13 +344,17 @@ def store_image(dest, raw, ext):
     return name
 
 
-def save_image(slug, mime, raw):
+def upload_image(dest, mime, raw):
     ext = IMG_UPLOAD.get(mime.split(";")[0].strip().lower())
     if not ext:
         raise ValueError("image type not allowed: " + mime)
     if not raw:
         raise ValueError("empty image")
-    name = store_image(folder(slug) / "notes" / "img", raw, ext)
+    return store_image(dest, raw, ext)
+
+
+def save_image(slug, mime, raw):
+    name = upload_image(folder(slug) / "notes" / "img", mime, raw)
     return {"src": f"/topics/{urllib.parse.quote(slug)}/notes/img/{name}"}
 
 
@@ -416,13 +424,108 @@ def check_links(links):
     return links
 
 
+TYPES = ("book", "certification", "documentation", "course", "practice")
+SOURCES_MODES = ("web", "local", "both")
+EDITABLE = ("title", "subtitle", "type", "area", "order", "goals", "reason", "language", "routine", "end_date", "sources_mode", "links")
+STRINGS = ("title", "subtitle", "area", "reason")
+
+
+def str_dict(v, keys, name):
+    if not isinstance(v, dict) or set(v) - set(keys) or not all(isinstance(v.get(k, ""), str) for k in keys):
+        raise ValueError(f"{name} must be an object with string fields {', '.join(keys)}")
+    return {k: v.get(k, "") for k in keys}
+
+
 def topic_meta(data):
-    fields = {k: data[k] for k in ("title", "subtitle") if k in data}
-    if not all(isinstance(v, str) for v in fields.values()):
-        raise ValueError("title and subtitle must be strings")
-    if "links" in data:
-        fields["links"] = check_links(data["links"])
+    fields = {k: data[k] for k in EDITABLE if k in data}
+    if not all(isinstance(fields[k], str) for k in STRINGS if k in fields):
+        raise ValueError(", ".join(STRINGS) + " must be strings")
+    if "type" in fields and fields["type"] not in TYPES:
+        raise ValueError("type must be one of " + ", ".join(TYPES))
+    if "sources_mode" in fields and fields["sources_mode"] not in SOURCES_MODES:
+        raise ValueError("sources_mode must be one of " + ", ".join(SOURCES_MODES))
+    if "order" in fields and (type(fields["order"]) is not int or not 1 <= fields["order"] <= 999):
+        raise ValueError("order must be an integer from 1 to 999")
+    if "end_date" in fields and not (isinstance(fields["end_date"], str) and re.fullmatch(r"(\d{4}-\d{2}-\d{2})?", fields["end_date"])):
+        raise ValueError("end_date must be YYYY-MM-DD or empty")
+    if "goals" in fields:
+        g = fields["goals"]
+        if not isinstance(g, list) or len(g) > 3 or not all(isinstance(x, str) and x.strip() for x in g):
+            raise ValueError("goals must be a list of up to 3 non-empty strings")
+    if "language" in fields:
+        fields["language"] = str_dict(fields["language"], ("source", "notes", "exams"), "language")
+    if "routine" in fields:
+        fields["routine"] = str_dict(fields["routine"], ("cadence", "session"), "routine")
+    if "links" in fields:
+        fields["links"] = check_links(fields["links"])
     return fields
+
+
+def learning_md(title, fields):
+    mission = "\n".join(filter(None, [fields.get("reason", "")] + ["- " + g for g in fields.get("goals", [])]))
+    return f"# Learning — {title}\n\n## Mission\n\n{mission}\n\n## Glossary\n\n## Record\n"
+
+
+LOG_MD = """
+## Reading
+| Date | Unit | Summary | Exam (score) |
+|------|------|---------|--------------|
+
+## Exams
+| Date | Exam | MC | Rubric | Attempt |
+|------|------|----|--------|---------|
+
+## Exercises
+| Date | Exercise | Format | Criteria | Attempt |
+|------|----------|--------|----------|---------|
+
+## Quizzes
+| Date | Edges | Attempt |
+|------|-------|---------|
+"""
+
+
+def create_topic(data, units=()):
+    if not isinstance(units, (list, tuple)) or not all(isinstance(u, str) for u in units):
+        raise ValueError("units must be a list of strings")
+    fields = topic_meta(data)
+    if not fields.get("title", "").strip():
+        raise ValueError("a topic needs a title")
+    slug = text.slug(fields["title"], "")
+    if not slug:
+        raise ValueError("the title needs at least one letter or digit")
+    d = TOPICS / slug
+    if d.exists():
+        raise Conflict(f"a topic named {slug} already exists")
+    taken = [meta(t)["order"] for t in topic_dirs()]
+    fields.setdefault("order", min(999, max([o for o in taken if o < 999] or [0]) + 1))
+    title = fields["title"]
+    body = {"title": title, "subtitle": "", "type": "book", "area": "", "order": fields["order"], "goals": [], "reason": "",
+            "language": {"source": "", "notes": "", "exams": ""}, "routine": {"cadence": "", "session": ""},
+            "end_date": "", "sources_mode": "both", "links": [], **fields}
+    for sub in ("resources", "notes", "exams", "exercises", "wiki", "progress"):
+        (d / sub).mkdir(parents=True)
+    write_json(d / "topic.json", body)
+    write_bytes(d / "learning.md", learning_md(title, body).encode())
+    write_bytes(d / "wiki" / "index.md", b'---\nokf_version: "0.2"\n---\n# Concepts\n\n# Sources\n')
+    up_next = "".join(f"- [ ] {u}\n" for u in units if u.strip()) or "- [ ] …\n"
+    write_bytes(d / "progress" / "status.md", (f"# Status — {title}\n\n**Updated:** {now('%Y-%m-%d')}\n\n"
+        f"- **Current unit:** —\n- **Summary written:** no\n- **Next exam:** —\n\n## Up next\n{up_next}").encode())
+    write_bytes(d / "progress" / "log.md", (f"# Log — {title}\n" + LOG_MD).encode())
+    write_bytes(d / "progress" / "sessions.jsonl", b"")
+    return {"ok": True, "slug": slug}
+
+
+def delete_topics(slugs):
+    if not isinstance(slugs, list) or not slugs or not all(isinstance(s, str) for s in slugs):
+        raise ValueError("delete needs a non-empty list of topic slugs")
+    dirs = [folder(s) for s in slugs]
+    for d in dirs:
+        if d.is_symlink():
+            d.unlink()
+        else:
+            shutil.rmtree(d)
+    return {"ok": True, "deleted": [d.name for d in dirs]}
 
 
 def write_sections(notes, html):
@@ -525,9 +628,9 @@ def check_answers(answers, questions):
     return sorted(answers, key=lambda a: a["i"])
 
 
-def free_stem(attempts, date):
+def free_stem(attempts, date, ext=".json"):
     stem, n = date, 1
-    while (attempts / (stem + ".json")).exists():
+    while (attempts / (stem + ext)).exists():
         n += 1
         stem = f"{date}-{n}"
     return stem
@@ -551,9 +654,212 @@ def save_attempt(slug, exam, answers):
             write_bytes(attempts / a["audio"], raw)
     path = attempts / (stem + ".json")
     write_json(path, {"exam": exam, "answers": answers})
+    (c / "draft.json").unlink(missing_ok=True)
     log_activity(slug, "quiz" if read_json(c / "exam.json").get("kind") == "quiz" else "exam", "exams/" + exam)
     return "topics/" + path.relative_to(TOPICS).as_posix()
 
+
+def exercise_folder(d, name):
+    c = d / "exercises" / str(name)
+    if not EXAM_NAME.fullmatch(str(name)) or not (c / "prompt.md").is_file():
+        raise NotFound("no such exercise: " + str(name))
+    return c
+
+
+def header_field(md, label):
+    m = re.search(rf"\*\*{label}:\*\*\s*([^·\n]*)", md)
+    return m.group(1).strip() if m else ""
+
+
+def exercise_row(p):
+    md = p.read_text(encoding="utf-8")
+    h1 = next((l[2:].strip() for l in md.splitlines() if l.startswith("# ")), "")
+    title = re.sub(r"^Exercise\s*[—–-]\s*", "", h1) or p.parent.name
+    attempts = [a for a in sorted((p.parent / "attempts").glob("*"))
+                if a.is_file() and not a.name.startswith(".") and not a.name.endswith((".feedback.md", ".tmp"))]
+    return {"name": p.parent.name, "title": title, "format": header_field(md, "Format"), "unit": header_field(md, "Unit"),
+            "prompt": md, "attempts": len(attempts),
+            "pending": sum(not a.with_name(a.name.split(".")[0] + ".feedback.md").is_file() for a in attempts)}
+
+
+def exercise_index():
+    return {"topics": sort_topics([{**topic_row(d), "exercises": [exercise_row(p) for p in sorted((d / "exercises").glob("*/prompt.md"))
+                                                                   if EXAM_NAME.fullmatch(p.parent.name)]}
+                                   for d in topic_dirs()])}
+
+
+def save_exercise_attempt(slug, name, md):
+    d = folder(slug)
+    c = exercise_folder(d, name)
+    if not isinstance(md, str) or not md.strip():
+        raise ValueError("the attempt text cannot be empty")
+    md = md.replace(topic_url(d, "exercises", name, "img") + "/", "img/")
+    for ref in re.findall(r"!\[[^\]]*\]\(\s*<?(img/[^)\s>]*)", md):
+        f = ref[4:]
+        if not IMG_NAME.match(f) or not (c / "img" / f).is_file():
+            raise ValueError("image not found in this exercise: " + ref)
+    attempts = c / "attempts"
+    attempts.mkdir(exist_ok=True)
+    path = attempts / (free_stem(attempts, now("%Y-%m-%dT%H%M"), ".md") + ".md")
+    write_bytes(path, md.encode())
+    (c / "draft.json").unlink(missing_ok=True)
+    log_activity(slug, "practice", "exercises/" + name)
+    return "topics/" + path.relative_to(TOPICS).as_posix()
+
+
+def save_exercise_image(slug, name, mime, raw):
+    d = folder(slug)
+    f = upload_image(exercise_folder(d, name) / "img", mime, raw)
+    return {"src": topic_url(d, "exercises", name, "img", f)}
+
+
+DRAFT_LIMIT = 2 * 1024 * 1024
+
+
+def draft_file(slug, kind, name):
+    d = folder(slug)
+    if kind == "exam":
+        return exam_folder(d, name) / "draft.json"
+    if kind == "exercise":
+        return exercise_folder(d, name) / "draft.json"
+    raise NotFound("draft kind must be exam or exercise: " + str(kind))
+
+
+def read_draft(slug, kind, name):
+    saved = read_json(draft_file(slug, kind, name))
+    return {"data": saved.get("data"), "saved": saved.get("saved")} if isinstance(saved.get("data"), dict) else {"data": None}
+
+
+def save_draft(slug, kind, name, data):
+    f = draft_file(slug, kind, name)
+    if not isinstance(data, dict):
+        raise ValueError("draft data must be a JSON object")
+    body = {"data": data, "saved": datetime.datetime.now().isoformat(timespec="seconds")}
+    raw = (json.dumps(body, ensure_ascii=False) + "\n").encode()
+    if len(raw) > DRAFT_LIMIT:
+        raise ValueError("draft too large")
+    write_bytes(f, raw)
+    return body
+
+
+def delete_draft(slug, kind, name):
+    draft_file(slug, kind, name).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+
+EXAM_TYPES = ("multiple_choice", "open", "oral", "practical")
+EXAM_KEYS = {"title", "kind", "questions"}
+QUESTION_KEYS = {"multiple_choice": {"type", "q", "options", "answer", "explanation"},
+                 **{t: {"type", "q", "rubric"} for t in EXAM_TYPES[1:]}}
+EXAM_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+KEBAB = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
+
+
+def filled(v):
+    return isinstance(v, str) and bool(v.strip())
+
+
+def exam_errors(exam):
+    if not isinstance(exam, dict):
+        return ["the exam must be a JSON object"]
+    errs = [f"unknown field {k!r}" for k in sorted(set(exam) - EXAM_KEYS)]
+    if not filled(exam.get("title")):
+        errs.append("title is required")
+    quiz = "kind" in exam
+    if quiz and exam["kind"] != "quiz":
+        errs.append('kind must be "quiz" or missing')
+    qs = exam.get("questions")
+    if not isinstance(qs, list) or not qs:
+        return errs + ["questions must be a non-empty list"]
+    for n, q in enumerate(qs, 1):
+        at = f"question {n}: "
+        if not isinstance(q, dict):
+            errs.append(at + "must be an object")
+            continue
+        t = q.get("type", "multiple_choice")
+        if t not in EXAM_TYPES:
+            errs.append(at + "type must be one of " + ", ".join(EXAM_TYPES))
+            continue
+        allowed = QUESTION_KEYS[t] | ({"thread", "level"} if quiz else set())
+        errs += [at + f"unknown field {k!r} for {t}" for k in sorted(set(q) - allowed)]
+        if not filled(q.get("q")):
+            errs.append(at + "q is required")
+        if t == "multiple_choice":
+            opts = q.get("options")
+            if not isinstance(opts, list) or len(opts) != 4 or not all(filled(o) for o in opts):
+                errs.append(at + "needs exactly 4 non-empty options")
+            elif len({o.strip().lower() for o in opts}) < 4:
+                errs.append(at + "options must be different")
+            if type(q.get("answer")) is not int or not 0 <= q["answer"] <= 3:
+                errs.append(at + "answer must be the 0-based index of the right option (0-3)")
+            if not filled(q.get("explanation")):
+                errs.append(at + "explanation is required")
+        else:
+            r = q.get("rubric")
+            if not isinstance(r, list) or not 3 <= len(r) <= 5 or not all(filled(x) for x in r):
+                errs.append(at + "rubric needs 3 to 5 non-empty points")
+        if quiz:
+            if not (isinstance(q.get("thread"), str) and KEBAB.fullmatch(q["thread"])):
+                errs.append(at + "thread must be kebab-case")
+            if type(q.get("level")) is not int or not 1 <= q["level"] <= 5:
+                errs.append(at + "level must be an integer from 1 to 5")
+    return errs
+
+
+def check_exam(exam):
+    errs = exam_errors(exam)
+    if errs:
+        raise ValueError("; ".join(errs))
+
+
+def next_exam_name(d, title):
+    nums = [int(m.group()) for f in (d / "exams").glob("*/exam.json") if (m := re.match(r"\d+", f.parent.name))]
+    return f"{max(nums, default=0) + 1:02d}-{text.slug(title, 'exam')[:40].strip('-')}"
+
+
+def exam_shape_errors(exam):
+    if not isinstance(exam, dict) or not isinstance(exam.get("title", ""), str) or not isinstance(exam.get("questions"), list):
+        return ["the exam needs a string title and a questions list"]
+    errs = []
+    for n, q in enumerate(exam["questions"], 1):
+        if not isinstance(q, dict) or q.get("type", "multiple_choice") not in EXAM_TYPES or not isinstance(q.get("q", ""), str):
+            errs.append(f"question {n}: needs a string q and a type among " + ", ".join(EXAM_TYPES))
+        elif q.get("type", "multiple_choice") == "multiple_choice" and not (
+                isinstance(q.get("options"), list) and all(isinstance(o, str) for o in q["options"])):
+            errs.append(f"question {n}: options must be a list of strings")
+    return errs
+
+
+def save_exam(slug, data):
+    d = folder(slug)
+    if not isinstance(data, dict):
+        raise ValueError("save must be an object")
+    exam, create = data.get("exam"), data.get("create") is True
+    errs = exam_shape_errors(exam)   # ponytail: the app only guards what it needs to render; exam_errors is the standard for agent-written exams
+    if errs:
+        raise ValueError("; ".join(errs))
+    name = data.get("name") or ("quiz" if exam.get("kind") == "quiz" else next_exam_name(d, exam.get("title", ""))) if create else data.get("name")
+    if not isinstance(name, str) or not EXAM_NAME.fullmatch(name):
+        raise ValueError("exam name must be kebab-case: " + repr(name))
+    c = d / "exams" / name
+    if create and c.exists():
+        raise Conflict(f"an exam named {name} already exists")
+    if not create:
+        exam_folder(d, name)
+    c.mkdir(parents=True, exist_ok=True)
+    write_json(c / "exam.json", exam)
+    return {"ok": True, "name": name}
+
+
+def delete_exams(slug, names):
+    d = folder(slug)
+    if not isinstance(names, list) or not names:
+        raise ValueError("delete needs a non-empty list of exam names")
+    dirs = [exam_folder(d, n) for n in names]
+    for c in dirs:
+        shutil.rmtree(c)
+    return {"ok": True, "deleted": [c.name for c in dirs]}
 
 def read_jsonl(f):
     try:
@@ -792,12 +1098,21 @@ def read_deck(slug):
     d = folder(slug)
     cards = deck(d)
     return {"slug": slug, "title": meta(d)["title"], "cards": cards, "sets": card_sets(d, cards),
-            "notes": list(note_files(d))}
+            "notes": list(note_files(d)), "note_files": note_files(d)}
 
 
 def write_cards(d, cards):
     (d / "cards").mkdir(exist_ok=True)
     write_json(d / "cards" / "cards.json", cards)
+
+
+def new_card_id(cards, front):
+    ids, base = {c["id"] for c in cards}, text.slug(front, "card")[:48].strip("-")
+    new_id, n = base, 1
+    while new_id in ids:
+        n += 1
+        new_id = f"{base}-{n}"
+    return new_id
 
 
 def upsert_card(slug, card):
@@ -827,12 +1142,7 @@ def upsert_card(slug, card):
         if chosen:
             old["set"] = chosen
     else:
-        ids, base = {c["id"] for c in cards}, text.slug(fields["front"], "card")[:48].strip("-")
-        new_id, n = base, 1
-        while new_id in ids:
-            n += 1
-            new_id = f"{base}-{n}"
-        cards.append({"id": new_id, **fields, **({"set": chosen} if chosen else {}), "by": "user"})
+        cards.append({"id": new_card_id(cards, fields["front"]), **fields, **({"set": chosen} if chosen else {}), "by": "user"})
     write_cards(d, cards)
     return read_deck(slug)
 
@@ -850,13 +1160,67 @@ def flag_card(slug, flag):
     return read_deck(slug)
 
 
-def delete_card(slug, card_id):
+def delete_card(slug, card_ids):
     d = folder(slug)
+    ids = card_ids if isinstance(card_ids, list) else [card_ids]
     cards = read_cards(d)
-    kept = [c for c in cards if c["id"] != card_id]
-    if len(kept) == len(cards):
-        raise NotFound(f"no such card: {card_id!r}")
-    write_cards(d, kept)
+    missing = set(ids) - {c["id"] for c in cards}
+    if missing or not ids:
+        raise NotFound(f"no such card: {sorted(missing, key=str)[0] if missing else None!r}")
+    write_cards(d, [c for c in cards if c["id"] not in ids])
+    return read_deck(slug)
+
+
+def save_set(slug, data):
+    d = folder(slug)
+    if not isinstance(data, dict):
+        raise ValueError("save_set must be an object")
+    old, name, note, rows = data.get("from"), data.get("name", ""), data.get("note"), data.get("cards", [])
+    if old is not None and not isinstance(old, str) or not isinstance(name, str) or note is not None and not isinstance(note, str):
+        raise ValueError("from, name and note must be strings (note null keeps each card's note)")
+    if not isinstance(rows, list) or not all(isinstance(r, dict) and isinstance(r.get("front", ""), str) and isinstance(r.get("back", ""), str) for r in rows):
+        raise ValueError("cards must be a list of {id?, front, back}")
+    name, note = name.strip(), note.strip() if note is not None else None
+    if not name and not note:
+        raise ValueError("a card set needs a name or a note")
+    if name == "unsorted":
+        raise ValueError("unsorted is not a set name")
+    cards = read_cards(d)
+    target = name or note
+    if target != old and target in {card_set(c) for c in cards}:
+        raise Conflict(f"a card set named {target} already exists")
+    current = {c["id"]: c for c in cards if old is not None and card_set(c) == old}
+    kept = set()
+    for r in rows:
+        front, back = r.get("front", "").strip(), r.get("back", "").strip()
+        if not front and not back:
+            continue
+        c = current.get(r.get("id"))
+        if c is None:
+            c = {"id": new_card_id(cards, front)}
+            cards.append(c)
+        c.update(front=front, back=back)
+        c.setdefault("by", "user")
+        if note is not None:
+            c["note"] = note
+        c.pop("set", None)
+        if name and name != c.get("note", ""):
+            c["set"] = name
+        kept.add(c["id"])
+    write_cards(d, [c for c in cards if c["id"] in kept or c["id"] not in current])
+    return read_deck(slug)
+
+
+def delete_sets(slug, names):
+    d = folder(slug)
+    if not isinstance(names, list) or not names:
+        raise ValueError("delete_sets needs a non-empty list of set names")
+    cards = read_cards(d)
+    have = {card_set(c) for c in cards}
+    missing = [n for n in names if n not in have]
+    if missing:
+        raise NotFound(f"no such card set: {missing[0]!r}")
+    write_cards(d, [c for c in cards if card_set(c) not in names])
     return read_deck(slug)
 
 

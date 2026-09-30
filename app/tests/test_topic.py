@@ -161,6 +161,29 @@ def test_sections_sort_numerically():
     assert [f.name for f in store.sections(store.TOPICS / "demo")] == ["02-x.md", "11-y.md", "100-z.md"]
 
 
+@with_temp_topics
+def test_create_edit_delete():
+    r = store.create_topic({"title": "Café Basics", "goals": ["do x"], "reason": "why", "type": "course"}, ["01 — one"])
+    d = store.TOPICS / "cafe-basics"
+    assert r == {"ok": True, "slug": "cafe-basics"} and d.is_dir(), r
+    saved = json.loads((d / "topic.json").read_text())
+    assert saved["order"] == 3 and saved["type"] == "course" and saved["sources_mode"] == "both", saved
+    assert "why\n- do x" in (d / "learning.md").read_text()
+    assert "- [ ] 01 — one" in (d / "progress" / "status.md").read_text()
+    assert (d / "progress" / "sessions.jsonl").read_bytes() == b"" and (d / "wiki" / "index.md").is_file()
+    assert raises(store.Conflict, lambda: store.create_topic({"title": "cafe basics"}))
+    for bad in ({"title": ""}, {"title": "x", "type": "novel"}, {"title": "x", "order": 0}, {"title": "x", "goals": ["a"] * 4},
+                {"title": "x", "end_date": "soon"}, {"title": "x", "language": {"src": "en"}}, {"title": "x", "sources_mode": "all"}):
+        assert raises(ValueError, lambda: store.create_topic(bad)), bad
+    store.save_topic("cafe-basics", {"area": "food", "routine": {"cadence": "daily", "session": "30m"}, "end_date": "2026-12-01"})
+    t = store.read_topic("cafe-basics")
+    assert t["area"] == "food" and t["routine"]["cadence"] == "daily" and t["goals"] == ["do x"], t
+    assert raises(store.NotFound, lambda: store.delete_topics(["demo", "../x"]))
+    assert (store.TOPICS / "demo").is_dir(), "a bad slug deletes nothing"
+    assert store.delete_topics(["demo", "cafe-basics"])["deleted"] == ["demo", "cafe-basics"]
+    assert store.topics() == []
+
+
 if __name__ == "__main__":
     test_split_rename_and_keep_meta()
     test_html_absent_keeps_notes()
@@ -171,4 +194,5 @@ if __name__ == "__main__":
     test_bad_topic_json_and_ordering()
     test_resources_and_sources()
     test_sections_sort_numerically()
+    test_create_edit_delete()
     print("ok")

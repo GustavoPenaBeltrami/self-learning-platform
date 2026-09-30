@@ -43,7 +43,7 @@ const run = async (busy, work, done = 'saved') => {
 tree.innerHTML = configTree('shortcuts.html');
 path('~/self-learning-platform/settings.json › shortcuts');
 
-const PAGE_NAMES = { notes: 'notes', exam: 'exams', cards: 'cards' };
+const PAGE_NAMES = { notes: 'notes', exam: 'exams', exercise: 'exercises', cards: 'cards' };
 const overrides = () => ({ ...currentSettings().shortcuts });
 const saveShortcuts = o => run('saving…', () => saveSettings({ shortcuts: o }));
 const conflict = (id, spec) => {

@@ -1,5 +1,5 @@
 (() => {
-  const PAGES = [['notes', 'notes.html'], ['exams', 'exam.html'], ['cards', 'cards.html'], ['project', 'project.html'], ['settings', 'settings.html']];
+  const PAGES = [['notes', 'notes.html'], ['cards', 'cards.html'], ['exams', 'exam.html'], ['exercises', 'exercises.html'], ['settings', 'settings.html']];
 
   const ICON = {
     highlight: '<path d="M3.5 16.5h13"/><path d="M6.5 13.5 12.5 3.5l3.5 2.2-6 10.3z"/><path d="M6.5 13.5 10 15.7"/>',
@@ -80,6 +80,10 @@
     ['exam.write', 't', 'answer in writing (oral)', 'exam'],
     ['exam.retake', 'enter', 'retake', 'exam.results'],
     ['exam.back', 'Esc', 'back', 'exam exam.topic exam.results', 1],
+    ['exercise.submit', 'meta+enter', 'submit the answer', 'exercise'],
+    ['exercise.image', 'ctrl+i', 'attach an image', 'exercise'],
+    ['exercise.again', 'enter', 'write again', 'exercise.done'],
+    ['exercise.back', 'Esc', 'leave the editor · back', 'exercise exercise.topic exercise.done', 1],
     ['cards.due', 'enter', 'study due', 'cards.sets cards.list'],
     ['cards.all', 'a', 'study all', 'cards.sets cards.empty cards.list cards.study'],
     ['cards.newset', 'c', 'new set', 'cards.sets'],
@@ -194,19 +198,17 @@
     return btn;
   };
 
-  window.cardForm = async (slug, card = {}, newSet = false) => {
+  window.cardForm = async (slug, card = {}) => {
     const url = '/api/cards/' + encodeURIComponent(slug);
     const t = document.createElement('template');
     const [topic, deck] = await Promise.all([api('/api/topic/' + encodeURIComponent(slug)).catch(() => ({})), api(url).catch(() => ({}))]);
     t.innerHTML = topic.html || '';
-    const taken = (deck.sets || []).map(s => s.name);
-    const sets = newSet ? (deck.notes || []).filter(n => !taken.includes(n))
-      : [...new Set([...(deck.notes || []), ...taken])].filter(s => s !== 'unsorted');
+    const sets = [...new Set([...(deck.notes || []), ...(deck.sets || []).map(s => s.name)])].filter(s => s !== 'unsorted');
     const notes = [...t.content.querySelectorAll('h1')].map(h => h.textContent.trim());
     const dlg = document.createElement('dialog');
     dlg.className = 'card-form float';
     dlg.innerHTML = `<form>
-      <p class="frame-title">${newSet ? 'new card set · first card' : card.id ? 'edit card' : 'new card'}</p>
+      <p class="frame-title">${card.id ? 'edit card' : 'new card'}</p>
       <label>set<input name="set" list="card-sets" value="${esc(card.set === 'unsorted' ? '' : card.set || '')}" placeholder="a note title, or any name" autocomplete="off"></label>
       <datalist id="card-sets">${sets.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <label>front (question)<textarea name="front" rows="2" placeholder="a question">${esc(card.front || '')}</textarea></label>
@@ -222,7 +224,6 @@
       let result = null;
       const save = async () => {
         const f = Object.fromEntries(new FormData(form));
-        if (newSet && !f.set.trim()) return dlg.querySelector('[role=status]').textContent = '✕ name the set: a note without cards, or any name';
         try {
           result = await api(url, JSON.stringify({ upsert: card.id ? { id: card.id, ...f } : f }));
           dlg.close();
@@ -239,12 +240,91 @@
       });
       dlg.addEventListener('close', () => { dlg.remove(); done(result); });
       dlg.showModal();
-      form.elements[newSet ? 'set' : card.front ? 'back' : 'front'].focus();
+      form.elements[card.front ? 'back' : 'front'].focus();
     });
   };
 
   window.deleteCard = (slug, card) => confirm(`delete the card "${card.front}"?`)
     ? api('/api/cards/' + encodeURIComponent(slug), JSON.stringify({ delete: card.id })) : Promise.resolve(null);
+
+  window.drafter = (topic, kind, name, collect, onSaved) => {
+    const url = `/api/draft/${encodeURIComponent(topic)}/${kind}/${encodeURIComponent(name)}`;
+    let timer = null, off = false, last = Promise.resolve();
+    const put = keepalive => {
+      clearTimeout(timer);
+      timer = null;
+      return last = fetch(url, { method: 'PUT', body: JSON.stringify({ data: collect() }), keepalive })
+        .then(r => r.ok && onSaved?.(), () => {});
+    };
+    const flush = () => timer && put(true);
+    addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
+    return {
+      load: () => api(url).then(r => r?.data ?? null, () => null),
+      touch: () => { if (off) return; clearTimeout(timer); timer = setTimeout(put, 800); },
+      flush,
+      stop: async () => { await (timer ? put() : last); off = true; },
+    };
+  };
+
+  window.lines = v => (v || '').split('\n').map(l => l.trim()).filter(Boolean);
+  window.options = (list, current) => list.map(v => `<option${v === current ? ' selected' : ''}>${esc(v)}</option>`).join('');
+
+  window.crudPill = (tips, handlers) => {
+    const pill = document.createElement('div');
+    pill.className = 'wb-mod pill';
+    [['plus', 'add'], ['edit', 'edit'], ['trash', 'del']].forEach(([icon, k]) => {
+      if (!handlers[k]) return;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.tip = tips[k];
+      b.setAttribute('aria-label', tips[k]);
+      b.innerHTML = svg(icon);
+      b.onmousedown = e => e.preventDefault();
+      b.onclick = e => handlers[k](b, e);
+      pill.append(b);
+    });
+    return pill;
+  };
+
+  window.modal = (cls, title, html, keys, onEnter) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'card-form float ' + cls;
+    dlg.innerHTML = `<form><p class="frame-title">${title}</p>${html}<p class="minor" role="status"></p>
+      <div class="keys">${keys.map(([k, t, c]) => key(k, t, c)).join('')}</div></form>`;
+    document.body.append(dlg);
+    const form = dlg.querySelector('form'), buttons = [...dlg.querySelectorAll('.keys .key')];
+    buttons.forEach(b => b.type = 'button');
+    buttons.at(-1).onclick = () => dlg.close();
+    form.onsubmit = e => { e.preventDefault(); onEnter(); };
+    dlg.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onEnter(); }
+    });
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.showModal();
+    return { dlg, form, buttons, status: t => dlg.querySelector('[role=status]').textContent = t ? '✕ ' + t : '' };
+  };
+
+  window.pickDelete = (what, items, checked = [], note = '') => new Promise(done => {
+    const run = () => {
+      const picked = [...m.form.querySelectorAll('[name=pick]:checked')].map(b => items[b.value][0]);
+      if (!picked.length) return m.status('pick at least one');
+      if (!confirm(`delete ${picked.length} ${what}${note ? ', ' + note : ''}?\n\n${picked.map(p => items.find(i => i[0] === p)[1]).join('\n')}\n\nThis can't be undone.`)) return;
+      done(picked);
+      m.dlg.close();
+    };
+    const m = modal('pick-delete', 'delete ' + esc(what), `
+      <label class="check"><input type="checkbox" data-all> select all</label>
+      ${items.map(([v, label, sub], i) => `<label class="check"><input type="checkbox" name="pick" value="${i}"${checked.includes(v) ? ' checked' : ''}>
+        <span>${esc(label)}${sub ? ` <span class="sub">${esc(sub)}</span>` : ''}</span></label>`).join('')}`,
+      [['⏎', 'Delete', 'cta'], ['Esc', 'Cancel']], run);
+    const boxes = [...m.form.querySelectorAll('[name=pick]')];
+    m.form.querySelector('[data-all]').onchange = e => boxes.forEach(b => b.checked = e.target.checked);
+    m.buttons[0].onclick = run;
+    m.dlg.addEventListener('close', () => done(null));
+    (boxes.find(b => b.checked) || boxes[0])?.focus();
+  });
 
   window.mountShell = current => {
     document.title = '独学 · ' + current;

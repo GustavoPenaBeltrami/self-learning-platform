@@ -72,9 +72,10 @@ Line breaks are `\n`; LaTeX backslashes are doubled (`\\frac`).
 
 ## 6. After writing
 
-1. `uv run python -m json.tool topics/<slug>/exams/<exam>/exam.json > /dev/null`.
-2. Check: MC has 4 options and `answer` in 0-3, spread; every non-MC question
-   has a 3-5 point `rubric`.
+1. `uv run slp check-exam topics/<slug>/exams/<exam>/exam.json`: it prints
+   `ok` or every broken rule. Fix and rerun until `ok`.
+2. Check what the script can't: `answer` spread over 0-3, options balanced
+   ([graded-questions.md](../../reference/graded-questions.md)).
 3. Tell the user the path and how to open it: `uv run slp`, then
    `http://localhost:8321/app/views/exam.html?topic=<slug>&exam=<exam>`.
 4. Tell them: after sitting it, run `slp-grade` on the attempt. Every attempt

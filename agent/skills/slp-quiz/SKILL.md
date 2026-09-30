@@ -27,7 +27,7 @@ one. Formats: [formats.md § Quiz](../../reference/formats.md#quiz).
   `multiple_choice`; one `open` per thread at level 4-5 is fine. Add
   `"kind": "quiz"` and `thread`/`level` on every question. Verify
   doubtful facts with `researcher`. Validate with
-  `uv run python -m json.tool <file> > /dev/null`.
+  `uv run slp check-exam <file>` until it prints `ok`.
 - **Exists**: never edit or reorder its questions. If a thread's ceiling was
   never found last time (all correct at the top level), **append** questions
   at a higher level to the end of `questions`.

@@ -100,6 +100,7 @@ async function index() {
     return;
   }
   path('~/topics/*/cards');
+  setTools(topics);
   app.innerHTML = `
     <div class="sheet">
     ${crumbs([['cards']])}
@@ -233,7 +234,7 @@ function empty() {
   const add = ['cards.new', 'New card', none ? 'cta' : '', () => newCard(r => { deck = r; study(false); })];
   page(none ? `no cards yet — press ${keyFor('cards.new')} to write one, or ask your agent: /slp-cards` : `nothing due · next in ${nextIn(inSet())}`,
     'ls cards/', '', none ? [add] : [['cards.all', 'Study all', 'cta', () => study(true)]],
-    none ? [BACK] : [add, ['cards.list', 'List', '', list], BACK]);
+    none ? [...(setName ? [] : [['cards.newset', 'New set', '', newSet]]), BACK] : [add, ['cards.list', 'List', '', list], BACK]);
   mode('NORMAL');
   statusEl.textContent = none ? 'no cards' : `${inSet().length} cards · 0 due`;
 }
@@ -257,6 +258,17 @@ function list() {
         </tr>`).join('')}</tbody>
     </table>`, [], [['cards.new', 'New card', '', () => newCard(r => { deck = r; list(); })],
       ['cards.due', 'Study due', '', () => study(false)], ['cards.all', 'Study all', '', () => study(true)], BACK]);
+  tools.prepend(crudPill({ del: 'Delete cards' }, { del: async () => {
+    const ids = await pickDelete('cards', cards.map(c => [c.id, c.front, c.set]));
+    if (!ids) return;
+    try {
+      deck = await api(deckUrl(), JSON.stringify({ delete: ids }));
+      load();
+      list();
+    } catch (e) {
+      statusEl.textContent = '✕ ' + e.message;
+    }
+  } }));
   mode('NORMAL');
   statusEl.textContent = `${cards.length} cards`;
   app.querySelector('tbody').onclick = e => {
@@ -420,11 +432,79 @@ addEventListener('keydown', e => {
 
 app.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
 
-const newSet = () => cardForm(slug, {}, true).then(r => {
-  if (!r) return;
-  const card = r.cards.find(c => !deck.cards.some(o => o.id === c.id));
-  location.href = setUrl(slug, card.set);
-});
+const cardBlock = (c = {}) => `<fieldset class="q-block" data-id="${esc(c.id || '')}">
+  <legend>card <span class="qn"></span>${c.id ? ` <span class="sub">${esc(c.id)}</span>` : ''}</legend>
+  <label>front (question)<textarea data-f="front" rows="2" placeholder="a question">${esc(c.front || '')}</textarea></label>
+  <label>back (answer)<textarea data-f="back" rows="2" placeholder="the answer, one or two sentences">${esc(c.back || '')}</textarea></label>
+  <button type="button" class="q-remove">remove card</button>
+</fieldset>`;
+
+async function setEditor(topic, name) {
+  const d = await api('/api/cards/' + encodeURIComponent(topic));
+  const cards = name ? d.cards.filter(c => c.set === name) : [];
+  const used = [...new Set(cards.map(c => c.note))];
+  const mixed = used.length > 1, named = name && name !== 'unsorted' ? name : '';
+  const note = mixed ? '\0keep' : used[0] || '';
+  const noteOpts = [['', '— none —'], ...(mixed ? [['\0keep', 'each card keeps its own note']] : []),
+    ...Object.entries(d.note_files).map(([h1, file]) => [h1, `${h1} · notes/${file}`])];
+  const save = async () => {
+    const f = Object.fromEntries(new FormData(m.form));
+    const rows = [...m.form.querySelectorAll('.q-block')].map(b => ({
+      ...(b.dataset.id ? { id: b.dataset.id } : {}),
+      front: b.querySelector('[data-f=front]').value, back: b.querySelector('[data-f=back]').value }));
+    try {
+      await api('/api/cards/' + encodeURIComponent(topic), JSON.stringify({ save_set: {
+        ...(name ? { from: name } : {}), name: f.name, note: f.note === '\0keep' ? null : f.note, cards: rows } }));
+      m.dlg.close();
+      location.href = '?topic=' + encodeURIComponent(topic);
+    } catch (e) {
+      m.status(e.message);
+    }
+  };
+  const m = modal('wide-form', name ? `edit set · ${esc(topic)} › ${esc(name)}` : `new card set · ${esc(topic)}`, `
+    <label>name · empty = the note's name<input name="name" value="${esc(named)}" placeholder="${esc(used[0] || 'Verbs')}" autocomplete="off"></label>
+    <label>note · the note.md these cards come from<select name="note">${noteOpts.map(([v, t]) =>
+      `<option value="${esc(v)}"${v === note ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+    <div class="q-list">${cards.map(cardBlock).join('')}</div>
+    <button type="button" class="q-add">+ add card</button>`,
+    [['⌘⏎', 'Save', 'cta'], ['Esc', 'Cancel']], save);
+  m.buttons[0].onclick = save;
+  const list = m.form.querySelector('.q-list');
+  const renumber = () => list.querySelectorAll('.qn').forEach((s, i) => s.textContent = i + 1);
+  const add = () => {
+    list.insertAdjacentHTML('beforeend', cardBlock());
+    renumber();
+    list.lastElementChild.querySelector('textarea').focus();
+  };
+  m.form.querySelector('.q-add').onclick = add;
+  list.onclick = e => { if (e.target.closest('.q-remove')) { e.target.closest('.q-block').remove(); renumber(); } };
+  if (!cards.length) add();
+  renumber();
+  m.form.elements.name.focus();
+}
+
+const newSet = () => setEditor(slug);
+
+const setTools = topics => {
+  const all = topics.flatMap(t => t.sets.map(s => [JSON.stringify([t.slug, s.name]), (topics.length > 1 ? t.slug + ' › ' : '') + setLabel(s), s.cards + ' cards']));
+  tools.prepend(crudPill({ add: 'New card set', edit: 'Edit a card set', del: 'Delete card sets' }, {
+    add: (b, e) => topics.length === 1 ? setEditor(topics[0].slug)
+      : dropMenu(b, topics.map(t => [t.slug, esc(t.title)]), s => setEditor(s), null, e.detail === 0),
+    edit: (b, e) => all.length ? dropMenu(b, all.map(([v, t]) => [v, esc(t)]), v => setEditor(...JSON.parse(v)),
+      slug && setName ? JSON.stringify([slug, setName]) : null, e.detail === 0) : statusEl.textContent = 'no card sets to edit',
+    del: async () => {
+      const picked = await pickDelete('card sets', all, slug && setName ? [JSON.stringify([slug, setName])] : [], 'with all their cards');
+      if (!picked) return;
+      try {
+        const byTopic = Object.groupBy(picked.map(v => JSON.parse(v)), ([t]) => t);
+        for (const [t, pairs] of Object.entries(byTopic)) await api('/api/cards/' + encodeURIComponent(t), JSON.stringify({ delete_sets: pairs.map(([, n]) => n) }));
+        location.href = slug ? '?topic=' + encodeURIComponent(slug) : 'cards.html';
+      } catch (e) {
+        statusEl.textContent = '✕ ' + e.message;
+      }
+    },
+  }));
+};
 
 function sets() {
   jump = null;
@@ -446,6 +526,7 @@ function sets() {
         </tr>`).join('')}</tbody>
     </table>`, due ? [['cards.due', 'Study due', 'cta', () => study(false)]] : [],
     [['cards.newset', 'New set', '', newSet], ['cards.new', 'New card', '', () => newCard(r => { deck = r; sets(); })], ['cards.list', 'List', '', list], ['cards.all', 'Study all', '', () => study(true)], BACK]);
+  setTools(topicsCache.filter(t => t.slug === slug));
   mode('NORMAL');
   statusEl.textContent = `${deck.cards.length} cards · ${due} due`;
 }

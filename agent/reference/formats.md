@@ -26,8 +26,8 @@ topics/<slug>/
   resources/                     raw sources, never edited by skills
   notes/NN-<slug-of-h1>.md
   wiki/index.md  wiki/concepts/  wiki/sources/
-  exams/<exam>/exam.json  exams/<exam>/attempts/
-  exercises/<exercise>/prompt.md  exercises/<exercise>/attempts/
+  exams/<exam>/exam.json  exams/<exam>/attempts/  exams/<exam>/draft.json
+  exercises/<exercise>/prompt.md  exercises/<exercise>/attempts/  exercises/<exercise>/img/  exercises/<exercise>/draft.json
   cards/cards.json  cards/reviews.jsonl
   progress/status.md  progress/log.md  progress/sessions.jsonl
 ```
@@ -146,7 +146,9 @@ Evidence and what to check next.
 - `open` / `oral` / `practical`: `rubric` with 3-5 checkable points, no `answer`. `oral` is answered by voice.
 - `q`, options and `explanation` may hold mermaid/math fences as `\n`-escaped text, LaTeX backslashes doubled.
 - Quiz only: top level `"kind": "quiz"`; per question `"thread"` and `"level"` ([§ Quiz](#quiz)).
-- **Never replace or reorder an exam that has an `attempts/` folder**: attempts point at questions by index. Create `<exam>-b` instead. Validate with `uv run python -m json.tool <file> > /dev/null`, then check the rules above.
+- No other fields: `title`, `kind`, `questions` at the top; per question only the fields of its type (plus `thread`/`level` in a quiz).
+- **Never replace or reorder the questions of an exam that has attempts**: attempts point at questions by index. Appending new questions at the end is fine; anything else is a new exam (`<exam>-b`). The app's exam editor lets the user do anything (it only warns): an exam written by hand may break these rules, and `slp-grade` reads it as it is.
+- Validate with `uv run slp check-exam <file>`: it prints `ok` or every broken rule above. Required for exams the agent writes; the app doesn't enforce it on hand-written ones.
 
 Guidance on writing questions: [graded-questions.md](graded-questions.md).
 
@@ -168,7 +170,11 @@ Guidance on writing questions: [graded-questions.md](graded-questions.md).
 - `chosen` (MC), `text` (open, practical, oral written fallback) or `audio` (oral: a file `<date>-p<i>.<ext>` next to it, not an attempt).
 - `"mode": "chat"`: a quiz run in the chat and written by `slp-quiz`.
 
-**Exercise attempt**: any file `exercises/<exercise>/attempts/<date>.<ext>` (`.md` for prose, the language's extension for code).
+**Exercise attempt**: any file `exercises/<exercise>/attempts/<date>.<ext>` (`.md` for prose, the language's extension for code). The app's Exercises tab writes a single `<date>.md`; files dropped into `attempts/` by hand count too.
+
+- Images attached in the app live in the shared `exercises/<exercise>/img/<hash>.<ext>` and are referenced from the attempt as `![](img/<file>)`, relative to the exercise folder, not to `attempts/`.
+
+**Drafts**: `exams/<exam>/draft.json` and `exercises/<exercise>/draft.json` hold in-progress work autosaved by the app. A draft is not an attempt: never graded, never pending, deleted on submit. Skills don't read or write it.
 
 **Correct or missed** (used by quizzes): MC is correct when `chosen == answer`; open/oral/practical when its feedback section has no ✗. An unanswered question is a miss.
 
@@ -211,7 +217,7 @@ The task, with conditions that can be checked one by one.
 **Submit:** a `.md` with …
 ```
 
-`Format` ∈ apply, build, critique, teach. The conditions are the grading criteria.
+`Format` ∈ apply, build, critique, teach. The conditions are the grading criteria. A condition may ask for a visual artifact (a comparative table, a concept map drawn in Excalidraw or on paper, a whiteboard photo): the `Submit:` line then names the image, e.g. "an image of the map attached in the Exercises tab".
 
 ## Cards
 

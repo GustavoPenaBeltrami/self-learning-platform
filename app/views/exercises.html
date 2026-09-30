@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>独学 · exercises</title>
+<link rel="stylesheet" href="/app/styles/style.css">
+<script src="/app/scripts/theme.js"></script>
+<script src="/app/scripts/viz.js"></script>
+<script src="/app/scripts/shell.js"></script>
+<style>
+  .md img, .answer-doc img { display: block; max-width: 100%; margin: .5rem 0; }
+  .md pre { white-space: pre-wrap; }
+  .answer-doc { min-height: 12rem; margin-top: .3rem; padding: .6rem .7rem; background: var(--color-graphite);
+    color: var(--ink); border: 1px solid var(--line); white-space: pre-wrap; outline: none; }
+  .answer-doc:focus { border-color: var(--accent); }
+  .answer-doc:empty::before { content: attr(data-placeholder); color: var(--color-steel); }
+  .answer-doc.over { border-style: dashed; border-color: var(--accent); }
+  .pending { margin: .3rem 0 0; color: var(--ansi-yellow); }
+  .pending::before { content: '// '; color: var(--color-steel); }
+</style>
+
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const { app, tree, tools, path, mode } = mountShell('exercises');
+const info = mode => tools.innerHTML = `<div class="wb-mod pill">${infoButton(keyIds(mode))}</div>`;
+const statusEl = document.getElementById('status');
+const slug = params.get('topic');
+const name = slug && params.get('exercise');
+const dir = name && `topics/${slug}/exercises/${name}`;
+const imgBase = name && `/topics/${encodeURIComponent(slug)}/exercises/${encodeURIComponent(name)}/img/`;
+const link = (topic, n) => `?topic=${encodeURIComponent(topic)}&exercise=${encodeURIComponent(n)}`;
+const pendingOf = t => t.exercises.reduce((n, e) => n + e.pending, 0);
+const row = `onclick="event.target.closest('a') || this.querySelector('a').click()"`;
+let onKey = null, topicTitle = slug, draft = null;
+
+function buildTree(topics) {
+  tree.innerHTML = topics.map(t => folder(t.slug + '/', t.exercises.length,
+    `<ul>${t.exercises.map(e => `<li><a href="${link(t.slug, e.name)}"${t.slug === slug && e.name === name ? ' aria-current="page"' : ''}
+        title="${esc(e.title)}"><span class="n">›</span><span>${esc(e.title)}</span></a></li>`).join('')
+      || '<li class="empty">(no exercises)</li>'}</ul>`,
+    t.slug === slug, t.title)).join('');
+}
+
+async function load() {
+  const data = await api('/api/exercises');
+  topicTitle = data.topics.find(t => t.slug === slug)?.title || slug;
+  buildTree(data.topics);
+  return data.topics;
+}
+
+async function index() {
+  let topics;
+  try {
+    topics = await load();
+  } catch (e) {
+    app.innerHTML = offline(e);
+    return;
+  }
+  path('~/topics/*/exercises');
+  app.innerHTML = `
+    <div class="sheet">
+    ${crumbs([['exercises']])}
+    ${promptLine('~/topics', 'ls */exercises')}
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>TOPIC</th><th>TYPE</th><th class="num">EXERCISES</th><th class="num">PENDING</th></tr></thead>
+      <tbody>${topics.map(l => `
+        <tr ${row}>
+          <td class="num">${l.order < 1000 ? String(l.order).padStart(3, '0') : '—'}</td>
+          <td class="wide"><a href="?topic=${encodeURIComponent(l.slug)}">${esc(l.title)}</a><br><span class="sub">${esc(l.subtitle || '')}</span></td>
+          <td class="type">${esc(l.type || '')}</td>
+          <td class="num${l.exercises.length ? '' : ' zero'}">${l.exercises.length}</td>
+          <td class="num${pendingOf(l) ? '' : ' zero'}">${pendingOf(l)}</td>
+        </tr>${l.exercises.map(e => `
+        <tr ${row}>
+          <td></td><td class="wide" colspan="3"><span class="sub">└─ </span><a href="${link(l.slug, e.name)}">${esc(e.title)}</a></td>
+          <td class="num${e.pending ? '' : ' zero'}">${e.pending}</td>
+        </tr>`).join('')}`).join('')}${topics.length ? '' : noTopicsRow(5)}</tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+}
+
+async function topic() {
+  let t;
+  try {
+    t = (await load()).find(t => t.slug === slug);
+    if (!t) throw new Error('no such topic: ' + slug);
+  } catch (e) {
+    app.innerHTML = offline(e);
+    return;
+  }
+  document.title = '独学 · ' + t.title;
+  path(`~/topics/${slug}/exercises`);
+  info('exercise.topic');
+  app.innerHTML = `
+    <div class="sheet">
+    ${crumbs([['exercises', 'exercises.html'], [t.title]])}
+    ${promptLine('~/topics/' + slug, 'ls exercises/')}
+    <h1>${esc(t.title)}</h1>
+    <p class="minor"># ${t.exercises.length ? `${t.exercises.length} exercises · ${pendingOf(t)} attempts pending grading: /slp-grade` : 'no exercises yet — ask your agent: /slp-exercises'}</p>
+    <table class="htop">
+      <thead><tr><th class="num">#</th><th>EXERCISE</th><th>FORMAT</th><th class="num">UNIT</th><th class="num">ATTEMPTS</th><th class="num">PENDING</th></tr></thead>
+      <tbody>${t.exercises.map((e, i) => `
+        <tr ${row}>
+          <td class="num">${pad(i + 1)}</td>
+          <td class="wide"><a href="${link(slug, e.name)}">${esc(e.title)}</a><br><span class="sub">exercises/${esc(e.name)}/</span></td>
+          <td class="type">${esc(e.format || '')}</td>
+          <td class="num">${esc(e.unit || '')}</td>
+          <td class="num${e.attempts ? '' : ' zero'}">${e.attempts}</td>
+          <td class="num${e.pending ? '' : ' zero'}">${e.pending}</td>
+        </tr>`).join('')}</tbody>
+    </table>
+    <div class="tildes"></div></div>`;
+  mode('NORMAL');
+  statusEl.textContent = `${t.exercises.length} exercises · ${pendingOf(t)} pending`;
+}
+
+const inline = s => esc(s)
+  .replace(/!\[([^\]]*)\]\(img\/([^)\s]+)\)/g, (_, alt, f) => `<img src="${imgBase}${f}" alt="${alt}">`)
+  .replace(/`([^`]+)`/g, '<code>$1</code>')
+  .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+function mdHTML(md) {
+  const out = [], lines = md.replace(/\r/g, '').split('\n');
+  let para = [], list = null;
+  const end = () => {
+    if (para.length) out.push(`<p>${para.map(inline).join('<br>')}</p>`);
+    if (list) out.push(`</${list}>`);
+    para = [];
+    list = null;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i], h = l.match(/^(#{1,6})\s+(.*)/), li = l.match(/^\s*(?:([-*])|\d+\.)\s+(.*)/);
+    if (l.startsWith('```')) {
+      end();
+      const body = [];
+      while (++i < lines.length && !lines[i].startsWith('```')) body.push(lines[i]);
+      out.push(`<pre><code>${esc(body.join('\n'))}</code></pre>`);
+    } else if (h) {
+      end();
+      out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`);
+    } else if (li) {
+      const tag = li[1] ? 'ul' : 'ol';
+      if (para.length || list !== tag) { end(); out.push(`<${tag}>`); list = tag; }
+      out.push(`<li>${inline(li[2])}</li>`);
+    } else if (!l.trim()) end();
+    else {
+      if (list) end();
+      para.push(l);
+    }
+  }
+  end();
+  return out.join('');
+}
+
+const toMd = el => [...el.childNodes].map(n => n.nodeType === Node.TEXT_NODE ? n.data
+  : n.nodeName === 'BR' ? '\n'
+  : n.nodeName === 'IMG' ? `![](img/${n.getAttribute('src').split('/').pop()})`
+  : (/^(DIV|P)$/.test(n.nodeName) ? '\n' : '') + toMd(n)).join('');
+const fromMd = md => esc(md).replace(/!\[[^\]]*\]\(img\/([^)\s]+)\)/g, (_, f) => `<img src="${imgBase}${f}" alt="">`);
+
+const leave = () => location.href = name ? '?topic=' + encodeURIComponent(slug) : 'exercises.html';
+
+function header(ex, command, note) {
+  return `
+    <div class="sheet">
+    ${crumbs([['exercises', 'exercises.html'], [topicTitle, '?topic=' + encodeURIComponent(slug)], [ex.title || name]])}
+    ${promptLine('~/' + dir, command)}
+    <p class="minor"># ${note}</p>`;
+}
+
+function write(ex, prompt, saved) {
+  document.title = '独学 · ' + (ex.title || name);
+  path(`~/${dir}/prompt.md`);
+  app.innerHTML = header(ex, 'cat prompt.md', [ex.format, ex.unit && 'unit ' + ex.unit, `${ex.attempts} attempts`,
+      `${ex.pending} pending grading${ex.pending ? ': /slp-grade' : ''}`].filter(Boolean).join(' · ')) + `
+    <div class="md">${mdHTML(prompt)}</div>
+    <p class="minor"># your answer · markdown · paste, drop or attach images</p>
+    <div class="answer-doc" contenteditable="plaintext-only" spellcheck="true" role="textbox" aria-multiline="true"
+      aria-label="your answer" data-placeholder="write your answer"></div>
+    <input type="file" accept="image/*" multiple hidden>
+    <div class="keys">${key('Esc', 'Back')}${key(keyFor('exercise.image'), 'Attach image')}${key(keyFor('exercise.submit'), 'Submit', 'cta')}</div>
+    <div class="tildes"></div></div>`;
+  info('exercise');
+  const doc = app.querySelector('.answer-doc'), picker = app.querySelector('input[type=file]');
+  const [backBtn, imageBtn, submitBtn] = app.querySelectorAll('.keys .key');
+  if (doc.contentEditable !== 'plaintext-only') doc.contentEditable = 'true';
+  if (saved?.text) doc.innerHTML = fromMd(saved.text);
+  let note = saved?.text ? 'draft restored' : '', range = null, sending = false;
+  const status = () => {
+    const n = toMd(doc).trim().length;
+    statusEl.textContent = [n && `${n} chars`, note].filter(Boolean).join(' · ');
+    mode(n ? 'INSERT' : 'NORMAL', n ? 'insert' : '');
+  };
+  const startDraft = () => draft = drafter(slug, 'exercise', name, () => ({ text: toMd(doc) }), () => { note = 'draft saved'; status(); });
+  startDraft();
+  status();
+  doc.addEventListener('input', () => { note = ''; status(); draft.touch(); });
+  document.addEventListener('selectionchange', () => {
+    const s = getSelection();
+    if (s.rangeCount && doc.contains(s.getRangeAt(0).startContainer)) range = s.getRangeAt(0).cloneRange();
+  });
+
+  const insertImage = src => {
+    const img = Object.assign(document.createElement('img'), { src, alt: '' });
+    const r = range || document.createRange();
+    if (!range) { r.selectNodeContents(doc); r.collapse(false); }
+    r.deleteContents();
+    r.insertNode(img);
+    r.setStartAfter(img);
+    r.collapse(true);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    range = r.cloneRange();
+    doc.dispatchEvent(new Event('input'));
+  };
+  const upload = async files => {
+    for (const f of files.filter(f => f.type.startsWith('image/'))) {
+      statusEl.textContent = `uploading ${f.name}…`;
+      try {
+        insertImage((await api(`/api/exercises/${encodeURIComponent(slug)}/${encodeURIComponent(name)}/img`, f)).src);
+      } catch (e) {
+        statusEl.textContent = 'image not saved: ' + e.message;
+      }
+    }
+  };
+  imageBtn.onclick = () => picker.click();
+  picker.onchange = () => { upload([...picker.files]); picker.value = ''; };
+  doc.addEventListener('paste', e => {
+    const files = [...e.clipboardData.files];
+    e.preventDefault();
+    files.some(f => f.type.startsWith('image/')) ? upload(files) : document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+  });
+  doc.addEventListener('dragover', e => { e.preventDefault(); doc.classList.add('over'); });
+  doc.addEventListener('dragleave', () => doc.classList.remove('over'));
+  doc.addEventListener('drop', e => {
+    doc.classList.remove('over');
+    const files = [...e.dataTransfer.files];
+    if (!files.length) return;
+    e.preventDefault();
+    upload(files);
+  });
+
+  submitBtn.onclick = async () => {
+    const text = toMd(doc).trim();
+    if (sending) return;
+    if (!text) return statusEl.textContent = 'nothing to submit';
+    sending = true;
+    await draft.stop();
+    try {
+      const r = await api('/api/exercises/' + encodeURIComponent(slug), JSON.stringify({ attempt: { exercise: name, text } }));
+      done(ex, text, r.path || dir + '/attempts/');
+    } catch (e) {
+      sending = false;
+      startDraft();
+      statusEl.textContent = '✕ could not save the attempt: ' + e.message;
+    }
+  };
+  backBtn.onclick = leave;
+  onKey = e => {
+    if (pressed(e, 'exercise.submit')) { e.preventDefault(); submitBtn.click(); }
+    if (pressed(e, 'exercise.image')) { e.preventDefault(); imageBtn.click(); }
+  };
+  doc.focus();
+}
+
+function done(ex, text, saved) {
+  path('~/' + saved);
+  app.innerHTML = header(ex, 'cat ' + saved.split('/').slice(-2).join('/'), `saved to <code>${esc(saved)}</code>`) + `
+    <h1>${esc(ex.title || name)}</h1>
+    <div class="md">${mdHTML(text)}</div>
+    <p class="pending">pending grading: run <code>slp-grade</code> on this attempt</p>
+    <div class="keys">${key('Esc', 'Back')}${key(keyFor('exercise.again'), 'Write again', 'cta')}</div>
+    <div class="tildes"></div></div>`;
+  info('exercise.done');
+  mode('DONE');
+  statusEl.textContent = 'attempt saved';
+  const [back, again] = app.querySelectorAll('.keys .key');
+  again.onclick = () => location.reload();
+  back.onclick = leave;
+  onKey = e => { if (pressed(e, 'exercise.again') && !(native(e) && e.target.closest?.('button'))) { e.preventDefault(); again.click(); } };
+  scrollTo(0, 0);
+}
+
+addEventListener('keydown', e => {
+  if (!slug || e.repeat) return;
+  if (e.target.closest?.('input, select, dialog')) return;
+  if (e.key === 'Escape' && !(e.metaKey || e.ctrlKey || e.altKey)) {
+    return e.target.closest?.('.answer-doc') ? e.target.blur() : leave();
+  }
+  onKey?.(e);
+});
+
+app.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
+
+name
+  ? Promise.all([load(), drafter(slug, 'exercise', name).load()]).then(([topics, saved]) => {
+      const ex = topics.find(t => t.slug === slug)?.exercises.find(e => e.name === name);
+      if (!ex) throw new Error('no such exercise: ' + dir);
+      write(ex, ex.prompt, saved);
+    }).catch(e => app.innerHTML = offline(e))
+  : slug ? topic() : index();
+</script>

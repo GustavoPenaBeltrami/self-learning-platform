@@ -18,15 +18,22 @@
 
 SLP is a self-hosted study environment you fully own: it runs on your machine, needs no subscription, and works with any agent and any model, local or paid.
 
-Full documentation: [selflearningplatform.github.io/docs](https://selflearningplatform.github.io/docs/overview), also as [`llms.txt`](https://selflearningplatform.github.io/llms.txt). Each section below is a short version of a docs section.
+Full documentation: [selflearningplatform.github.io/docs](https://selflearningplatform.github.io/docs/overview), using the standard [`llms.txt`](https://selflearningplatform.github.io/llms.txt).
+
+## Video trailer
+<div align="center">
+
+[![Watch the video](https://img.youtube.com/vi/3GVoLZFPIgU/maxresdefault.jpg)](https://youtu.be/3GVoLZFPIgU)
+
+</div>
 
 ## Introduction
 
 ### [Overview](https://selflearningplatform.github.io/docs/overview)
 
-Reading is not learning. You learn when you express the material again and again, with someone pointing out your mistakes. SLP gives you that someone: an agent that teaches, quizzes, grades and brings your mistakes back before you forget them, plus a local app to take notes, sit exams and study cards.
+Reading is not learning. You learn when you express the material again and again, with someone pointing out your mistakes. SLP gives you that someone: an agent that teaches, quizzes, grades and brings your mistakes back before you forget them, plus a local app to take notes, sit exams, do exercises and study cards.
 
-SLP has two layers. The core is the app and your files: notes, exams, cards and session tracking. It works without an agent or a model, and every file is plain JSON or Markdown you can write by hand. The agent layer is optional: skills that teach, grade, give feedback and keep your progress and the wiki, on whatever model you plug in.
+SLP has two layers. The core is the app and your files: notes, exams, exercises, cards and session tracking. It works without an agent or a model, and every file is plain JSON or Markdown you can write by hand. The agent layer is optional: skills that teach, grade, give feedback and keep your progress and the wiki, on whatever model you plug in.
 
 ### [Prerequisites](https://selflearningplatform.github.io/docs/prerequisites)
 
@@ -68,7 +75,7 @@ The agent plays the teacher. It explains from what you already know, grades agai
 | [`/slp-teach`](https://selflearningplatform.github.io/docs/slp-teach) | prepare | Teaches until you understand, and writes the note and the wiki |
 | [`/slp-exercises`](https://selflearningplatform.github.io/docs/slp-exercises) | practice | An applied exercise: code, an ADR, a critique |
 | [`/slp-exam`](https://selflearningplatform.github.io/docs/slp-exam) | practice | Builds an exam you sit in the app |
-| [`/slp-grade`](https://selflearningplatform.github.io/docs/slp-grade) | feedback | Grades an attempt against a rubric |
+| [`/slp-grade`](https://selflearningplatform.github.io/docs/slp-grade) | feedback | Grades an attempt against a rubric, images included |
 | [`/slp-quiz`](https://selflearningplatform.github.io/docs/slp-quiz) | control | A repeatable level quiz in the chat, from the same bank each time |
 | [`/slp-cards`](https://selflearningplatform.github.io/docs/slp-cards) | review | Flashcards from your notes, studied in the app |
 
@@ -76,10 +83,11 @@ The [researcher](https://selflearningplatform.github.io/docs/researcher) agent v
 
 ## [Visual interface](https://selflearningplatform.github.io/docs/deploy)
 
-`uv run slp` serves the app at `http://localhost:8321`, local only.
+`uv run slp` serves the app at `http://localhost:8321`, local only. Tabs: notes, cards, exams, exercises and settings; the logo links to the project page.
 
 - [notes](https://selflearningplatform.github.io/docs/editor): a notebook per topic, saved as Markdown as you type, with tables, Mermaid, LaTeX and images. You can upload sources and open local ones from here
-- [exams](https://selflearningplatform.github.io/docs/exam-app): sit the exams the agent builds: multiple choice, open, practical and oral
+- [exams](https://selflearningplatform.github.io/docs/exam-app): sit the exams the agent builds: multiple choice, open, practical and oral. Drafts autosave and come back when you reopen the exam
+- [exercises](https://selflearningplatform.github.io/docs/exercises-app): read an exercise's prompt and write your answer in a notes-style editor. Paste, drag or drop images to attach them. It saves as an attempt `.md` with the images in the exercise's `img/` folder, and drafts autosave and restore when reopened
 - [cards](https://selflearningplatform.github.io/docs/cards-app): study flashcards with Leitner scheduling. Mark a card unsure and `/slp-session` goes over it with you
 - [settings](https://selflearningplatform.github.io/docs/settings): profile, fonts, and themes, built in or generated from one color
 - [dictation](https://selflearningplatform.github.io/docs/dictation): speak your notes or oral answers, transcribed locally with Whisper

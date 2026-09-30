@@ -63,6 +63,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         self.handle_api(self.post)
 
+    def do_PUT(self):
+        self.handle_api(self.draft)
+
+    def do_DELETE(self):
+        self.handle_api(self.draft)
+
     def do_HEAD(self):
         self.send_error(405)
 
@@ -86,6 +92,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.respond(200, store.read_card_config())
         if path == "/api/exams":
             return self.respond(200, store.exam_index())
+        if path == "/api/exercises":
+            return self.respond(200, store.exercise_index())
+        if len(segs) == 5 and segs[1] == "draft":
+            return self.respond(200, store.read_draft(*segs[2:]))
         if path == "/api/cards":
             return self.respond(200, store.cards_index())
         if len(segs) == 3 and segs[1] == "cards":
@@ -138,6 +148,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             result = self.write(path, segs, q, raw)
         self.respond(200, result)
 
+    def draft(self, path, segs, q):
+        if len(segs) != 5 or segs[:2] != ["api", "draft"]:
+            raise store.NotFound("no such endpoint: " + path)
+        data = json_body(self.body()).get("data") if self.command == "PUT" else None
+        with write_lock:
+            result = store.save_draft(*segs[2:], data) if self.command == "PUT" else store.delete_draft(*segs[2:])
+        self.respond(200, result)
+
     def write(self, path, segs, q, raw):
         if path == "/api/settings":
             return store.save_settings(json_body(raw))
@@ -146,8 +164,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/font":
             return store.save_font(q.get("name", [""])[0], raw)
         if segs[:2] == ["api", "exams"] and len(segs) == 3:
-            data = json_body(raw)["attempt"]
+            data = json_body(raw)
+            if "save" in data:
+                return store.save_exam(segs[2], data["save"])
+            if "delete" in data:
+                return store.delete_exams(segs[2], data["delete"])
+            data = data["attempt"]
             return {"path": store.save_attempt(segs[2], data["exam"], data["answers"])}
+        if segs[:2] == ["api", "exercises"] and len(segs) == 3:
+            data = json_body(raw)["attempt"]
+            return {"path": store.save_exercise_attempt(segs[2], data["exercise"], data["text"])}
+        if segs[:2] == ["api", "exercises"] and len(segs) == 5 and segs[4] == "img":
+            return store.save_exercise_image(segs[2], segs[3], self.headers.get("Content-Type", ""), raw)
         if segs[:2] == ["api", "cards"] and len(segs) == 3:
             data = json_body(raw)
             if "upsert" in data:
@@ -156,9 +184,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return store.flag_card(segs[2], data["flag"])
             if "delete" in data:
                 return store.delete_card(segs[2], data["delete"])
+            if "save_set" in data:
+                return store.save_set(segs[2], data["save_set"])
+            if "delete_sets" in data:
+                return store.delete_sets(segs[2], data["delete_sets"])
             return store.save_reviews(segs[2], data["reviews"])
         if segs[:2] == ["api", "session"] and len(segs) == 3:
             return store.session_action(segs[2], json_body(raw).get("action"))
+        if path == "/api/topics":
+            data = json_body(raw)
+            if "delete" in data:
+                return store.delete_topics(data["delete"])
+            return store.create_topic(data["create"], data.get("units", []))
         if segs[:2] == ["api", "topic"] and len(segs) == 3:
             return store.save_topic(segs[2], json_body(raw))
         if segs[:2] == ["api", "topic"] and len(segs) == 4 and segs[3] == "img":
@@ -188,6 +225,15 @@ def sessions(args):
         print(f"{slug} {s['id']} started {s['start']} last {s['last']} activities {kinds}: {ended}")
 
 
+def check_exam_file(path):
+    try:
+        exam = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        sys.exit(f"{path}: {e}")
+    errs = store.exam_errors(exam)
+    sys.exit("\n".join(f"{path}: {e}" for e in errs) if errs else print(f"{path}: ok"))
+
+
 def serve():
     print(f"Profile: {voice.active_profile()}")
     url = f"http://localhost:{PORT}/app/views/notes.html"
@@ -211,10 +257,12 @@ def main(args=None):
         print("Setup done:", json.dumps(voice.setup()), "\nStart the app with uv run slp")
     elif args[:1] == ["sessions"]:
         sessions(args[1:])
+    elif args[:1] == ["check-exam"] and len(args) == 2:
+        check_exam_file(args[1])
     elif args[:1] == ["transcribe"] and len(args) in (2, 3):
         print(" ".join(t for _, t in voice.whisper(args[1], args[2] if len(args) > 2 else None)).strip())
     elif args:
-        sys.exit("usage: slp [setup | sessions [close] | transcribe <audio> [lang]]")
+        sys.exit("usage: slp [setup | sessions [close] | check-exam <exam.json> | transcribe <audio> [lang]]")
     else:
         serve()
 

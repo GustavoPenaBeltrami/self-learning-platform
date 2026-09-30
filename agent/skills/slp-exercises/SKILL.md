@@ -14,7 +14,8 @@ belongs to `slp-grade`.
 ```
 topics/<topic>/exercises/<exercise-slug>/
   prompt.md
-  attempts/            the user submits here
+  attempts/            the user submits here (the app writes <date>.md)
+  img/                 images attached to attempts in the app
 ```
 
 `<exercise-slug>`: kebab-case, descriptive (`adr-topic-vs-queue`). Prompt
@@ -34,7 +35,7 @@ Language: `language.exams` unless the user asks for another.
 3. **Format**, the one that best forces use of the concept:
    - **apply**: use the concept in a concrete case.
    - **build**: produce an artifact from scratch (code, diagram, decision
-     document).
+     document, comparative table, concept map).
    - **critique**: point out what's wrong in a given design or code, and why,
      with the topic's vocabulary.
    - **teach**: explain the concept from scratch to a third party (Feynman),
@@ -62,8 +63,15 @@ Language: `language.exams` unless the user asks for another.
    `Rests on` names note headings, never file names. Hard rule: a verifiable
    result, never "think about this". Each condition is a grading criterion:
    write them so they can be checked one by one.
-6. **Close**: tell them where to submit,
+
+   A visual artifact is fair game when drawing forces the concept better than
+   prose: a comparative table, a concept map (Excalidraw or a photo of paper).
+   Then the `Submit:` line names the image: "an image of the map attached in
+   the Exercises tab".
+6. **Close**: tell them to submit in the app's **Exercises** tab (read the
+   prompt, write the attempt, attach images; in-progress work autosaves as a
+   draft). Fallback without the app: a file
    `topics/<topic>/exercises/<slug>/attempts/<YYYY-MM-DDTHHmm>.<ext>` (`.md`
    for prose, the language's extension for code, `.md` with the transcription
-   if it was spoken), and that `slp-grade` gives the feedback. Write nothing else
-   to `progress/`.
+   if it was spoken). `slp-grade` gives the feedback. Write nothing else to
+   `progress/`.

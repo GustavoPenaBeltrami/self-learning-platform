@@ -45,6 +45,10 @@
   .given-answer { margin: .3rem 0 0; color: var(--ink); white-space: pre-wrap; }
   .pending { margin: .3rem 0 0; color: var(--ansi-yellow); }
   .pending::before { content: '// '; color: var(--color-steel); }
+
+  .exam-form:not(.is-quiz) .quiz-only { display: none; }
+  .exam-form label.opt { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; }
+  .exam-form label.opt input[type=radio] { width: auto; accent-color: var(--good); }
 </style>
 
 <body>
@@ -61,7 +65,7 @@ const examName = slug && params.get('exam');
 const file = examName && `topics/${slug}/exams/${examName}/exam.json`;
 const link = (topic, name) => `?topic=${encodeURIComponent(topic)}&exam=${encodeURIComponent(name)}`;
 const pendingOf = t => t.exams.reduce((n, e) => n + e.pending, 0);
-let answered = 0, onKey = null, topicTitle = slug;
+let onKey = null, topicTitle = slug, draft = null;
 
 function buildTree(topics) {
   tree.innerHTML = topics.map(t => folder(t.slug + '/', t.exams.length,
@@ -87,6 +91,7 @@ async function index() {
     return;
   }
   path('~/topics/*/exams');
+  examTools(topics);
   app.innerHTML = `
     <div class="sheet">
     ${crumbs([['exams']])}
@@ -121,12 +126,13 @@ async function topic() {
   document.title = '独学 · ' + t.title;
   path(`~/topics/${slug}/exams`);
   info('exam.topic');
+  examTools([t], slug);
   app.innerHTML = `
     <div class="sheet">
     ${crumbs([['exams', 'exam.html'], [t.title]])}
     ${promptLine('~/topics/' + slug, 'ls exams/')}
     <h1>${esc(t.title)}</h1>
-    <p class="minor"># ${t.exams.length ? `${t.exams.length} exams · ${pendingOf(t)} attempts pending grading: /slp-grade` : 'no exams yet — ask your agent: /slp-exam'}</p>
+    <p class="minor"># ${t.exams.length ? `${t.exams.length} exams · ${pendingOf(t)} attempts pending grading: /slp-grade` : 'no exams yet — ask your agent: /slp-exam, or write one with +'}</p>
     <table class="htop">
       <thead><tr><th class="num">#</th><th>EXAM</th><th class="num">QUESTIONS</th><th class="num">ATTEMPTS</th><th class="num">PENDING</th></tr></thead>
       <tbody>${t.exams.map((e, i) => `
@@ -143,6 +149,130 @@ async function topic() {
   statusEl.textContent = `${t.exams.length} exams · ${pendingOf(t)} pending`;
 }
 
+const QTYPES = ['multiple_choice', 'open', 'oral', 'practical'];
+const examApi = (topic, body) => api('/api/exams/' + encodeURIComponent(topic), JSON.stringify(body));
+const examItems = topics => topics.flatMap(t => t.exams.map(e => [t.slug + '/' + e.name, (topics.length > 1 ? t.slug + ' › ' : '') + e.title, e.attempts ? e.attempts + ' attempts' : '']));
+
+function examTools(topics, current) {
+  tools.prepend(crudPill({ add: 'New exam', edit: 'Edit an exam', del: 'Delete exams' }, {
+    add: (b, e) => current ? examForm(current)
+      : dropMenu(b, topics.map(t => [t.slug, esc(t.title)]), s => examForm(s), null, e.detail === 0),
+    edit: (b, e) => {
+      const items = examItems(topics);
+      if (!items.length) return statusEl.textContent = 'no exams to edit';
+      dropMenu(b, items.map(([v, label]) => [v, esc(label)]), v => examForm(...v.split('/')), null, e.detail === 0);
+    },
+    del: async () => {
+      const picked = await pickDelete('exams', examItems(topics), [], 'with their attempts');
+      if (!picked) return;
+      try {
+        const byTopic = Object.groupBy(picked, v => v.split('/')[0]);
+        for (const [topic, vs] of Object.entries(byTopic)) await examApi(topic, { delete: vs.map(v => v.split('/')[1]) });
+        location.reload();
+      } catch (e) {
+        statusEl.textContent = '✕ ' + e.message;
+      }
+    },
+  }));
+}
+
+let qSeq = 0;
+const optRow = (n, j, o = '', right = false) => `<label class="opt"><input type="radio" name="answer-${n}" value="${j}"${right ? ' checked' : ''} aria-label="right answer" title="right answer">
+  <input data-f="option" value="${esc(o)}" placeholder="option ${j + 1}" autocomplete="off"></label>`;
+
+function qBlock(q = {}) {
+  const type = q.type || 'multiple_choice', n = qSeq++;
+  const opts = q.options?.length ? q.options : ['', '', '', ''];
+  return `<fieldset class="q-block" data-n="${n}">
+    <legend>question <span class="qn"></span></legend>
+    <div class="cols">
+      <label>type<select data-f="type">${options(QTYPES, type)}</select></label>
+      <label class="quiz-only">thread<input data-f="thread" value="${esc(q.thread || '')}" placeholder="kebab-case" autocomplete="off"></label>
+      <label class="quiz-only">level 1-5<input data-f="level" type="number" min="1" max="5" value="${esc(q.level ?? '')}"></label>
+    </div>
+    <label>question<textarea data-f="q" rows="2">${esc(q.q || '')}</textarea></label>
+    <div class="mc"${type === 'multiple_choice' ? '' : ' hidden'}>
+      <div class="opts">${opts.map((o, j) => optRow(n, j, o, q.answer === j)).join('')}</div>
+      <button type="button" class="opt-add">+ option</button>
+      <label>explanation · why the right one is right, what each wrong one confuses<textarea data-f="explanation" rows="2">${esc(q.explanation || '')}</textarea></label>
+    </div>
+    <label class="rubric"${type === 'multiple_choice' ? ' hidden' : ''}>rubric · 3-5 checkable points, one per line<textarea data-f="rubric" rows="3">${esc((q.rubric || []).join('\n'))}</textarea></label>
+    <button type="button" class="q-remove">remove question</button>
+  </fieldset>`;
+}
+
+function readQuestion(fs, quiz) {
+  const f = k => fs.querySelector(`[data-f="${k}"]`).value.trim();
+  const type = f('type');
+  let q = { type, q: f('q'), rubric: lines(fs.querySelector('[data-f=rubric]').value) };
+  if (type === 'multiple_choice') {
+    const rows = [...fs.querySelectorAll('.opt')].filter(r => r.querySelector('[data-f=option]').value.trim());
+    const answer = rows.findIndex(r => r.querySelector('[type=radio]').checked);
+    q = { type, q: f('q'), options: rows.map(r => r.querySelector('[data-f=option]').value.trim()),
+          ...(answer >= 0 ? { answer } : {}), explanation: f('explanation') };
+  }
+  return quiz ? { ...q, thread: f('thread'), ...(f('level') ? { level: +f('level') } : {}) } : q;
+}
+
+async function examForm(topic, name) {
+  const exam = name ? await api(`/topics/${encodeURIComponent(topic)}/exams/${encodeURIComponent(name)}/exam.json`) : { questions: [] };
+  const attempts = name ? (await load()).find(t => t.slug === topic)?.exams.find(e => e.name === name)?.attempts || 0 : 0;
+  const save = async () => {
+    const f = Object.fromEntries(new FormData(m.form));
+    const quiz = f.kind === 'quiz';
+    const blocks = [...m.form.querySelectorAll('.q-block')];
+    const questions = blocks.map(fs => readQuestion(fs, quiz));
+    const data = { title: f.title.trim(), ...(quiz ? { kind: 'quiz' } : {}), questions };
+    try {
+      const r = await examApi(topic, { save: name ? { name, exam: data } : { create: true, name: f.name.trim(), exam: data } });
+      m.dlg.close();
+      location.href = link(topic, r.name);
+    } catch (e) {
+      m.status(e.message);
+    }
+  };
+  const m = modal('wide-form exam-form', name ? `edit exam · ${esc(topic)}/${esc(name)}` : `new exam · ${esc(topic)}`, `
+    <label>title<input name="title" value="${esc(exam.title || '')}" placeholder="HTTP — 01: methods and codes" autocomplete="off"></label>
+    <div class="cols">
+      <label>kind<select name="kind">${options(['exam', 'quiz'], exam.kind === 'quiz' ? 'quiz' : 'exam')}</select></label>
+      ${name ? '' : '<label>folder<input name="name" placeholder="auto: NN-title, or quiz" autocomplete="off"></label>'}
+    </div>
+    ${attempts ? `<p class="minor"># ${attempts} attempts point at these questions by position: changing or moving them makes old attempts read against the new questions</p>` : ''}
+    <div class="q-list">${exam.questions.map(q => qBlock(q)).join('')}</div>
+    <button type="button" class="q-add">+ add question</button>`,
+    [['⌘⏎', 'Save', 'cta'], ['Esc', 'Cancel']], save);
+  m.buttons[0].onclick = save;
+  const list = m.form.querySelector('.q-list'), kind = m.form.elements.kind;
+  const renumber = () => list.querySelectorAll('.qn').forEach((s, i) => s.textContent = i + 1);
+  const syncKind = () => m.dlg.classList.toggle('is-quiz', kind.value === 'quiz');
+  kind.onchange = syncKind;
+  syncKind();
+  const add = () => {
+    list.insertAdjacentHTML('beforeend', qBlock());
+    renumber();
+    list.lastElementChild.querySelector('textarea').focus();
+  };
+  m.form.querySelector('.q-add').onclick = add;
+  list.onclick = e => {
+    const fs = e.target.closest('.q-block');
+    if (e.target.closest('.opt-add')) {
+      const box = fs.querySelector('.opts');
+      box.insertAdjacentHTML('beforeend', optRow(fs.dataset.n, box.children.length));
+      box.lastElementChild.querySelector('[data-f=option]').focus();
+    }
+    if (e.target.closest('.q-remove')) { fs.remove(); renumber(); }
+  };
+  list.onchange = e => {
+    if (e.target.dataset.f !== 'type') return;
+    const fs = e.target.closest('.q-block'), mc = e.target.value === 'multiple_choice';
+    fs.querySelector('.mc').hidden = !mc;
+    fs.querySelector('.rubric').hidden = mc;
+  };
+  if (!exam.questions.length) add();
+  renumber();
+  m.form.elements.title.focus();
+}
+
 function header(exam, note, command) {
   const parts = file.split('/');
   return `
@@ -154,14 +284,16 @@ function header(exam, note, command) {
 }
 
 const leave = () => {
-  if (answered && !confirm('leave? answers not saved are lost')) return;
+  if ([...app.querySelectorAll('.oral-preview')].some(a => a._blob) && !confirm('leave? recordings are not saved')) return;
   location.href = file ? '?topic=' + encodeURIComponent(slug) : 'exam.html';
 };
 
 const stemHTML = (q, i) => `<p class="stem"><span class="num">[${pad(i + 1)}]</span><span>${vizText(q.q)}</span></p>`;
 
-function take(exam) {
-  const questions = shuffle(exam.questions.map((q, i) => ({ ...q, i })));
+function take(exam, saved) {
+  const all = exam.questions.map((q, i) => ({ ...q, i }));
+  const order = saved?.order;
+  const questions = order?.length === all.length && all.every(q => order.includes(q.i)) ? order.map(i => all[i]) : shuffle(all);
   document.title = '独学 · ' + (exam.title || 'exam');
   path('~/' + file);
 
@@ -178,17 +310,37 @@ function take(exam) {
     div.querySelector('.record').onclick = () => recordOral(div.querySelector('.record'), div.querySelector('.oral-preview'));
     div.querySelector('.write-instead').onclick = () => showText(question);
   });
+  const qEls = app.querySelectorAll('.question');
+  const kept = Object.fromEntries((saved?.answers || []).map(a => [a.i, a]));
+  questions.forEach((q, k) => {
+    const a = kept[q.i];
+    if (!a || a.q !== q.q) return;
+    if (a.chosen != null) qEls[k].querySelector(`input[value="${a.chosen}"]`)?.click();
+    if (a.text) {
+      if (qEls[k].querySelector('.oral')) showText(qEls[k]);
+      qEls[k].querySelector('textarea').value = a.text;
+    }
+  });
+  let note = saved ? ' · draft restored' : '';
   const progress = () => {
     const picked = app.querySelectorAll('input:checked').length;
     const written = [...app.querySelectorAll('textarea.answer')].filter(t => t.value.trim()).length;
     const spoken = [...app.querySelectorAll('.oral-preview')].filter(a => a._blob).length;
-    answered = picked + written + spoken;
-    statusEl.textContent = `${answered}/${questions.length} answered`;
+    const answered = picked + written + spoken;
+    statusEl.textContent = `${answered}/${questions.length} answered${note}`;
     mode(answered ? 'INSERT' : 'NORMAL', answered ? 'insert' : '');
   };
+  draft = drafter(slug, 'exam', examName, () => ({
+    order: questions.map(q => q.i),
+    answers: questions.map((q, k) => {
+      const sel = qEls[k].querySelector('input:checked'), text = qEls[k].querySelector('textarea')?.value || '';
+      return { i: q.i, q: q.q, ...(sel ? { chosen: +sel.value } : {}), ...(text.trim() ? { text } : {}) };
+    }),
+  }), () => { note = ' · draft saved'; progress(); });
   progress();
-  app.addEventListener('change', progress);
-  app.addEventListener('input', progress);
+  const edited = () => { note = ''; progress(); draft.touch(); };
+  app.addEventListener('change', edited);
+  app.addEventListener('input', edited);
   const [backBtn, gradeBtn] = app.querySelectorAll('.keys .key');
   let grading = false;
   gradeBtn.onclick = () => grading || (grading = true, grade(exam, questions));
@@ -297,6 +449,7 @@ const savedLine = saved => saved.error
   : `run <code>slp-grade</code> on this attempt — saved to <code>${esc(saved.path)}</code>`;
 
 async function grade(exam, questions) {
+  await draft.stop();
   app.querySelectorAll('.record[data-recording]').forEach(b => b.dataset.stop = '1');
   await Promise.all([...app.querySelectorAll('.record')].map(b => b._done));
   let right = 0, totalMC = 0;
@@ -338,7 +491,6 @@ async function grade(exam, questions) {
 
   const pct = totalMC ? Math.round(right / totalMC * 100) : null;
   const saved = await saveAttempt(answers);
-  if (!saved.error) answered = 0;
 
   app.innerHTML = header(exam, `${questions.length} questions`, 'exam --check') + `
     ${pct !== null ? meter(pct) : ''}
@@ -368,10 +520,11 @@ addEventListener('keydown', e => {
 app.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
 
 file
-  ? Promise.all([api(`/topics/${encodeURIComponent(slug)}/exams/${encodeURIComponent(examName)}/exam.json`), load()])
-      .then(([exam]) => {
+  ? Promise.all([api(`/topics/${encodeURIComponent(slug)}/exams/${encodeURIComponent(examName)}/exam.json`), load(),
+      drafter(slug, 'exam', examName).load()])
+      .then(([exam, , saved]) => {
         if (!exam?.questions?.length) throw new Error('no questions in ' + file);
-        take(exam);
+        take(exam, saved);
       }).catch(e => app.innerHTML = offline(e))
   : slug ? topic() : index();
 </script>

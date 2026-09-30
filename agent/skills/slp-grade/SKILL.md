@@ -14,7 +14,8 @@ the `## Exams` and `## Exercises` rows of `log.md` (and `## Quizzes` for a quiz 
 ## 1. Which attempt
 
 Pending = `attempts/<date>.<ext>` with no `<date>.feedback.md`. Files
-`<date>-p<i>.<ext>` are exam audio, not attempts. If the user doesn't say
+`<date>-p<i>.<ext>` are exam audio, not attempts; `draft.json` is unsubmitted
+work, never graded. If the user doesn't say
 which, look in `topics/*/exams/*/attempts/` and `topics/*/exercises/*/attempts/`:
 one pending, grade it; several, ask with `AskUserQuestion`.
 
@@ -45,6 +46,12 @@ on. The prompt's conditions are the criteria: judge whether the artifact
 **uses** the concept, not whether it mentions it. An ADR that doesn't weigh
 trade-offs fails even with the right words. Format `teach` is graded like an
 `oral` answer.
+
+Images: an attempt may reference `![](img/<file>)` (relative to the exercise
+folder): a diagram, concept map, table or photo of paper or a whiteboard.
+**Look at every one** (Read it) and grade what it shows against the prompt's
+criteria, like text. An image that is missing or can't be read: the criteria
+it was meant to meet are ✗, and the feedback says which image and why.
 
 **Facts**: before judging a factual answer, read the `Source choice` entries
 in the Record and grade against the version that was taught. Anything you'd

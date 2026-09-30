@@ -160,10 +160,46 @@ def test_card_sets():
         shutil.rmtree(tmp)
 
 
+def test_set_rename_and_bulk_delete():
+    tmp = pathlib.Path(tempfile.mkdtemp()).resolve()
+    real = store.TOPICS
+    store.TOPICS = tmp
+    try:
+        (tmp / "demo" / "notes").mkdir(parents=True)
+        (tmp / "demo" / "notes" / "01-a.md").write_text("# A\n")
+        (tmp / "demo" / "notes" / "02-b.md").write_text("# B\n")
+        for front in ("one", "two"):
+            store.upsert_card("demo", {"front": front, "back": "x", "note": "A"})
+        store.upsert_card("demo", {"front": "three", "back": "x", "set": "Verbs"})
+        deck = store.save_set("demo", {"from": "A", "name": "Nouns", "note": "A", "cards": [
+            {"id": "one", "front": "one!", "back": "x"}, {"front": "new", "back": "y"}, {"front": " ", "back": ""}]})
+        got = {c["front"]: (c["set"], c["note"]) for c in deck["cards"]}
+        assert got == {"one!": ("Nouns", "A"), "new": ("Nouns", "A"), "three": ("Verbs", "")}, "two dropped from the form is deleted"
+        deck = store.save_set("demo", {"from": "Verbs", "name": "", "note": "B", "cards": [{"id": "three", "front": "three", "back": "x"}]})
+        assert next(c for c in deck["cards"] if c["front"] == "three")["set"] == "B", "a set named after its note is that note's set"
+        deck = store.save_set("demo", {"name": "Fresh", "note": None, "cards": [{"front": "q", "back": ""}]})
+        assert next(c for c in deck["cards"] if c["front"] == "q")["set"] == "Fresh"
+        expect_rejection(lambda: store.save_set("demo", {"name": "Fresh", "cards": []}))
+        expect_rejection(lambda: store.save_set("demo", {"name": "", "note": "", "cards": []}))
+        expect_rejection(lambda: store.save_set("demo", {"name": "unsorted", "cards": []}))
+        deck = store.save_set("demo", {"from": "Nouns", "name": "Nouns", "note": None, "cards": [
+            {"id": "one", "front": "one", "back": "x"}, {"id": "new", "front": "new", "back": "y"}, {"id": "two", "front": "two", "back": "x"}]})
+        assert {c["front"] for c in deck["cards"] if c["set"] == "Nouns"} == {"one", "new", "two"}
+        deck = store.delete_card("demo", ["one"])
+        assert {c["front"] for c in deck["cards"]} == {"new", "two", "three", "q"}
+        expect_rejection(lambda: store.delete_card("demo", ["two", "ghost"]))
+        expect_rejection(lambda: store.delete_sets("demo", ["Nouns", "ghost"]))
+        assert store.delete_sets("demo", ["Nouns", "B", "Fresh"])["cards"] == []
+    finally:
+        store.TOPICS = real
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     test_manual_cards()
     test_card_sets()
     test_schedule()
     test_card_config()
     test_deck()
+    test_set_rename_and_bulk_delete()
     print("ok")

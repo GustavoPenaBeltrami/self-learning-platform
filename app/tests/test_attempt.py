@@ -119,6 +119,39 @@ def test_audio_on_a_written_question_is_dropped():
     assert json.loads((store.ROOT / path).read_text())["answers"][0] == {"i": 1, "type": "open", "text": "t"}
 
 
+MC = {"type": "multiple_choice", "q": "q?", "options": ["a", "b", "c", "d"], "answer": 2, "explanation": "c because"}
+OPEN = {"type": "open", "q": "why?", "rubric": ["one", "two", "three"]}
+
+
+@with_test_topic
+def test_exam_standard_and_crud():
+    assert store.exam_errors({"title": "t", "questions": [MC, OPEN]}) == []
+    bad = [{"title": "", "questions": [MC]}, {"title": "t", "questions": []}, {"title": "t", "questions": [MC], "extra": 1},
+           {"title": "t", "questions": [{**MC, "options": ["a", "b", "c"]}]}, {"title": "t", "questions": [{**MC, "answer": 4}]},
+           {"title": "t", "questions": [{**MC, "explanation": " "}]}, {"title": "t", "questions": [{**MC, "options": ["a", "a", "c", "d"]}]},
+           {"title": "t", "questions": [{**OPEN, "rubric": ["one", "two"]}]}, {"title": "t", "questions": [{**OPEN, "answer": 1}]},
+           {"title": "t", "questions": [{**OPEN, "type": "essay"}]}, {"title": "t", "kind": "quiz", "questions": [MC]},
+           {"title": "t", "kind": "quiz", "questions": [{**MC, "thread": "Bad Thread", "level": 3}]}]
+    for exam in bad:
+        assert store.exam_errors(exam), exam
+    assert store.exam_errors({"title": "t", "kind": "quiz", "questions": [{**MC, "thread": "methods", "level": 3}]}) == []
+    r = store.save_exam("demo", {"create": True, "exam": {"title": "Methods & codes", "questions": [MC]}})
+    assert r["name"] == "01-methods-codes", r
+    assert store.save_exam("demo", {"create": True, "exam": {"title": "More", "questions": [MC]}})["name"] == "02-more"
+    expect_rejection(lambda: store.save_exam("demo", {"create": True, "name": "02-more", "exam": {"title": "x", "questions": [MC]}}))
+    store.save_exam("demo", {"name": "01-methods-codes", "exam": {"title": "Renamed", "questions": [OPEN]}})
+    store.save_attempt("demo", "01-methods-codes", [{"i": 0, "text": "x"}])
+    loose = {"title": "", "questions": [{"type": "multiple_choice", "q": "no answer", "options": ["a", "b"]}, {"type": "open", "q": "", "rubric": []}]}
+    store.save_exam("demo", {"name": "01-methods-codes", "exam": loose})
+    assert json.loads((store.TOPICS / "demo" / "exams" / "01-methods-codes" / "exam.json").read_text()) == loose, "the app saves what the user wrote"
+    for broken in ({"title": "t"}, {"title": "t", "questions": [{"type": "essay"}]}, {"title": "t", "questions": [{"q": "x", "options": "ab"}]}):
+        expect_rejection(lambda: store.save_exam("demo", {"name": "01-methods-codes", "exam": broken}))
+    expect_rejection(lambda: store.save_exam("demo", {"name": "nope", "exam": {"title": "t", "questions": [MC]}}))
+    expect_rejection(lambda: store.delete_exams("demo", ["02-more", "../x"]))
+    assert store.delete_exams("demo", ["02-more", "01-methods-codes"])["deleted"] == ["02-more", "01-methods-codes"]
+    assert [e["name"] for e in store.exam_index()["topics"][0]["exams"]] == ["ch-01"]
+
+
 if __name__ == "__main__":
     test_same_minute_gets_a_suffix()
     test_rejected_audio_leaves_no_files()
@@ -131,4 +164,5 @@ if __name__ == "__main__":
     test_rejects_escaping_exam()
     test_rejects_missing_exam()
     test_empty_topics()
+    test_exam_standard_and_crud()
     print("ok")

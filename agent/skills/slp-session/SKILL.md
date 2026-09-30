@@ -62,7 +62,8 @@ what has something:
 - `topic.json` and `progress/status.md`: current unit.
 - **Pending attempts**: every `topics/*/{exams,exercises}/*/attempts/<date>.<ext>`
   without `<date>.feedback.md`. `<date>-p<i>.<ext>` files are exam audio, not
-  attempts; `.feedback.md` files are not attempts.
+  attempts; `.feedback.md` files are not attempts; `draft.json` (next to
+  `attempts/`) is unsubmitted work, not pending.
 - **Due cards**: count per topic from `cards/cards.json` and
   `cards/reviews.jsonl` with the rule in
   [formats.md § Cards](../../reference/formats.md#cards).
