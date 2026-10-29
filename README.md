@@ -23,7 +23,7 @@ Full documentation: [selflearningplatform.github.io/docs](https://selflearningpl
 ## Video trailer
 <div align="center">
 
-[![Watch the video](https://img.youtube.com/vi/3GVoLZFPIgU/maxresdefault.jpg)](https://youtu.be/3GVoLZFPIgU)
+[![Watch the video](https://img.youtube.com/vi/3GVoLZFPIgU/maxresdefault.jpg)](https://youtu.be/q_26omGX7AI)
 
 </div>
 
